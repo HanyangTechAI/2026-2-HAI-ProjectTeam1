@@ -1,6 +1,4 @@
-# Constraint-Preserving Budget-Aware Memory Testbed
-
-한양대 HAI 2026-2 프로젝트팀 테스트베드입니다.
+# 2026-2-HAI-ProjectTeam1
 
 긴 대화(120턴)를 하는 LLM 에이전트가 **토큰 예산이 부족해도**
 
