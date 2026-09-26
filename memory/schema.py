@@ -47,7 +47,7 @@ class MemoryItem:
     is_protected: bool = False
     supersedes: Optional[str] = None
     superseded_by: Optional[str] = None
-    state_key: Optional[str] = None
+    memory_key: Optional[str] = None
 
     def __post_init__(self) -> None:
         """생성 시 값의 범위와 한 기록 안의 모순을 검사한다."""
