@@ -330,17 +330,33 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
 ```json
 {
   "sample_id": "sample_001",
-  "strategy": "long_context",
-  "task_type": "single_fact",
-  "prediction": "Database-X13",
-  "ground_truth": "Database-X13",
+  "strategy": "external_memory",
+  "task_type": "temporal_update",
+  "query_at": "2026-09-27T10:00:00+09:00",
+
+  "prediction": "report_final.pdf",
+  "ground_truth": "report_final.pdf",
   "correct": true,
-  "input_tokens": 18240,
+
+  "retrieved_memory_ids": ["mem_001"],
+  "target_memory_ids": ["mem_001"],
+
+  "retrieval_hit": true,
+  "recall_at_k": 1.0,
+  "precision_at_k": 1.0,
+  "mrr": 1.0,
+
+  "active_target_hit": true,
+  "stale_memory_count": 0,
+  "protected_memory_recall": null,
+
+  "retrieval_tokens": 10,
+  "input_tokens": 320,
   "output_tokens": 18,
-  "retrieval_tokens": 0,
-  "retrieval_latency_ms": 0,
+
+  "retrieval_latency_ms": 12,
   "llm_latency_ms": 1420,
-  "total_latency_ms": 1420
+  "total_latency_ms": 1432
 }
 ```
 
