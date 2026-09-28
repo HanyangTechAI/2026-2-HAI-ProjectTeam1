@@ -67,7 +67,7 @@ class MemoryItem:
                 or not 0 <= self.importance <= 1):
             raise ValueError("importance must be a finite number between 0 and 1")
         object.__setattr__(self, "memory_type", MemoryType(self.memory_type))
-        for name in ("supersedes", "superseded_by", "state_key"):
+        for name in ("supersedes", "superseded_by", "memory_key"):
             value = getattr(self, name)
             if value is not None and (not isinstance(value, str) or not value.strip()):
                 raise ValueError(f"{name} must be None or a non-empty string")
@@ -77,10 +77,10 @@ class MemoryItem:
             raise ValueError("replacement links cannot form a cycle")
         if self.is_active and self.superseded_by is not None:
             raise ValueError("a superseded memory cannot be active")
-        if self.memory_type == MemoryType.STATE and self.state_key is None:
-            raise ValueError("state memories require state_key")
-        if self.memory_type != MemoryType.STATE and self.state_key is not None:
-            raise ValueError("state_key is only valid for state memories")
+        if self.memory_type == MemoryType.STATE and self.memory_key is None:
+            raise ValueError("state memories require memory_key")
+        if self.memory_type != MemoryType.STATE and self.memory_key is not None:
+            raise ValueError("memory_key is only valid for state memories")
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible record."""
