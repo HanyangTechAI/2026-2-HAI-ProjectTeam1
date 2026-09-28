@@ -331,34 +331,90 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
 {
   "sample_id": "sample_001",
   "strategy": "external_memory",
-  "task_type": "temporal_update",
-  "query_at": "2026-09-27T10:00:00+09:00",
-
-  "prediction": "report_final.pdf",
-  "ground_truth": "report_final.pdf",
-  "correct": true,
-
+  "max_token": 2048,
   "retrieved_memory_ids": ["mem_001"],
-  "target_memory_ids": ["mem_001"],
-
-  "retrieval_hit": true,
-  "recall_at_k": 1.0,
-  "precision_at_k": 1.0,
-  "mrr": 1.0,
-
-  "active_target_hit": true,
-  "stale_memory_count": 0,
-  "protected_memory_recall": null,
-
+  "target_memory_ids": ["mem_002"],
+  "retrieved_memories": [
+    {
+      "memory_id": "mem_001",
+      "is_active": false,
+      "is_protected": true,
+      "supersedes": null,
+      "superseded_by": "mem_002",
+      "token_count": 10
+    }
+  ],
+  "retrieval_hit": false,
+  "active_target_hit": false,
+  "stale_memory_count": 1,
+  "protected_memory_recall": 1.0,
   "retrieval_tokens": 10,
   "input_tokens": 320,
-  "output_tokens": 18,
-
-  "retrieval_latency_ms": 12,
-  "llm_latency_ms": 1420,
-  "total_latency_ms": 1432
+  "output_tokens": 18
 }
 ```
+## Memory Schema와 Evaluation Schema의 분리 이유
+
+공통 Memory schema와 Evaluation output schema는 저장 대상과 목적이 서로 다르므로 동일한 형태를 사용하지 않는다.
+
+공통 Memory schema는 **Memory 하나의 영속적인 상태**를 표현한다. 따라서 `session_id`, `turn_id`, `memory_type`, `content`, `importance`, `created_at`, `valid_from`, `valid_to` 등 Memory 생성·저장·갱신에 필요한 정보를 포함한다.
+
+반면 Evaluation schema는 **특정 실험 실행 한 번의 결과**를 표현한다. 따라서 다음 정보를 중심으로 기록한다.
+
+- 어떤 Memory를 검색했는지
+- 정답 Memory를 검색했는지
+- 검색 당시 Memory가 활성·보호·대체 상태였는지
+- 설정된 최대 토큰과 실제 사용 토큰이 얼마인지
+- 최종 응답과 retrieval 성능이 어떠했는지
+
+Evaluation schema의 `retrieved_memories`는 별도의 Memory schema가 아니라, 공통 Memory schema에서 평가에 필요한 필드만 가져온 **검색 시점의 상태 snapshot**이다.
+
+```json
+{
+  "memory_id": "mem_001",
+  "is_active": false,
+  "is_protected": true,
+  "supersedes": null,
+  "superseded_by": "mem_002",
+  "token_count": 10
+}
+```
+
+이 snapshot을 기록하는 이유는 실험 이후 Memory store의 상태가 변경되더라도, 실행 당시 검색된 Memory가 최신 상태였는지, 이미 대체된 Memory였는지, 보호 대상이었는지를 재현할 수 있도록 하기 위함이다.
+
+`retrieved_memory_ids`와 `retrieved_memories`를 모두 기록하는 이유는 다음과 같다.
+
+- `retrieved_memory_ids`: Recall@k, Precision@k, Hit@k, MRR 등 ID 기반 metric 계산
+- `retrieved_memories`: Temporal Failure, stale retrieval, protected memory 누락 등 상태 기반 failure analysis
+- `target_memory_ids`: evaluation sample의 정답 Memory 집합
+- `max_token`: 해당 실험 실행에 설정된 최대 토큰 조건
+- `retrieval_tokens`: 검색된 Memory가 실제 사용한 토큰
+- `input_tokens`, `output_tokens`: 전체 LLM 요청의 실제 토큰 사용량
+
+따라서 Evaluation schema는 공통 Memory schema를 대체하거나 새롭게 정의하는 것이 아니다. 공통 Memory schema를 입력으로 사용하고, 그중 평가에 필요한 상태를 snapshot으로 보존한 뒤 실험 조건과 계산된 metric을 추가한 실행 결과 schema이다.
+
+```text
+Common Memory Schema
+        |
+        | retrieval
+        v
+Retrieved Memory Snapshot
+        +
+Experiment Configuration
+        +
+Evaluation Metrics
+        |
+        v
+Evaluation Result
+```
+
+이 구조를 통해 공통 Memory schema와의 호환성을 유지하면서도 다음 실패를 구분할 수 있다.
+
+- 필요한 Memory를 검색하지 못한 Retrieval Failure
+- 대체된 Memory를 검색한 Temporal/Stale Failure
+- 보호 Memory를 누락한 Protected Memory Failure
+- 필요한 Memory를 검색했지만 답변에 실패한 Reasoning Failure
+- 최대 토큰 조건을 초과한 Budget Failure
 
 External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
