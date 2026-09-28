@@ -2,23 +2,30 @@
 
 ## 1. Experiment Objective
 
-본 실험의 목적은 장기 대화 환경에서 **Long Context와 External Memory 기반 접근법의 성능 및 효율성을 비교**하는 것이다.
+본 실험의 목적은 제한된 Context Token Budget에서 행동에 필수적인 제약과 최신 상태를 우선 보존하는 **Constraint-Preserving Budget-Aware Memory**가 Long-Horizon Tool-Using Agent의 작업 성공률과 신뢰성을 개선하는지 검증하는 것이다.
 
-동일한 LLM과 동일한 원본 conversation을 사용하되, 모델에게 과거 정보를 제공하는 방식만 변경하여 평가한다.
+동일한 LLM, Tool, Task, 원본 interaction history와 실행 조건을 사용하되, 모델에게 과거 정보를 제공하는 Memory strategy만 변경하여 평가한다. 제안 방식의 성능 개선은 실험으로 검증할 가설이며 결과로 전제하지 않는다.
 
 주요 비교 대상은 다음과 같다.
 
-1. **Long Context**
-   - 가능한 conversation history를 context window에 직접 제공한다.
-2. **External Memory**
-   - conversation에서 생성된 memory를 외부 저장소에 저장한다.
-   - 현재 query와 관련된 memory를 retrieval하여 LLM에 제공한다.
-3. **Hybrid** *(추후 실험)*
+1. **Constraint-Preserving Budget-Aware Memory (Proposed)**
+   - Protected Memory, Current State와 State Versioning을 우선 보존한다.
+   - 남은 예산 안에서 Flexible Memory를 선택한다.
+2. **Sliding Window**
+   - 최신 interaction부터 Budget이 허용하는 범위까지 제공한다.
+3. **Vector Top-k Memory**
+   - 현재 요청과의 vector similarity를 기준으로 Memory를 선택한다.
+4. **Utility-per-Token Memory**
+   - 예상 utility를 token cost로 나눈 값을 기준으로 Memory를 선택한다.
+5. **Long Context Reference**
+   - 원본 interaction history 전체가 예산과 모델 context window 안에 들어갈 때 직접 제공한다.
+   - 전체 History가 설정 Budget을 초과하면 동일 예산 baseline이 아니라 별도의 비용·성능 참고 기준으로 보고한다.
+6. **Hybrid** *(추후 실험)*
    - 최근 conversation context와 retrieved memory를 함께 제공한다.
 
 핵심적으로 다음 질문을 확인한다.
 
-> 동일한 장기 대화에서 Context와 External Memory는 각각 어떤 조건에서 강점과 약점을 보이는가?
+> 동일한 Budget에서 제안 방식이 기존 Memory 방식보다 행동 수준의 Task Success Rate를 높이며, Budget 감소와 Horizon 증가에 따른 실패를 완화하는가?
 
 ---
 
@@ -32,8 +39,12 @@
 - 동일 system prompt
 - 동일 conversation
 - 동일 query
+- 동일 Tool 및 Tool interface
+- 동일 Task scenario와 ground truth
 - 동일 decoding parameter
 - 동일 evaluation method
+- 동일 Context Token Budget
+- 동일 반복 횟수와 random seed 정책
 
 즉, 다음 형태로 평가한다.
 
@@ -54,13 +65,39 @@ Long Context        External Memory
             Evaluator
 ```
 
+### 2.1 Context Token Budget 정의
+
+`B`는 Memory만의 크기가 아니라 **Memory를 포함한 Agent 입력 Context 전체의 token 상한**으로 정의한다.
+
+```text
+B = Fixed Input Tokens + Available Memory Tokens
+
+Fixed Input Tokens
+  = System Prompt + Current Request + Tool Definitions + Other Fixed Inputs
+```
+
+각 실행에서 `B`, 고정 입력 token 수, Memory에 실제로 할당 가능한 token 수, Memory가 실제 사용한 token 수와 전체 input token 수를 함께 기록한다. 모든 strategy는 설정된 `B`를 초과할 수 없다.
+
+Protected Memory와 Current State만으로 가용 Memory Budget을 초과하는 조건은 `mandatory_memory_overflow`로 별도 표시한다. 이 조건에서도 제안 방식만 예산을 초과하도록 허용하지 않으며, 필수 정보 보존이 가능한 범위와 실패 한계를 별도로 보고한다.
+
+### 2.2 Full Context 비교 원칙
+
+- 전체 History가 `B` 안에 들어가면 Long Context를 다른 방식과 동일 Budget에서 비교한다.
+- 전체 History가 `B`를 초과하면 잘린 History를 `Full Context`라고 부르지 않는다.
+- 잘린 History를 사용하는 경우 별도의 `Truncated Context` 또는 `Sliding Window` baseline으로 기록한다.
+- Budget을 초과한 진짜 Full Context 실행은 가능할 경우 비용·성능 참고 기준으로만 보고하며 동일 Budget 순위 비교에서 제외한다.
+
+### 2.3 반복 실행과 불확실성
+
+각 조건은 사전에 정한 횟수만큼 반복한다. 평균과 함께 95% 신뢰구간을 보고하며, stochastic decoding을 사용하는 경우 seed 또는 반복 실행 정책을 기록한다. 동일 sample과 반복 번호에서는 모든 strategy에 같은 실행 조건을 적용한다.
+
 ---
 
 ## 3. Evaluation Targets
 
 ### 3.1 Long Context
 
-전체 conversation history를 가능한 범위까지 직접 context로 제공한다.
+전체 interaction history가 설정 Budget과 모델 context window 안에 들어가는 조건에서 원본 History를 직접 제공한다.
 
 ```text
 Conversation History
@@ -71,11 +108,13 @@ Current Query
       LLM
 ```
 
-모델의 최대 context window를 초과하는 경우에는 별도의 context policy를 적용하며, 사용된 정책과 실제 입력 token 수를 반드시 기록한다.
+전체 History가 설정 Budget 또는 모델 context window를 초과하면 Long Context 동일 Budget 조건에서 제외한다. 잘린 History를 사용한 실행은 `Truncated Context` 또는 `Sliding Window`로 분류하며, 사용된 정책과 실제 입력 token 수를 반드시 기록한다.
 
 ### 3.2 External Memory
 
 conversation에서 생성된 memory를 외부 memory store에 저장한다. 현재 query가 입력되면 관련 memory를 검색하여 LLM에게 제공한다.
+
+External Memory에는 Vector Top-k, Utility-per-Token 및 Proposed 방식을 포함하며, 각 방식은 동일한 Memory store 입력과 Budget 조건을 사용한다.
 
 ```text
 Conversation
@@ -118,7 +157,28 @@ Hybrid 실험에서는 Context와 Memory가 각각 차지하는 token 수를 별
 
 ## 4. Evaluation Dimensions
 
-### 4.1 Answer Accuracy
+### 4.1 Task Success Rate
+
+Task Success는 단순한 최종 답변 일치가 아니라 다음 조건을 모두 만족하는 행동 수준의 성공으로 정의한다.
+
+1. Task의 목표를 완료한다.
+2. 해당 시점에 적용되는 Constraint를 위반하지 않는다.
+3. 행동에 필요한 최신 Current State를 사용한다.
+4. 승인이 필요한 Task에서는 승인 전 실행하지 않고 올바르게 승인을 요청한다.
+
+sample별 성공 여부를 이진 값으로 기록하고, 조건별 `Task Success Rate (TSR)`를 계산한다. Task별 세부 성공 조건과 ground truth는 실험 전에 고정한다.
+
+### 4.2 Constraint 및 State 지표
+
+- **Constraint Violation Rate (CVR):** 적용 대상 Constraint 가운데 Agent 행동이 위반한 비율. 실행 단위 위반 여부도 함께 기록한다.
+- **Current-State Accuracy (CSA):** 행동에 필요한 State 항목 가운데 최신 유효 값을 올바르게 사용한 비율.
+- **Stale-State Usage Rate (SSUR):** 최신 State가 존재하지만 Agent가 superseded된 이전 값을 행동에 사용한 비율.
+- **State Omission Rate:** 필요한 State를 행동에서 누락한 비율.
+- **State Fabrication/Error Rate:** History에 없는 값 또는 최신·과거 버전 모두와 일치하지 않는 값을 사용한 비율.
+
+Stale-State Usage는 오래된 Memory의 검색 여부가 아니라 **최종 행동에서 이전 State를 실제 사용했는지**를 기준으로 판정한다. 따라서 stale retrieval과 stale usage를 별도 필드로 기록한다.
+
+### 4.3 Answer Accuracy
 
 최종 LLM 응답이 ground-truth answer와 일치하는지 평가한다. 가능한 경우 자동 평가를 우선 사용한다.
 
@@ -130,7 +190,7 @@ Hybrid 실험에서는 Context와 Memory가 각각 차지하는 token 수를 별
 
 자유형 응답처럼 deterministic evaluation이 어려운 경우에는 별도의 LLM-based evaluator 사용을 고려한다.
 
-### 4.2 Retrieval Accuracy
+### 4.4 Retrieval Accuracy
 
 External Memory 방식에서는 최종 답변뿐만 아니라 **필요한 memory를 실제로 retrieval했는지**도 평가한다.
 
@@ -193,11 +253,25 @@ Latency
 Cost
 ```
 
+### Planning Latency
+
+Tool 실행 시간을 제외하고 Agent가 입력을 받은 뒤 실행 계획 또는 첫 Tool action을 결정하기까지의 시간을 가능한 경우 별도로 측정한다. 측정할 수 없는 실행 환경에서는 `not_available`로 기록하고 Total latency로 대체하지 않는다.
+
 ---
 
 ## 6. Experimental Variables
 
-### 6.1 Conversation Length
+### 6.1 Context Token Budget
+
+기본 Budget grid는 다음과 같다.
+
+```text
+1K / 2K / 4K / 8K tokens
+```
+
+모델과 Tool 정의의 고정 입력이 1K 조건을 성립시키지 못하는 경우 실제 적용 가능한 최솟값을 사전에 정하고 변경 사유를 기록한다. RQ3에서는 History와 Task 난이도를 고정한 채 Budget만 단계적으로 줄인다.
+
+### 6.2 Conversation Length
 
 장기 interaction의 길이에 따라 성능이 어떻게 변하는지 측정한다.
 
@@ -221,7 +295,7 @@ Very Long
 
 실제 값은 사용하는 모델의 context window와 dataset에 맞추어 결정한다.
 
-### 6.2 Temporal Distance
+### 6.3 Horizon / Temporal Distance
 
 필요한 정보가 현재 query에서 얼마나 멀리 떨어져 있는지를 측정한다.
 
@@ -242,7 +316,9 @@ Far
 
 이를 통해 오래된 정보를 찾는 능력을 평가한다.
 
-### 6.3 Noise
+`History Length`는 전체 interaction의 길이이고, `Horizon (H)`은 행동에 필요한 중요 정보가 제시된 시점부터 최종 Task까지의 turn 또는 token 거리이다. 두 값을 별도 변수로 기록하여 단순한 History 증가와 장기간 정보 유지 부담을 구분한다.
+
+### 6.4 Noise
 
 필요한 정보 사이에 관련 없는 conversation을 추가하여 noise에 대한 robustness를 측정한다.
 
@@ -256,7 +332,20 @@ High Noise
 
 필요한 경우 noise ratio를 정량적으로 정의한다.
 
-### 6.4 Task Type
+Noise Memory ratio는 후보 또는 제공 Memory token 중 최종 행동에 불필요한 Memory token의 비율로 정의하고, 사전에 정한 Low/Medium/High 수준으로 조절한다.
+
+### 6.5 Constraint와 State Update
+
+Memory corruption에 대한 강건성을 평가하기 위해 다음 변수를 독립적으로 조절한다.
+
+- 적용되는 Constraint 수
+- State 변경 횟수
+- 이전 State와 최신 State 사이의 거리
+- 누락되거나 잘못 선택된 필수 Memory의 비율
+
+Memory Corruption은 저장 장치의 물리적 손상이 아니라 필요한 정보의 누락, 잘못된 선택 또는 활용으로 행동이 실패하는 현상으로 정의한다.
+
+### 6.6 Task Type
 
 최소한 다음 유형을 고려한다.
 
@@ -320,10 +409,53 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
 - Noise ratio
 - Number of relevant facts
 - Fact update 여부
+- Constraint 수
+- State update 횟수
+- Context Token Budget
 
 ---
 
-## 8. Evaluation Output Format
+## 8. Research Question별 실험 설계
+
+| RQ | 비교 및 통제 | 독립 변수 | 주요 종속 변수 | 분석 |
+|---|---|---|---|---|
+| RQ1 | Proposed vs Sliding Window vs Vector Top-k vs Utility-per-Token; Agent, Task, History, Budget 고정 | Memory strategy | TSR, CVR, CSA | 동일 Budget에서 strategy별 평균과 95% CI 비교 |
+| RQ2 | Long Context와 External Memory 계열 비교 | Constraint 수, State update 횟수, Noise Memory ratio, Horizon | TSR, failure type, stale usage | corruption 유형별 강건성 비교 |
+| RQ3 | History와 Task 난이도 고정 | Budget 1K/2K/4K/8K | CVR, SSUR, CSA, omission/error rate | Budget 감소에 따른 오류 증가 추세와 Proposed의 완화 효과 |
+| RQ4 | 모든 Memory strategy에 동일한 교차 조건 적용 | History Length × Budget; Horizon 별도 기록 | TSR, CVR, CSA, tokens, cost, planning latency | 성능 저하 구간과 성능·비용·신뢰성 trade-off 분석 |
+| RQ5 | Proposed와 각 baseline을 쌍별 비교 | Budget `B`, Horizon `H` | `ΔSuccess(B,H)` | Budget 고정/Horizon 변화와 Horizon 고정/Budget 변화의 성공률 격차 및 CI 분석 |
+
+### 8.1 RQ4 교차 실험
+
+History Length와 Token Budget을 독립적으로 변화시키는 full-factorial grid를 기본으로 한다. 각 `(History Length, B)` 셀에서 동일한 sample과 반복 조건으로 모든 strategy를 실행한다. Horizon은 History Length와 별도로 기록하고, 가능한 경우 Near/Medium/Far 층화 결과도 보고한다.
+
+### 8.2 RQ5 성공률 격차
+
+각 baseline에 대해 다음 값을 계산한다.
+
+```text
+ΔSuccess(B, H)
+  = TSR_proposed(B, H) - TSR_baseline(B, H)
+```
+
+- `H`를 고정하고 `B`가 감소할 때 격차가 커지는지 확인한다.
+- `B`를 고정하고 `H`가 증가할 때 격차가 커지는지 확인한다.
+- paired bootstrap 또는 동일 sample 기반의 적절한 방법으로 95% 신뢰구간을 계산한다.
+- 모든 방식의 TSR이 바닥 수준에 도달하는 극단 조건에서는 격차가 다시 감소하는지도 별도로 확인한다.
+
+### 8.3 Ablation Study
+
+제안 방식의 각 구성 요소 기여를 확인하기 위해 동일 조건에서 다음 ablation을 수행한다.
+
+1. Protected Memory 제거
+2. State Versioning 제거
+3. Budget Optimization 제거
+
+각 ablation은 완전한 Proposed 방식과 TSR, CVR, CSA, SSUR 및 token usage를 비교한다.
+
+---
+
+## 9. Evaluation Output Format
 
 `evaluator.py`는 최소한 다음 결과를 기록할 수 있도록 구현한다.
 
@@ -331,7 +463,14 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
 {
   "sample_id": "sample_001",
   "strategy": "external_memory",
-  "max_token": 2048,
+  "context_token_budget": 2048,
+  "fixed_input_tokens": 310,
+  "available_memory_tokens": 1738,
+  "history_length_tokens": 12000,
+  "horizon_turns": 100,
+  "constraint_count": 3,
+  "state_update_count": 2,
+  "noise_memory_ratio": 0.5,
   "retrieved_memory_ids": ["mem_001"],
   "target_memory_ids": ["mem_002"],
   "retrieved_memories": [
@@ -347,10 +486,22 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
   "retrieval_hit": false,
   "active_target_hit": false,
   "stale_memory_count": 1,
+  "task_success": false,
+  "constraint_violation_count": 0,
+  "constraint_violation_rate": 0.0,
+  "current_state_accuracy": 0.0,
+  "stale_state_used": true,
+  "state_omission_count": 0,
+  "state_error_count": 0,
+  "approval_behavior_correct": null,
+  "mandatory_memory_overflow": false,
   "protected_memory_recall": 1.0,
   "retrieval_tokens": 10,
   "input_tokens": 320,
-  "output_tokens": 18
+  "output_tokens": 18,
+  "planning_latency_ms": 250,
+  "total_latency_ms": 1200,
+  "total_llm_cost": 0.0012
 }
 ```
 ## Memory Schema와 Evaluation Schema의 분리 이유
@@ -387,7 +538,9 @@ Evaluation schema의 `retrieved_memories`는 별도의 Memory schema가 아니�
 - `retrieved_memory_ids`: Recall@k, Precision@k, Hit@k, MRR 등 ID 기반 metric 계산
 - `retrieved_memories`: Temporal Failure, stale retrieval, protected memory 누락 등 상태 기반 failure analysis
 - `target_memory_ids`: evaluation sample의 정답 Memory 집합
-- `max_token`: 해당 실험 실행에 설정된 최대 토큰 조건
+- `context_token_budget`: 해당 실험 실행에 설정된 전체 Agent 입력 Context의 token 상한
+- `fixed_input_tokens`: System Prompt, 현재 요청과 Tool 정의 등 고정 입력의 token 수
+- `available_memory_tokens`: 전체 Context 상한에서 고정 입력을 제외한 Memory 가용 token 수
 - `retrieval_tokens`: 검색된 Memory가 실제 사용한 토큰
 - `input_tokens`, `output_tokens`: 전체 LLM 요청의 실제 토큰 사용량
 
@@ -434,15 +587,17 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
 ---
 
-## 9. Aggregated Results
+## 10. Aggregated Results
 
 실험 종료 후 최소한 다음 결과를 strategy별로 집계한다.
 
-| Strategy | Accuracy | Recall@k | Avg. Input Tokens | Avg. Latency | Cost |
-|---|---:|---:|---:|---:|---:|
-| Long Context | TBD | - | TBD | TBD | TBD |
-| External Memory | TBD | TBD | TBD | TBD | TBD |
-| Hybrid | TBD | TBD | TBD | TBD | TBD |
+| Strategy | TSR | CVR | CSA | SSUR | Recall@k | Avg. Input Tokens | Avg. Planning Latency | Cost |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Proposed | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Sliding Window | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
+| Vector Top-k | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Utility-per-Token | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Long Context Reference | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
 
 추가적으로 다음 조건별 결과를 분석한다.
 
@@ -450,10 +605,17 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 - Temporal Distance
 - Noise Level
 - Task Type
+- Context Token Budget
+- Constraint Count
+- State Update Count
+- Horizon
+- History Length × Token Budget
+
+모든 주요 집계에는 반복 횟수, 평균과 95% 신뢰구간을 포함한다. RQ5 결과에는 baseline별 `ΔSuccess(B,H)`와 그 신뢰구간을 추가한다.
 
 ---
 
-## 10. Failure Analysis
+## 11. Failure Analysis
 
 단순 평균 성능뿐만 아니라 실패 원인을 분석한다.
 
@@ -472,6 +634,18 @@ Reasoning Failure
 Temporal Failure
   과거 정보와 최신 정보를 잘못 구분
 
+Constraint Failure
+  적용되는 제약을 누락하거나 위반
+
+State Omission
+  행동에 필요한 State를 사용하지 않음
+
+State Fabrication/Error
+  History에 없거나 어떤 유효 버전과도 일치하지 않는 State를 사용
+
+Approval Failure
+  승인이 필요한 행동을 승인 없이 실행하거나 필요한 승인 요청을 하지 않음
+
 Hallucination
   제공되지 않은 정보를 생성
 ```
@@ -480,7 +654,7 @@ Hallucination
 
 ---
 
-## 11. Responsibilities
+## 12. Responsibilities
 
 본 프로젝트에서는 팀원 간 작업 충돌을 방지하기 위해 담당 영역을 분리한다.
 
@@ -515,12 +689,12 @@ Evaluator
 
 ---
 
-## 12. Implementation Order
+## 13. Implementation Order
 
 평가 파트는 다음 순서로 구현한다.
 
 ```text
-1. Experiment schema 확정
+1. RQ별 성공 기준과 Experiment schema 확정
        ↓
 2. evaluator.py 기본 구조
        ↓
@@ -530,13 +704,13 @@ Evaluator
        ↓
 5. Retrieval metric 구현
        ↓
-6. Long Context baseline 평가
+6. Sliding Window / Vector Top-k / Utility-per-Token baseline 평가
        ↓
-7. External Memory baseline 평가
+7. Proposed / Long Context Reference 평가
        ↓
 8. 조건별 실험
        ↓
-9. Failure analysis
+9. Failure analysis / ΔSuccess / Ablation 분석
 ```
 
 초기 단계에서는 복잡한 자동 평가보다 **재현 가능한 deterministic metric과 logging pipeline을 먼저 완성하는 것**을 우선한다.
