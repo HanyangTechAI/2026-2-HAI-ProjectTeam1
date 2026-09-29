@@ -9,7 +9,7 @@
 
   "content": "사용자는 Python을 주력 언어로 사용한다.",
 
-  "is_active: bool"
+  "is_active": true,
   "max_token"
 
 
@@ -19,7 +19,7 @@
 
   "supersedes": null
   "superseded_by": null
-  "is_protected: bool"
+  "is_protected": false,
 
   "created_at": "2026-08-15T14:00:00",
   "valid_from": "2026-08-15T14:00:00",
