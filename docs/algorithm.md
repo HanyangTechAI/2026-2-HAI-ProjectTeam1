@@ -15,17 +15,23 @@ Memory Store / Versioning
     ↓
 Temporal Intent Detection
     ↓
-Candidate Retrieval
+General Candidate Retrieval
+    ↓
+Version Chain Expansion
     ↓
 Temporal / Version Resolution
-    ↓
-Protected Memory Resolution
     ↓
 Budget-Aware Selection
     ↓
 Context Construction
     ↓
 LLM Agent Action
+
+Memory Store
+    ↓
+Protected Retrieval
+    ↓
+Budget-Aware Selection
 ```
 
 본 프로젝트의 핵심 Contribution은 다음 세 부분이다.
@@ -188,7 +194,7 @@ FUNCTION EXTRACT_MEMORY(interaction):
             item.memory_key,
             normalized content,
 
-            ACTIVE,
+            TRUE,
             is_protected,
 
             item.importance,
@@ -224,6 +230,8 @@ SUPERSEDED
 = 현재 기준으로 대체되었지만
   과거 시점 Query에서는 유효할 수 있는 Memory
 ```
+
+현재 행동 Constraint가 대체되는 경우 기존 Constraint는 Store에 남기되 현재 Protected 대상에서는 해제한다.
 
 ## Input
 
@@ -261,17 +269,22 @@ FUNCTION INSERT_MEMORY(new_memory):
         RETURN
 
     updated_previous ← previous WITH:
-        status = SUPERSEDED
+        is_active = FALSE
         valid_to = new_memory.valid_from
         superseded_by = new_memory.memory_id
 
+    IF previous.memory_type == CONSTRAINT:
+        updated_previous.is_protected = FALSE
+
     updated_new ← new_memory WITH:
-        status = ACTIVE
+        is_active = TRUE
         supersedes = previous.memory_id
 
     REPLACE previous WITH updated_previous
     STORE updated_new
 ```
+
+현재 행동에 적용되는 새로운 Hard Constraint는 Memory Extraction 단계에서 `is_protected = TRUE`로 생성한다.
 
 ---
 
@@ -480,6 +493,60 @@ FUNCTION RETRIEVE_CANDIDATES(query_context, memory_store):
 
 ---
 
+## Version Chain Expansion
+
+General Retrieval에서 `memory_key`를 가진 Versioned Memory를 발견한 경우, Temporal Resolution 전에 Store에서 해당 key의 Version Chain을 조회한다.
+
+```text
+FUNCTION EXPAND_VERSION_CHAINS(
+    candidates,
+    memory_store
+):
+
+    expanded ← candidates
+
+    FOR candidate IN candidates:
+
+        memory ← candidate.memory
+
+        IF memory.memory_key IS NULL:
+            CONTINUE
+
+        IF NOT IS_VERSIONED(memory):
+            CONTINUE
+
+        versions ← FIND_ALL_BY_KEY(
+            session_id = memory.session_id,
+            memory_key = memory.memory_key
+        )
+
+        expanded ← UNION(
+            expanded,
+            versions
+        )
+
+    RETURN DEDUPLICATE(expanded)
+```
+
+예:
+
+```text
+Initial Retrieval:
+report_v1.pdf
+
+memory_key:
+report.current_file
+
+Version Chain Expansion:
+report_v1.pdf
+report_v2.pdf
+report_final.pdf
+```
+
+이후 Temporal Resolver가 Query 시점에 맞는 Version을 선택한다.
+
+---
+
 # 7. Algorithm 5 — Temporal / Version Resolution
 
 ## 목적
@@ -487,6 +554,8 @@ FUNCTION RETRIEVE_CANDIDATES(query_context, memory_store):
 현재 Query가 요구하는 시점과 맞는 Memory Version을 선택한다.
 
 이 단계가 `SUPERSEDED Memory를 무조건 제거`하는 기존 단순 필터링과 다른 부분이다.
+
+Protected Retrieval 경로에서 가져오는 현재 행동 Constraint는 이 Temporal Resolution을 거치지 않는다.
 
 ---
 
@@ -533,7 +602,7 @@ FUNCTION RESOLVE_TEMPORAL_VERSION(
         IF query_context.temporal_intent
             IN {CURRENT, UNSPECIFIED}:
 
-            active ← FIND status == ACTIVE
+            active ← FIND is_active == TRUE
 
             IF active exists:
                 KEEP active
@@ -564,58 +633,62 @@ FUNCTION RESOLVE_TEMPORAL_VERSION(
 
 ## 목적
 
-현재 Task에 실제로 적용되는 Protected Memory를 찾는다.
+현재 Task에 실제로 적용되는 **현재 활성화된 Protected Constraint**를 찾는다.
 
-중요:
+Protected Memory는 General Retrieval과 별도로 Memory Store에서 검색하며, Temporal Resolver를 통과하지 않는다.
 
-```text
-is_protected = TRUE
-```
-
-라고 해서 모든 Query에 무조건 포함하지 않는다.
-
-## Applicability
-
-Protected Memory가 다음 조건을 만족하는지 확인한다.
+## Protected Candidate 조건
 
 ```text
-1. 현재 Task와 의미적으로 관련
-2. 현재 Tool / Action과 관련
-3. Query가 요구하는 시간에 유효
+memory_type == CONSTRAINT
+is_active == TRUE
+is_protected == TRUE
 ```
+
+이 조건을 만족한다고 해서 모든 Task에 무조건 포함하는 것은 아니다.
+
+현재 Task와 Tool / Action에 적용 가능한 Constraint만 선택한다.
 
 ## Pseudocode
 
 ```text
-FUNCTION RESOLVE_PROTECTED(
-    candidates,
-    query_context
+FUNCTION RETRIEVE_PROTECTED(
+    query_context,
+    memory_store
 ):
+
+    candidates ← FIND memories WHERE:
+        memory_type == CONSTRAINT
+        AND is_active == TRUE
+        AND is_protected == TRUE
 
     protected ← empty list
 
-    FOR candidate IN candidates:
-
-        IF candidate.memory.is_protected == FALSE:
-            CONTINUE
-
-        IF NOT TEMPORALLY_VALID(
-            candidate.memory,
-            query_context
-        ):
-            CONTINUE
+    FOR memory IN candidates:
 
         applicability ← CHECK_APPLICABILITY(
-            candidate.memory,
+            memory,
             query_context
         )
 
         IF applicability >= threshold:
-            candidate.is_applicable ← TRUE
-            ADD candidate TO protected
+            ADD memory TO protected
 
     RETURN protected
 ```
+
+과거 Constraint는 Store에서 삭제하지 않는다.
+
+단:
+
+```text
+is_active = false
+is_protected = false
+```
+
+상태이므로 현재 행동의 Protected Retrieval에는 포함되지 않는다.
+
+Historical Query에서 과거 Constraint 자체가 필요한 경우에는 General Retrieval 및 Temporal Resolution 경로를 사용한다.
 
 ---
 
@@ -657,7 +730,7 @@ Task:
 
 ## 목적
 
-현재 Task에 필요한 최신 State를 선택한다.
+현재 Task에 필요한 State를 선택한다.
 
 ## Input
 
@@ -779,6 +852,13 @@ system prompt
 + required output overhead
 ```
 
+먼저 고정 비용을 검사한다.
+
+```text
+IF C_fixed > B_total:
+    RETURN INVALID_BUDGET_CONFIGURATION
+```
+
 실제 Memory Budget:
 
 ```text
@@ -794,7 +874,14 @@ C_protected
 + C_required_state
 ```
 
-남은 예산:
+Mandatory Memory가 가용 Memory Budget을 초과하면:
+
+```text
+IF C_mandatory > B_memory:
+    RETURN INSUFFICIENT_CONTEXT_BUDGET
+```
+
+정상 조건에서 남은 예산:
 
 ```text
 B_flexible =
@@ -805,7 +892,9 @@ B_memory - C_mandatory
 
 # 12. Algorithm 10 — Mandatory Memory Selection
 
-Protected Memory와 필수 Current State는 일반 Flexible Memory보다 먼저 선택한다.
+Protected Memory와 필수 State는 일반 Flexible Memory보다 먼저 선택한다.
+
+필수 Memory 일부를 임의로 제거하여 Agent를 실행하지 않는다.
 
 ## Pseudocode
 
@@ -820,59 +909,32 @@ FUNCTION SELECT_MANDATORY(
 
     total_cost ← SUM token_count
 
-    IF total_cost <= B_memory:
-        RETURN mandatory, B_memory - total_cost
+    IF total_cost > B_memory:
+        RETURN INSUFFICIENT_CONTEXT_BUDGET
 
-    ELSE:
-        RETURN HANDLE_MANDATORY_OVERFLOW(
-            mandatory,
-            B_memory
-        )
+    RETURN mandatory,
+           B_memory - total_cost
 ```
 
 ---
 
-# 13. Mandatory Overflow 처리
+# 13. Mandatory Budget Failure
 
-Protected Memory와 필수 State 자체가 Budget을 초과할 수 있다.
-
-이 경우 예산을 무시하고 모두 삽입하면 실험 공정성이 깨지므로 별도 처리한다.
-
-우선순위:
+Protected Memory와 필수 State의 전체 비용이 Memory Budget을 초과하는 경우:
 
 ```text
-1. 현재 Task의 직접적인 Hard Constraint
-2. Tool 실행을 막는 Safety / Permission Constraint
-3. Task 수행에 필수적인 Current State
-4. 기타 Protected Memory
+C_mandatory > B_memory
 ```
 
-## Pseudocode
+일부 Constraint 또는 State만 선택하지 않는다.
+
+처리:
 
 ```text
-FUNCTION HANDLE_MANDATORY_OVERFLOW(
-    mandatory,
-    budget
-):
-
-    SORT mandatory BY:
-        action_criticality DESC,
-        task_relevance DESC,
-        importance DESC
-
-    selected ← empty list
-    used ← 0
-
-    FOR memory IN mandatory:
-
-        IF used + memory.token_count <= budget:
-            SELECT memory
-            used += memory.token_count
-
-    RECORD mandatory_overflow = TRUE
-
-    RETURN selected, 0
+RETURN INSUFFICIENT_CONTEXT_BUDGET
 ```
+
+이 경우 Agent Action은 실행하지 않는다.
 
 이 조건은 일반 실험과 별도로 기록한다.
 
@@ -986,37 +1048,45 @@ FUNCTION SELECT_MEMORY(
 
     query_context ← ANALYZE_QUERY(query)
 
-    candidates ← RETRIEVE_CANDIDATES(
+    memory_budget ←
+        CALCULATE_MEMORY_BUDGET(token_budget)
+
+    IF memory_budget == INVALID_BUDGET_CONFIGURATION:
+        RETURN INVALID_BUDGET_CONFIGURATION
+
+    general_candidates ← RETRIEVE_CANDIDATES(
         query_context,
         memory_store
     )
 
-    candidates ← RESOLVE_TEMPORAL_VERSION(
-        candidates,
+    general_candidates ← EXPAND_VERSION_CHAINS(
+        general_candidates,
+        memory_store
+    )
+
+    general_candidates ← RESOLVE_TEMPORAL_VERSION(
+        general_candidates,
         query_context
     )
 
-    protected ← RESOLVE_PROTECTED(
-        candidates,
-        query_context
+    protected ← RETRIEVE_PROTECTED(
+        query_context,
+        memory_store
     )
 
     states ← RESOLVE_STATE(
-        candidates,
+        general_candidates,
         query_context
     )
 
-    flexible ← candidates
-        EXCLUDING protected
+    flexible ← general_candidates
         EXCLUDING states
+        EXCLUDING protected
 
     flexible ← COMPUTE_UTILITY(
         flexible,
         query_context
     )
-
-    memory_budget ←
-        CALCULATE_MEMORY_BUDGET(token_budget)
 
     mandatory,
     remaining_budget ← SELECT_MANDATORY(
@@ -1024,6 +1094,9 @@ FUNCTION SELECT_MEMORY(
         states,
         memory_budget
     )
+
+    IF mandatory == INSUFFICIENT_CONTEXT_BUDGET:
+        RETURN INSUFFICIENT_CONTEXT_BUDGET
 
     flexible_selected ←
         SELECT_FLEXIBLE(
@@ -1055,6 +1128,8 @@ FUNCTION SELECT_MEMORY(
 6. Current Task
 ```
 
+Memory 선택 시 계산한 Token Cost와 실제 Formatting된 Prompt의 Token Count에는 차이가 발생할 수 있으므로, 최종 Context를 다시 Tokenize한다.
+
 ## Pseudocode
 
 ```text
@@ -1062,26 +1137,46 @@ FUNCTION BUILD_CONTEXT(
     system_prompt,
     tools,
     selected_memories,
-    query
+    query,
+    B_total
 ):
 
-    protected ← selected where is_protected
-    states ← selected where memory_type == STATE
+    protected ← selected where
+        memory_type == CONSTRAINT
+        AND is_active == TRUE
+        AND is_protected == TRUE
+
+    states ← selected where
+        memory_type == STATE
+
     flexible ← remaining selected
 
-    context ← FORMAT(
-        system_prompt,
-        tools,
-        protected,
-        states,
-        flexible,
-        query
-    )
+    SORT flexible BY selection_priority DESC
 
-    ASSERT TOKEN_COUNT(context) <= B_total
+    LOOP:
 
-    RETURN context
+        context ← FORMAT(
+            system_prompt,
+            tools,
+            protected,
+            states,
+            flexible,
+            query
+        )
+
+        actual_tokens ← COUNT_TOKENS(context)
+
+        IF actual_tokens <= B_total:
+            RETURN context
+
+        IF flexible is empty:
+            RETURN INSUFFICIENT_CONTEXT_BUDGET
+
+        REMOVE lowest-priority item
+        FROM flexible
 ```
+
+Protected Memory와 Required State는 최종 Context 보정 과정에서 제거하지 않는다.
 
 ---
 
@@ -1096,12 +1191,28 @@ FUNCTION RUN_AGENT(task):
         context_budget
     )
 
+    IF selected_memories
+        == INVALID_BUDGET_CONFIGURATION:
+        LOG error
+        RETURN INVALID_BUDGET_CONFIGURATION
+
+    IF selected_memories
+        == INSUFFICIENT_CONTEXT_BUDGET:
+        LOG error
+        RETURN INSUFFICIENT_CONTEXT_BUDGET
+
     context ← BUILD_CONTEXT(
         system_prompt,
         tools,
         selected_memories,
-        task
+        task,
+        context_budget
     )
+
+    IF context
+        == INSUFFICIENT_CONTEXT_BUDGET:
+        LOG error
+        RETURN INSUFFICIENT_CONTEXT_BUDGET
 
     action ← LLM_AGENT(context)
 
@@ -1131,7 +1242,8 @@ FUNCTION RUN_AGENT(task):
 ```text
 Constraint Violation
 =
-현재 Task와 해당 시점에 적용되는
+현재 활성화되어 있으며
+현재 Task에 적용되는
 Protected Constraint를 위반한 Tool Action이 발생한 경우
 ```
 
@@ -1186,18 +1298,19 @@ report_v1.pdf 사용
 
 # 19. Edge Cases
 
-## Edge Case 1 — Protected Memory가 Budget보다 큼
+## Edge Case 1 — Mandatory Memory가 Budget보다 큼
 
 ```text
-C_protected > B_memory
+C_mandatory > B_memory
 ```
 
 처리:
 
 ```text
-Criticality + Task Relevance 기준으로 선택
-mandatory_overflow 기록
+RETURN INSUFFICIENT_CONTEXT_BUDGET
 ```
+
+Protected Constraint 또는 Required State 일부를 제거한 채 Agent를 실행하지 않는다.
 
 ---
 
@@ -1257,7 +1370,7 @@ general constraint
 
 를 적용한다.
 
-동일 specificity이면 최신 Valid Constraint를 우선한다.
+동일 specificity이면 현재 활성화된 최신 Constraint를 우선한다.
 
 ---
 
@@ -1283,7 +1396,13 @@ memory.token_count > B_flexible
 
 Flexible Memory라면 제외한다.
 
-Protected Memory라면 `mandatory_overflow` 정책을 적용한다.
+Protected Memory 또는 Required State라면 Mandatory 비용 검사에 의해:
+
+```text
+INSUFFICIENT_CONTEXT_BUDGET
+```
+
+을 반환한다.
 
 ---
 
@@ -1293,26 +1412,69 @@ Protected Memory라면 `mandatory_overflow` 정책을 적용한다.
 
 Protected Memory가 일반 Retrieval Top-K 단계에서 탈락하면 이후 보존할 수 없다.
 
-따라서 Protected Memory는 일반 Candidate Retrieval과 별도로 검색 가능해야 한다.
-
-권장 구조:
+따라서 Protected Memory는 일반 Candidate Retrieval과 별도로 검색한다.
 
 ```text
 General Retrieval
-+
+
 Protected Constraint Retrieval
 ```
 
-즉:
+Protected Retrieval은 다음 조건을 대상으로 한다.
 
 ```text
-candidate_pool =
-general_candidates
-∪
-protected_candidates
+memory_type == CONSTRAINT
+is_active == TRUE
+is_protected == TRUE
 ```
 
-로 구성한다.
+이후 현재 Task에 대한 Applicability를 평가한다.
+
+---
+
+## Edge Case 8 — Fixed Input이 전체 Budget보다 큼
+
+```text
+C_fixed > B_total
+```
+
+처리:
+
+```text
+RETURN INVALID_BUDGET_CONFIGURATION
+```
+
+Memory Selection 자체를 수행하지 않는다.
+
+---
+
+## Edge Case 9 — Formatting 이후 Context가 Budget을 초과함
+
+Memory Selection 결과 자체는 Budget 안에 있었지만 Formatting overhead로:
+
+```text
+TOKEN_COUNT(final_context) > B_total
+```
+
+이 될 수 있다.
+
+처리:
+
+```text
+lowest-priority Flexible Memory 제거
+↓
+Context 재생성
+↓
+재tokenize
+↓
+B_total 이하가 될 때까지 반복
+```
+
+Flexible Memory를 모두 제거한 뒤에도 초과하면:
+
+```text
+RETURN INSUFFICIENT_CONTEXT_BUDGET
+```
 
 ---
 
@@ -1321,25 +1483,53 @@ protected_candidates
 최종적으로 Candidate Retrieval은 다음 구조를 사용한다.
 
 ```text
-                    Query
-                      │
-          ┌───────────┴───────────┐
-          │                       │
-          ▼                       ▼
- General Memory Retrieval   Protected Retrieval
-          │                       │
- Semantic / BM25 / Entity   Constraint / Tool Match
-          │                       │
-          └───────────┬───────────┘
-                      ▼
-               Candidate Pool
-                      ↓
-             Temporal Resolution
-                      ↓
-             Budget-Aware Selection
+                         Query
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+              ▼                         ▼
+     General Memory Retrieval    Protected Retrieval
+              │                         │
+ Semantic / BM25 / Entity       Active Protected
+              │                    Constraints
+              ▼                         │
+    Version Chain Expansion             │
+              │                         │
+              ▼                         │
+      Temporal Resolution               │
+              │                         │
+              ▼                         ▼
+       Required State             Applicability
+       + Flexible Candidates       Resolution
+              │                         │
+              └────────────┬────────────┘
+                           ▼
+                   Mandatory Check
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+          Overflow                     Success
+             │                           │
+             ▼                           ▼
+INSUFFICIENT_CONTEXT_BUDGET    Flexible Selection
+                                         │
+                                         ▼
+                                  Context Builder
+                                         │
+                                         ▼
+                              Final Token Validation
 ```
 
-이 구조를 통해 **Protected Memory가 일반 relevance ranking 때문에 후보 단계에서 사라지는 문제**를 방지한다.
+이 구조를 통해:
+
+```text
+1. Protected Constraint가 일반 relevance ranking 때문에 사라지는 문제
+2. Retrieval된 Version만 보고 잘못된 State를 선택하는 문제
+3. Mandatory Memory를 임의로 버린 채 Agent를 실행하는 문제
+4. Formatting overhead로 실제 Context Budget을 초과하는 문제
+```
+
+를 방지한다.
 
 ---
 
@@ -1352,12 +1542,15 @@ Memory Extraction
 Memory Versioning
 Temporal Intent Detection
 Semantic Retrieval
+Version Chain Expansion
 Protected Retrieval
 Temporal Resolution
 Protected Selection
 Current State Selection
 Budget Calculation
+Mandatory Budget Validation
 Flexible Selection
+Final Context Token Validation
 Context Builder
 Tool Action
 Automatic Evaluation
@@ -1384,15 +1577,21 @@ Query
 ↓
 Temporal Intent Detection
 ↓
-General Retrieval + Protected Retrieval
-↓
-Version-Aware Temporal Resolution
-↓
-Applicable Protected Constraint Selection
-↓
-Required State Selection
-↓
-Mandatory Token Allocation
+┌─────────────────────────────┐
+│                             │
+General Retrieval       Protected Retrieval
+│                             │
+Version Chain Expansion       │
+│                             │
+Version-Aware                Active Protected
+Temporal Resolution          Constraint Selection
+│                             │
+Required State                Applicability
++ Flexible Candidates         │
+│                             │
+└──────────────┬──────────────┘
+               ↓
+Fixed / Mandatory Budget Check
 ↓
 Flexible Memory Utility Calculation
 ↓
@@ -1400,11 +1599,33 @@ Budget-Aware Flexible Selection
 ↓
 Context Construction
 ↓
+Final Token Validation
+↓
+필요 시 낮은 우선순위
+Flexible Memory 제거
+↓
 LLM Agent
 ↓
 Tool Action
 ```
 
+실패 조건:
+
+```text
+C_fixed > B_total
+→ INVALID_BUDGET_CONFIGURATION
+
+C_mandatory > B_memory
+→ INSUFFICIENT_CONTEXT_BUDGET
+
+Final Context > B_total
+→ Flexible Memory 제거 후 재tokenize
+
+Flexible Memory가 없는데도
+Final Context > B_total
+→ INSUFFICIENT_CONTEXT_BUDGET
+```
+
 핵심 원칙은 다음 한 문장으로 요약된다.
 
-> **현재 Task와 시점에 반드시 필요한 Constraint와 State를 먼저 확보하고, 남은 Token Budget만 Flexible Memory의 효용 최적화에 사용한다.**
+> **현재 Task에 적용되는 최신 Protected Constraint와 Query 시점에 맞는 Required State를 모두 확보한 뒤, 남은 Token Budget만 Flexible Memory에 사용하며, 필수 정보 자체가 Budget에 들어가지 않으면 Agent를 실행하지 않는다.**

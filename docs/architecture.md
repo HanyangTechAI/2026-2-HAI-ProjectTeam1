@@ -13,7 +13,9 @@ Memory Analyzer
         ↓
 Memory Store
         ↓
-Candidate Retrieval
+General Retrieval
+        ↓
+Version Chain Expansion
         ↓
 Temporal / State Filtering
         ↓
@@ -27,13 +29,20 @@ LLM Agent
 Tool Executor
         ↓
 Environment / New Interaction
+
+Memory Store
+        ↓
+Protected Retrieval
+        ↓
+Constraint-Preserving
+Budget-Aware Selector
 ```
 
 핵심은 단순히 관련성이 높은 Memory를 검색하는 것이 아니라,
 
 1. 현재 Task와 관련된 Memory를 찾고
-2. 오래되었거나 대체된 State를 제거하고
-3. 반드시 지켜야 하는 Constraint를 우선 보존한 뒤
+2. Versioned Memory의 전체 Version Chain을 확인하여 올바른 State를 선택하고
+3. 현재 활성화된 행동 Constraint를 별도로 검색하여 우선 보존한 뒤
 4. 남은 Token Budget에 Flexible Memory를 배치하는 것
 
 이다.
@@ -145,17 +154,20 @@ flowchart TD
 
     MA --> MS[(Memory Store)]
 
-    MS --> R[Candidate Retriever]
+    Q[Current Task / Query] --> R[General Candidate Retriever]
+    MS --> R
 
-    Q[Current Task / Query] --> R
+    R --> VE[Version Chain Expansion]
+    VE --> TF[Temporal & State Filter]
 
-    R --> TF[Temporal & State Filter]
+    MS --> PR[Protected Retrieval]
+    Q --> PR
 
-    TF --> PS[Protected Memory Resolver]
-    TF --> FS[Flexible Memory Candidates]
+    TF --> RS[Required State / Flexible Candidates]
+    PR --> PS[Protected Memory Resolver]
 
-    PS --> BAS[Budget-Aware Selector]
-    FS --> BAS
+    RS --> BAS[Budget-Aware Selector]
+    PS --> BAS
 
     BAS --> CB[Context Builder]
 
@@ -173,6 +185,8 @@ flowchart TD
     BAS --> LOG
     TE --> LOG
 ```
+
+Protected Retrieval 경로는 현재 활성화된 Constraint를 대상으로 하며 Temporal / State Filter를 통과하지 않는다.
 
 ---
 
@@ -309,6 +323,26 @@ is_active = true
 이며, 새로운 State에 의해 대체되면 기존 State의 valid_to가 설정되고 SUPERSEDED 상태가 된다.
 
 Timestamp는 단순 Recency 점수뿐 아니라 Historical Query에서 특정 시점에 유효했던 Memory Version을 복원하기 위해 사용한다.
+
+현재 행동에 적용되는 Constraint가 새로운 Constraint에 의해 대체되는 경우 기존 Constraint는 Store에 남겨 두되:
+
+```text
+is_active = false
+is_protected = false
+```
+
+로 변경한다.
+
+새로운 현재 Constraint는:
+
+```text
+is_active = true
+is_protected = true
+```
+
+로 유지한다.
+
+따라서 과거 Constraint는 Historical Retrieval에 사용할 수 있지만 현재 행동의 Protected Memory로는 사용하지 않는다.
 
 ---
 
@@ -458,6 +492,8 @@ BM25 Retrieval ─────┤
 Entity Retrieval ───┤
                     ↓
               Candidate Pool
+                    ↓
+          Version Chain Expansion
 ```
 
 각 Memory에 대해 요청 시점에 Retrieval Score를 계산한다.
@@ -470,11 +506,51 @@ entity_score
 
 이 값들은 Memory 자체에 영구 저장하지 않고 **현재 Query에 대한 Candidate 정보**로 관리한다.
 
+## Version Chain Expansion
+
+General Retrieval 결과에 `memory_key`를 가진 Versioned Memory가 포함되어 있으면, 해당 Candidate 하나만으로 Temporal Resolution을 수행하지 않는다.
+
+```text
+Retrieved Candidate
+        ↓
+memory_key 확인
+        ↓
+Versioned Memory인 경우
+Memory Store에서 동일 Session,
+동일 memory_key의 Version Chain 조회
+        ↓
+Expanded Candidate Pool
+        ↓
+Temporal Resolution
+```
+
+예:
+
+```text
+Retrieval Result:
+report_v1.pdf
+memory_key = report.current_file
+```
+
+이라면 Store에서:
+
+```text
+report_v1.pdf
+report_v2.pdf
+report_final.pdf
+```
+
+의 Version Chain을 조회한 뒤 Query가 요구하는 시점에 맞는 Version을 선택한다.
+
+이를 통해 올바른 State가 Store에는 존재하지만 최초 Retrieval Candidate에 포함되지 않은 경우에도 Version Resolution이 가능하다.
+
 ---
 
 # 7. Temporal Intent Detection & Version-Aware Filtering
 
 현재 Query가 요구하는 시간적 기준을 먼저 파악한 뒤 적절한 Memory Version을 선택한다.
+
+이 단계는 General Retrieval 및 Version Chain Expansion 결과를 대상으로 한다. 현재 행동을 위한 Protected Constraint는 별도의 Protected Retrieval 경로에서 처리한다.
 
 ## 7.1 Temporal Intent Detection
 
@@ -591,13 +667,23 @@ f(current_time - created_at)
 
 단, Recency는 Flexible Memory의 Ranking Signal이며, State의 올바른 Version을 결정하는 기준과는 구분한다.
 
-또한 Protected Constraint는 단순히 오래되었다는 이유만으로 제거하지 않는다.
-
 ---
 
 # 8. Protected Memory Resolver
 
-현재 Task와 요구된 시점에 적용되는 Protected Memory를 식별한다.
+현재 행동에 적용되는 **활성화된 Protected Constraint**를 식별한다.
+
+Protected Memory는 General Retrieval 및 Temporal Filtering과 별도의 경로에서 검색한다.
+
+Protected 후보의 기본 조건은 다음과 같다.
+
+```text
+memory_type = constraint
+is_active = true
+is_protected = true
+```
+
+그중 현재 Task와 Tool / Action에 적용 가능한 Constraint만 Mandatory Memory로 사용한다.
 
 중요한 점은:
 
@@ -621,17 +707,29 @@ is_protected = true
 "앞으로는 외부 이메일도 승인 없이 보내도 돼."
 ```
 
-현재 이메일을 보내는 Task라면 최신 Constraint를 사용해야 한다.
-
-반대로 사용자가:
+새로운 Constraint가 기존 Constraint를 대체했다면 현재 행동에서는 최신 Constraint만 Protected 상태로 유지한다.
 
 ```text
-"6월 당시 규칙대로 처리했다면 어떤 행동을 했어야 해?"
+Old Constraint
+is_active = false
+is_protected = false
+
+New Constraint
+is_active = true
+is_protected = true
 ```
 
-라고 요청한다면 과거 시점에 유효했던 Constraint Version이 필요할 수 있다.
+과거 Constraint는 삭제하지 않고 Store에 보존한다.
 
-따라서 Protected Memory 역시 필요한 경우 Temporal Validity를 고려하여 적용 가능성을 판단한다.
+사용자가:
+
+```text
+"6월 당시 이메일 규칙은 뭐였어?"
+```
+
+와 같이 과거 규칙 자체를 조회하는 경우에는 Protected Retrieval이 아니라 General Historical Retrieval을 통해 해당 Constraint를 검색한다.
+
+따라서 Protected Memory에는 별도의 Temporal Filter를 적용하지 않는다.
 
 ---
 
@@ -645,28 +743,73 @@ is_protected = true
 B_total
 ```
 
-먼저 공통 입력 비용을 제외한다.
+먼저 공통 입력 비용을 계산한다.
+
+```text
+C_fixed
+=
+System Prompt
++ Tool Definition
++ Current Query
++ Other Fixed Inputs
+```
+
+Memory Budget:
 
 ```text
 B_memory
 =
 B_total
-- System Prompt
-- Tool Definition
-- Current Query
+- C_fixed
 ```
 
-그다음 Protected Memory와 필요한 Current State를 우선 할당한다.
+만약:
+
+```text
+C_fixed > B_total
+```
+
+이면 Memory 선택을 수행할 수 없는 잘못된 실행 설정이므로:
+
+```text
+INVALID_BUDGET_CONFIGURATION
+```
+
+을 반환한다.
+
+그다음 Protected Memory와 필요한 State를 Mandatory Memory로 정의한다.
+
+```text
+C_mandatory
+=
+C_protected
++ C_state
+```
+
+만약:
+
+```text
+C_mandatory > B_memory
+```
+
+이면 필수 Constraint나 State를 임의로 제거한 채 Agent를 실행하지 않고:
+
+```text
+INSUFFICIENT_CONTEXT_BUDGET
+```
+
+을 반환한다.
+
+정상적으로 Mandatory Memory가 모두 들어가는 경우에만:
 
 ```text
 B_flexible
 =
 B_memory
-- C_protected
-- C_state
+- C_mandatory
 ```
 
-남은 Budget에서 Flexible Memory를 선택한다.
+를 계산하여 남은 Budget에서 Flexible Memory를 선택한다.
 
 ---
 
@@ -742,6 +885,32 @@ Selector 결과를 실제 LLM Prompt 형태로 변환한다.
 
 최신 보고서를 교수님께 보내줘.
 ```
+
+Memory Selection 단계에서 계산한 Token Cost와 실제 Formatting 이후의 Token Cost에는 차이가 발생할 수 있다.
+
+따라서 Context Builder는 완성된 Prompt를 실제 Tokenizer로 다시 측정한다.
+
+```text
+Final Context Token Count > B_total
+        ↓
+가장 낮은 우선순위의 Flexible Memory 제거
+        ↓
+Context 재구성
+        ↓
+다시 Tokenize
+        ↓
+B_total 이하가 될 때까지 반복
+```
+
+이 과정에서는 Protected Memory와 Required State를 제거하지 않는다.
+
+모든 Flexible Memory를 제거한 뒤에도 최종 Context가 `B_total`을 초과한다면:
+
+```text
+INSUFFICIENT_CONTEXT_BUDGET
+```
+
+을 반환한다.
 
 Context Builder는 다음을 기록한다.
 
@@ -862,6 +1031,14 @@ Latency
 Cost
 ```
 
+Budget 관련 실패가 발생하면 다음 상태도 기록한다.
+
+```text
+INVALID_BUDGET_CONFIGURATION
+
+INSUFFICIENT_CONTEXT_BUDGET
+```
+
 예:
 
 ```json
@@ -902,6 +1079,8 @@ Cost
 3. Memory Store에 저장
    State 변경 시 Versioning 및
    Temporal Validity 갱신
+   Constraint 대체 시 이전 Constraint의
+   active / protected 상태 해제
 
         ↓
 
@@ -918,7 +1097,7 @@ Cost
 
         ↓
 
-6. Candidate Retrieval
+6-A. General Candidate Retrieval
 
    Semantic
    BM25
@@ -926,13 +1105,15 @@ Cost
 
         ↓
 
-7. Temporal Resolution
+7-A. Version Chain Expansion
 
-   Target Time / Time Range 결정
+   Retrieval된 memory_key가
+   Versioned Memory이면
+   Store에서 Version Chain 조회
 
         ↓
 
-8. Version-Aware Filtering
+8-A. Temporal / Version Resolution
 
    현재 Query:
    ACTIVE State 우선
@@ -940,45 +1121,78 @@ Cost
    Historical Query:
    해당 시점에 유효한 Version 선택
 
-        ↓
 
-9. Applicable Protected Memory 결정
+6-B. Protected Retrieval
 
-        ↓
-
-10. 필요한 State 확보
-
-        ↓
-
-11. 남은 Token Budget 계산
+   is_active = true
+   is_protected = true
+   Constraint
 
         ↓
 
-12. Flexible Memory 최적화
+7-B. Task Applicability 판단
 
         ↓
 
-13. Context Builder
+9. 필요한 State와
+   Applicable Protected Memory 확보
 
         ↓
 
-14. LLM Agent Reasoning
+10. Fixed Input Budget 검사
+
+   C_fixed > B_total
+   → INVALID_BUDGET_CONFIGURATION
 
         ↓
 
-15. Tool Action
+11. Mandatory Budget 검사
+
+   C_mandatory > B_memory
+   → INSUFFICIENT_CONTEXT_BUDGET
 
         ↓
 
-16. Environment Result
+12. 남은 Token Budget 계산
 
         ↓
 
-17. Evaluation / Logging
+13. Flexible Memory 최적화
 
         ↓
 
-18. 새로운 Memory 생성 가능
+14. Context Builder
+
+        ↓
+
+15. 최종 Token Validation
+
+   B_total 초과 시
+   낮은 우선순위 Flexible Memory 제거 후
+   재구성 / 재tokenize
+
+   Flexible Memory가 없는데도 초과
+   → INSUFFICIENT_CONTEXT_BUDGET
+
+        ↓
+
+16. LLM Agent Reasoning
+
+        ↓
+
+17. Tool Action
+
+        ↓
+
+18. Environment Result
+
+        ↓
+
+19. Evaluation / Logging
+
+        ↓
+
+20. 새로운 Memory 생성 가능
 ```
 
 ---
@@ -1047,9 +1261,11 @@ Budget-Aware Memory Selection
 │   │
 │   ├── store.py
 │   │   └── Storage / State Versioning
+│   │       / Version Chain Lookup
 │   │
 │   └── selector.py
 │       └── Retrieval / Protected Resolution
+│           / Temporal Resolution
 │           / Budget-Aware Selection
 │
 ├── agent/
@@ -1103,24 +1319,47 @@ Budget-Aware Memory Selection
 4. Historical Query에서는 status가 아니라
    valid_from / valid_to를 기준으로 올바른 Version을 선택한다.
 
-5. Query가 요구한 시점과 다른 State Version을 사용하는 경우
+5. General Retrieval에서 Versioned Memory의 memory_key를 발견하면
+   Store에서 해당 key의 Version Chain을 조회한 뒤
+   Temporal Resolution을 수행한다.
+
+6. Query가 요구한 시점과 다른 State Version을 사용하는 경우
    Temporal / Stale-State Error로 기록한다.
 
-6. Protected Memory는 일반 Flexible Memory보다 우선한다.
+7. Protected Memory는 현재 활성화된 Constraint 중
+   현재 Task에 적용 가능한 항목으로 정의하며
+   일반 Flexible Memory보다 우선한다.
 
-7. Protected Memory도 현재 Task 및 Target Time에
-   적용 가능한 경우에만 Context에 포함한다.
+8. 대체된 과거 Constraint는
+   is_active = false, is_protected = false로 유지하고
+   Historical Query에서는 General Retrieval을 통해 조회한다.
 
-8. 전체 Context는 설정된 Token Budget을 초과하지 않는다.
+9. Protected Retrieval에는 별도의 Temporal Filter를 적용하지 않는다.
 
-9. Retrieval Score와 Recency Score는 Query-dependent 값이므로
-   MemoryItem에 영구적인 최종 점수로 저장하지 않는다.
+10. Fixed Input 자체가 B_total을 초과하면
+    INVALID_BUDGET_CONFIGURATION을 반환한다.
 
-10. Timestamp / Entity / Version Metadata는
+11. Protected Memory와 Required State의 합이
+    가용 Memory Budget을 초과하면
+    일부 Mandatory Memory를 제거하지 않고
+    INSUFFICIENT_CONTEXT_BUDGET을 반환한다.
+
+12. 최종 Context는 설정된 Token Budget을 초과하지 않는다.
+    Formatting 이후 초과하면 낮은 우선순위의
+    Flexible Memory부터 제거하고 다시 Tokenize한다.
+
+13. 모든 Flexible Memory를 제거한 뒤에도
+    Context가 Budget을 초과하면
+    INSUFFICIENT_CONTEXT_BUDGET을 반환한다.
+
+14. Retrieval Score와 Recency Score는 Query-dependent 값이므로
+    MemoryItem에 영구적인 최종 점수로 저장하지 않는다.
+
+15. Timestamp / Entity / Version Metadata는
     검색과 Temporal Resolution에 사용하며,
     필요하지 않으면 LLM Context에 직접 노출하지 않는다.
 
-11. Baseline과 Proposed 방식은
+16. Baseline과 Proposed 방식은
     동일한 Agent / Model / Tool / Task 조건에서 비교한다.
 ```
 
@@ -1170,8 +1409,10 @@ Structured Memory Store
 State Versioning
 Timestamp / Turn Metadata
 Semantic Retrieval
+Version Chain Expansion
 Protected Memory
 Budget-Aware Selection
+Final Context Token Validation
 LLM Tool Agent
 Automatic Evaluation
 ```
