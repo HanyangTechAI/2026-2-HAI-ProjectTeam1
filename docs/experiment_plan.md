@@ -212,6 +212,22 @@ Retrieval Failure
 Reasoning Failure
 필요한 memory를 찾았지만 LLM이 정답 생성에 실패함
 ```
+### 4.5 Temporal Version Accuracy
+
+State update가 존재하는 sample에서는 retrieval 이후 실제 LLM context에 포함된 Memory가 해당 시점에 유효한 버전인지 평가한다.
+
+각 sample에 대해 다음 값을 기록한다.
+
+* `selected_memory_ids`: retrieval 이후 temporal resolution 및 budget selection을 거쳐 실제 LLM context에 포함된 Memory ID
+* `temporal_version_required`: 해당 sample에서 동일 State의 여러 버전 중 올바른 버전을 선택해야 하는지 여부
+* `temporal_version_correct`: 필요한 temporal version을 올바르게 선택했는지 여부
+* `stale_selected_memory_count`: 최종 선택된 Memory 가운데 이미 superseded된 stale Memory의 수
+
+Temporal Version Accuracy (TVA)는 temporal version 판단이 필요한 sample만 대상으로 다음과 같이 계산한다.
+
+TVA = 올바른 temporal version을 선택한 sample 수 / temporal version 판단이 필요한 sample 수
+
+이를 통해 필요한 Memory 자체를 검색하지 못한 Retrieval Failure와, 필요한 버전이 후보에 존재하지만 잘못된 버전을 선택한 Temporal Failure를 구분한다.
 
 ---
 
@@ -451,8 +467,7 @@ History Length와 Token Budget을 독립적으로 변화시키는 full-factorial
 2. State Versioning 제거
 3. Budget Optimization 제거
 
-각 ablation은 완전한 Proposed 방식과 TSR, CVR, CSA, SSUR 및 token usage를 비교한다.
-
+각 ablation은 완전한 Proposed 방식과 TSR, CVR, CSA, SSUR, TVA 및 token usage를 비교한다.
 ---
 
 ## 9. Evaluation Output Format
@@ -483,9 +498,19 @@ History Length와 Token Budget을 독립적으로 변화시키는 full-factorial
       "token_count": 10
     }
   ],
+  "retrieved_memory_ids": ["mem_001"],
+  "selected_memory_ids": ["mem_001"],
+  "target_memory_ids": ["mem_002"],
+
   "retrieval_hit": false,
   "active_target_hit": false,
+
+  "temporal_version_required": true,
+  "temporal_version_correct": false,
+
   "stale_memory_count": 1,
+  "stale_selected_memory_count": 1,
+
   "task_success": false,
   "constraint_violation_count": 0,
   "constraint_violation_rate": 0.0,
@@ -543,6 +568,10 @@ Evaluation schema의 `retrieved_memories`는 별도의 Memory schema가 아니�
 - `available_memory_tokens`: 전체 Context 상한에서 고정 입력을 제외한 Memory 가용 token 수
 - `retrieval_tokens`: 검색된 Memory가 실제 사용한 토큰
 - `input_tokens`, `output_tokens`: 전체 LLM 요청의 실제 토큰 사용량
+-  `selected_memory_ids`: retrieval된 후보 중 temporal resolution 및 budget selection 이후 실제 LLM context에 포함된 Memory 집합
+- `temporal_version_required`: 해당 sample에서 State version 선택이 필요한지 여부
+- `temporal_version_correct`: 실제 선택된 Memory가 해당 시점의 올바른 State version인지 여부
+- `stale_selected_memory_count`: 실제 LLM context에 포함된 Memory 중 superseded된 stale Memory의 수
 
 따라서 Evaluation schema는 공통 Memory schema를 대체하거나 새롭게 정의하는 것이 아니다. 공통 Memory schema를 입력으로 사용하고, 그중 평가에 필요한 상태를 snapshot으로 보존한 뒤 실험 조건과 계산된 metric을 추가한 실행 결과 schema이다.
 
@@ -591,13 +620,13 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
 실험 종료 후 최소한 다음 결과를 strategy별로 집계한다.
 
-| Strategy | TSR | CVR | CSA | SSUR | Recall@k | Avg. Input Tokens | Avg. Planning Latency | Cost |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Proposed | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| Sliding Window | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
-| Vector Top-k | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| Utility-per-Token | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| Long Context Reference | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
+| Strategy | TSR | CVR | CSA | SSUR | TVA | Recall@k | Avg. Input Tokens | Avg. Planning Latency | Cost |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Proposed | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Sliding Window | TBD | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
+| Vector Top-k | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Utility-per-Token | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| Long Context Reference | TBD | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
 
 추가적으로 다음 조건별 결과를 분석한다.
 
