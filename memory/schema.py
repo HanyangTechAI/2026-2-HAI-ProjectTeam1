@@ -5,6 +5,7 @@
 """
 
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from enum import Enum
 from math import isfinite
 from typing import Any, Mapping, Optional
@@ -30,7 +31,13 @@ class MemoryItem:
     행동의 필수 제약은 생성하는 쪽에서 is_protected=True로 지정한다.
     보호는 선택 우선권이며, 명시적인 폐기나 대체를 금지하지 않는다.
 
-    state_key는 세션 안에서 동일한 상태를 식별한다(예: report.current_file).
+    memory_key는 유형에 관계없이 세션 안에서 변경되는 동일 정보를
+    식별한다(예: report.current_file, email.external.requires_approval).
+    created_at은 생성 시점, valid_from과 valid_to는 정보의 유효 기간이다.
+    유효 기간은 [valid_from, valid_to)이며 valid_to=None이면 종료 미정이다.
+    시간은 datetime 또는 ISO 8601 문자열로 입력하고 내부에서는 datetime으로
+    보관한다. 한 기록의 시간대 유무는 통일해야 하며, 시간대 없는 입력에
+    임의의 시간대를 붙이지 않는다.
     실제 최신 버전 판별과 기억 사이의 참조 검증은 저장소의 책임이다.
     token_count는 외부 토크나이저가 계산한 비용이며, importance의 0~1
     범위는 구현상의 정규화 규칙이다. importance 자체가 최종 효용은 아니다.
@@ -42,6 +49,9 @@ class MemoryItem:
     memory_type: MemoryType
     content: str
     token_count: int
+    created_at: datetime
+    valid_from: datetime
+    valid_to: Optional[datetime] = None
     importance: float = 0.5
     is_active: bool = True
     is_protected: bool = False
@@ -79,13 +89,34 @@ class MemoryItem:
             raise ValueError("a superseded memory cannot be active")
         if self.memory_type == MemoryType.STATE and self.memory_key is None:
             raise ValueError("state memories require memory_key")
-        if self.memory_type != MemoryType.STATE and self.memory_key is not None:
-            raise ValueError("memory_key is only valid for state memories")
+
+        for name in ("created_at", "valid_from", "valid_to"):
+            value = getattr(self, name)
+            if name == "valid_to" and value is None:
+                continue
+            if isinstance(value, str):
+                try:
+                    value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError as exc:
+                    raise ValueError(f"{name} must be an ISO 8601 timestamp") from exc
+            if not isinstance(value, datetime):
+                raise ValueError(f"{name} must be a datetime or ISO 8601 timestamp")
+            object.__setattr__(self, name, value)
+
+        timestamps = (self.created_at, self.valid_from, self.valid_to)
+        awareness = {value.utcoffset() is not None for value in timestamps if value is not None}
+        if len(awareness) > 1:
+            raise ValueError("timestamps must consistently include or omit timezone information")
+        if self.valid_to is not None and self.valid_to < self.valid_from:
+            raise ValueError("valid_to cannot precede valid_from")
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible record."""
         result = asdict(self)
         result["memory_type"] = self.memory_type.value
+        for name in ("created_at", "valid_from", "valid_to"):
+            value = getattr(self, name)
+            result[name] = value.isoformat() if value is not None else None
         return result
 
     @classmethod
