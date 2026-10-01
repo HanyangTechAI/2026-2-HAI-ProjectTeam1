@@ -612,6 +612,10 @@ def list_session_memories(
 
 # 6. Query Analyzer Interface
 
+담당 파일:
+
+memory/query_analyzer.py
+
 Query를 Memory selection에 필요한 구조로 변환한다.
 
 ```python
