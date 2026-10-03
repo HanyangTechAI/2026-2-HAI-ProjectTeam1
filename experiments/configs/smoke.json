@@ -1,0 +1,26 @@
+{
+  "name": "smoke",
+  "description": "Small integration grid. Model must be selected before live execution.",
+  "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
+  "dataset": {"source": "synthetic", "samples_per_cell": 5, "task_types": ["temporal_update", "approval"]},
+  "strategies": ["proposed", "sliding_window", "vector_top_k", "utility_per_token"],
+  "seeds": [42],
+  "repeats": 1,
+  "grid": {
+    "context_token_budget": [2048],
+    "history_length_tokens": [10000],
+    "horizon_turns": [50],
+    "noise_memory_ratio": [0.5],
+    "constraint_count": [1],
+    "state_update_count": [2]
+  },
+  "evaluation": {
+    "retrieval_k": 20,
+    "bootstrap_iterations": 2000,
+    "bootstrap_seed": 42,
+    "group_by": ["strategy", "context_token_budget"],
+    "delta_group_by": ["context_token_budget", "horizon_turns"]
+  },
+  "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget"},
+  "output_directory": "experiments/results/smoke"
+}

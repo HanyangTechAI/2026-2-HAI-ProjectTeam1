@@ -1,5 +1,11 @@
 # Experiment Plan
 
+평가 코드 및 설정 사용법: [evaluation_usage.md](evaluation_usage.md).
+`benchmark/evaluator.py`는 전달받은 Scenario/실행 snapshot의 deterministic 평가,
+JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다.
+실험 설정은 `experiments/configs/`에 있으며, 실제 Agent 호출과 데이터 생성은
+각 담당 모듈에서 연결해야 한다.
+
 ## 1. Experiment Objective
 
 본 실험의 목적은 제한된 Context Token Budget에서 행동에 필수적인 제약과 최신 상태를 우선 보존하는 **Constraint-Preserving Budget-Aware Memory**가 Long-Horizon Tool-Using Agent의 작업 성공률과 신뢰성을 개선하는지 검증하는 것이다.
@@ -486,8 +492,6 @@ History Length와 Token Budget을 독립적으로 변화시키는 full-factorial
   "constraint_count": 3,
   "state_update_count": 2,
   "noise_memory_ratio": 0.5,
-  "retrieved_memory_ids": ["mem_001"],
-  "target_memory_ids": ["mem_002"],
   "retrieved_memories": [
     {
       "memory_id": "mem_001",

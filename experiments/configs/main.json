@@ -1,0 +1,26 @@
+{
+  "name": "main",
+  "description": "RQ1/3/4/5: full factorial history x budget x horizon; other difficulty axes fixed.",
+  "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
+  "dataset": {"source": "synthetic", "samples_per_cell": 30, "task_types": ["single_fact", "multi_hop", "temporal_update", "approval", "abstention"]},
+  "strategies": ["proposed", "sliding_window", "vector_top_k", "utility_per_token"],
+  "seeds": [42, 43, 44],
+  "repeats": 3,
+  "grid": {
+    "context_token_budget": [1024, 2048, 4096, 8192],
+    "history_length_tokens": [10000, 25000, 50000],
+    "horizon_turns": [10, 50, 100],
+    "noise_memory_ratio": [0.5],
+    "constraint_count": [3],
+    "state_update_count": [2]
+  },
+  "evaluation": {
+    "retrieval_k": 20,
+    "bootstrap_iterations": 2000,
+    "bootstrap_seed": 42,
+    "group_by": ["strategy", "context_token_budget", "history_length_tokens", "horizon_turns"],
+    "delta_group_by": ["context_token_budget", "history_length_tokens", "horizon_turns"]
+  },
+  "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget"},
+  "output_directory": "experiments/results/main"
+}

@@ -1,0 +1,26 @@
+{
+  "name": "stress",
+  "description": "RQ2: constraint count x updates x noise; full-context reference evaluated separately.",
+  "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
+  "dataset": {"source": "synthetic", "samples_per_cell": 30, "task_types": ["temporal_update", "approval"]},
+  "strategies": ["proposed", "sliding_window", "vector_top_k", "utility_per_token"],
+  "seeds": [42, 43, 44],
+  "repeats": 3,
+  "grid": {
+    "context_token_budget": [2048],
+    "history_length_tokens": [25000],
+    "horizon_turns": [100],
+    "noise_memory_ratio": [0.1, 0.5, 0.9],
+    "constraint_count": [1, 3, 5],
+    "state_update_count": [0, 2, 5]
+  },
+  "evaluation": {
+    "retrieval_k": 20,
+    "bootstrap_iterations": 2000,
+    "bootstrap_seed": 42,
+    "group_by": ["strategy", "context_token_budget", "constraint_count", "state_update_count", "noise_memory_ratio"],
+    "delta_group_by": ["context_token_budget", "horizon_turns", "constraint_count", "state_update_count", "noise_memory_ratio"]
+  },
+  "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget"},
+  "output_directory": "experiments/results/stress"
+}
