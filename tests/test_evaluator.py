@@ -54,6 +54,72 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual((scenario, run), original)
         json.dumps(result)
 
+    def test_general_top_k_is_preserved_after_other_paths_recover_targets(self):
+        scenario, run = fixture()
+        run["selection_result"]["retrieved_memory_ids"] = ["old"]
+        result = evaluate(scenario, run).to_dict()
+        self.assertEqual(result["retrieved_memory_ids"], ["old"])
+        self.assertEqual(result["recall_at_k"], 0)
+        self.assertEqual(result["stale_memory_count"], 1)
+        self.assertEqual(result["stale_selected_memory_count"], 0)
+        self.assertEqual(result["general_retrieval_missing_target_ids"], ["current"])
+        self.assertEqual(result["recovered_target_ids"], ["current"])
+        self.assertTrue(result["general_retrieval_miss"])
+        self.assertFalse(result["selection_failure"])
+        self.assertTrue(result["task_success"])
+        self.assertNotIn("retrieval_failure", result["failure_types"])
+        self.assertNotIn("selection_failure", result["failure_types"])
+
+    def test_unrecovered_general_target_is_a_selection_failure(self):
+        scenario, run = fixture()
+        run["selection_result"].update(retrieved_memory_ids=["old"], selected_memory_ids=["approval"])
+        result = evaluate(scenario, run).to_dict()
+        self.assertTrue(result["general_retrieval_miss"])
+        self.assertTrue(result["selection_failure"])
+        self.assertEqual(result["missing_selected_target_ids"], ["current"])
+        self.assertIn("selection_failure", result["failure_types"])
+        self.assertNotIn("retrieval_failure", result["failure_types"])
+        self.assertEqual(result["recovered_target_ids"], [])
+
+    def test_protected_target_absence_does_not_imply_general_retrieval_failure(self):
+        scenario, run = fixture()
+        run["selection_result"].update(retrieved_memory_ids=["current"], selected_memory_ids=["current"])
+        result = evaluate(scenario, run).to_dict()
+        self.assertEqual(result["recall_at_k"], .5)
+        self.assertEqual(result["applicable_protected_recall"], 0)
+        self.assertFalse(result["general_retrieval_miss"])
+        self.assertTrue(result["selection_failure"])
+        self.assertEqual(result["missing_selected_target_ids"], ["approval"])
+        self.assertIn("selection_failure", result["failure_types"])
+        self.assertNotIn("retrieval_failure", result["failure_types"])
+
+    def test_general_miss_and_selection_failure_matrix(self):
+        for retrieved_target in (False, True):
+            for selected_target in (False, True):
+                with self.subTest(retrieved=retrieved_target, selected=selected_target):
+                    scenario, run = fixture()
+                    run["selection_result"].update(
+                        retrieved_memory_ids=["current"] if retrieved_target else ["old"],
+                        selected_memory_ids=["current", "approval"] if selected_target else ["approval"])
+                    result = evaluate(scenario, run).to_dict()
+                    self.assertEqual(result["general_retrieval_miss"], not retrieved_target)
+                    self.assertEqual(result["selection_failure"], not selected_target)
+                    self.assertEqual("selection_failure" in result["failure_types"], not selected_target)
+                    self.assertNotIn("retrieval_failure", result["failure_types"])
+
+    def test_no_general_targets_has_no_general_miss_metric(self):
+        scenario, run = fixture()
+        scenario["target_memory_ids"] = ["approval"]
+        self.assertIsNone(evaluate(scenario, run).metrics["general_retrieval_miss"])
+
+    def test_no_targets_has_no_selection_failure_metric(self):
+        scenario, run = fixture()
+        scenario["target_memory_ids"] = []
+        result = evaluate(scenario, run)
+        self.assertIsNone(result.metrics["general_retrieval_miss"])
+        self.assertIsNone(result.metrics["selection_failure"])
+        self.assertNotIn("selection_failure", result.metrics["failure_types"])
+
     def test_stale_selection_and_usage_are_distinct(self):
         scenario, run = fixture()
         run["selection_result"]["selected_memory_ids"] = ["old", "approval"]
@@ -96,7 +162,17 @@ class EvaluatorTests(unittest.TestCase):
         result = evaluate(scenario, run)
         self.assertTrue(result.task_success)
         self.assertIsNone(result.metrics["recall_at_k"])
+        self.assertIsNone(result.metrics["general_retrieval_miss"])
         self.assertNotIn("retrieval_failure", result.metrics["failure_types"])
+
+    def test_window_missing_target_is_still_a_selection_failure(self):
+        scenario, run = fixture()
+        run["strategy"] = "sliding_window"
+        run["selection_result"]["selected_memory_ids"] = ["approval"]
+        result = evaluate(scenario, run)
+        self.assertIsNone(result.metrics["general_retrieval_miss"])
+        self.assertTrue(result.metrics["selection_failure"])
+        self.assertIn("selection_failure", result.metrics["failure_types"])
 
     def test_historical_version_is_not_stale(self):
         scenario, run = fixture()
@@ -193,6 +269,91 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIsNone(retrieval_metrics([], [])["recall_at_k"])
 
 
+class SelectionTraceTests(unittest.TestCase):
+    def test_expanded_target_found_but_rejected_is_not_an_initial_hit(self):
+        scenario, run = fixture()
+        run["selection_result"].update(retrieved_memory_ids=["old"],
+                                       selected_memory_ids=["approval"],
+                                       rejected_memory_ids=["current"])
+        result = evaluate(scenario, run).to_dict()
+        self.assertTrue(result["general_retrieval_miss"])
+        self.assertTrue(result["selection_failure"])
+        self.assertEqual(result["found_but_unselected_target_ids"], ["current"])
+        self.assertIsNone(result["budget_selection_failure"])
+        self.assertEqual(result["target_omission_reasons"]["current"], ["selection_rejection_unspecified"])
+
+    def test_explicit_selection_budget_reason(self):
+        scenario, run = fixture()
+        run["selection_result"].update(retrieved_memory_ids=["old"],
+                                       selected_memory_ids=["approval"], rejected_memory_ids=["current"])
+        run["selection_trace"] = {"candidate_memory_ids": ["current", "approval"],
+                                  "budget_rejected_memory_ids": ["current"]}
+        result = evaluate(scenario, run).to_dict()
+        self.assertEqual(result["selection_budget_omitted_target_ids"], ["current"])
+        self.assertTrue(result["budget_selection_failure"])
+        self.assertIn("budget_selection_failure", result["failure_types"])
+        self.assertEqual(result["target_omission_reasons"]["current"], ["selection_budget"])
+
+    def test_context_formatting_budget_drop(self):
+        scenario, run = fixture()
+        run["context_result"] = {"selected_memory_ids": ["approval"], "dropped_flexible_ids": ["current"]}
+        result = evaluate(scenario, run).to_dict()
+        self.assertFalse(result["general_retrieval_miss"])
+        self.assertTrue(result["selection_failure"])
+        self.assertEqual(result["pre_context_selected_memory_ids"], ["approval", "current"])
+        self.assertEqual(result["context_budget_omitted_target_ids"], ["current"])
+        self.assertEqual(result["target_omission_reasons"]["current"], ["context_budget"])
+        self.assertTrue(result["budget_selection_failure"])
+
+    def test_absent_trace_does_not_invent_a_budget_cause(self):
+        scenario, run = fixture()
+        run["selection_result"]["selected_memory_ids"] = ["approval"]
+        result = evaluate(scenario, run).to_dict()
+        self.assertIsNone(result["budget_selection_failure"])
+        self.assertEqual(result["found_but_unselected_target_ids"], [])
+        self.assertEqual(result["target_omission_reasons"]["current"], ["unknown"])
+        self.assertNotIn("budget_selection_failure", result["failure_types"])
+
+    def test_complete_empty_budget_logs_are_a_known_negative(self):
+        scenario, run = fixture()
+        run["selection_result"]["selected_memory_ids"] = ["approval"]
+        run["selection_trace"] = {"budget_rejected_memory_ids": []}
+        run["context_result"] = {"selected_memory_ids": ["approval"], "dropped_flexible_ids": []}
+        result = evaluate(scenario, run).to_dict()
+        self.assertFalse(result["budget_selection_failure"])
+        self.assertTrue(result["budget_omission_trace_complete"])
+
+    def test_protected_candidate_found_before_mandatory_budget_abort(self):
+        scenario, run = fixture()
+        run["status"] = "insufficient_context_budget"
+        run["usage"] = {}
+        run["tool_calls"] = []
+        run["selection_result"].update(retrieved_memory_ids=["old"], selected_memory_ids=[])
+        run["selection_trace"] = {"candidate_memory_ids": ["current", "approval"],
+                                  "budget_rejected_memory_ids": ["current", "approval"]}
+        result = evaluate(scenario, run).to_dict()
+        self.assertEqual(result["found_but_unselected_target_ids"], ["approval", "current"])
+        self.assertEqual(result["budget_omitted_target_ids"], ["approval", "current"])
+        self.assertTrue(result["budget_selection_failure"])
+
+    def test_malformed_trace_is_rejected(self):
+        scenario, run = fixture()
+        run["selection_trace"] = {"budget_rejected_memory_ids": ["current"]}
+        with self.assertRaises(ValueError):
+            evaluate(scenario, run)
+        run["selection_trace"] = {"candidate_memory_ids": ["approval"]}
+        with self.assertRaises(ValueError):
+            evaluate(scenario, run)
+
+    def test_budget_metric_aggregation_excludes_unknown(self):
+        rows = [dict(sample_id="a", strategy="proposed", task_success=False, budget_selection_failure=True),
+                dict(sample_id="b", strategy="proposed", task_success=True, budget_selection_failure=False),
+                dict(sample_id="c", strategy="proposed", task_success=False, budget_selection_failure=None)]
+        metric = aggregate_results(rows, bootstrap_iterations=100)[0]["metrics"]["budget_selection_failure"]
+        self.assertEqual(metric["mean"], .5)
+        self.assertEqual(metric["n"], 2)
+
+
 class AggregationTests(unittest.TestCase):
     def test_paired_ci_and_unmatched(self):
         rows = []
@@ -219,6 +380,18 @@ class AggregationTests(unittest.TestCase):
         summary = aggregate_results(rows, bootstrap_iterations=100)[0]
         self.assertIsNone(summary["metrics"]["task_success"]["ci95"])
         self.assertEqual(summary["metrics"]["total_llm_cost"]["n"], 0)
+
+    def test_new_metrics_aggregate_as_rates_excluding_null(self):
+        rows = [dict(sample_id="a", strategy="proposed", task_success=True,
+                     general_retrieval_miss=True, selection_failure=False),
+                dict(sample_id="b", strategy="proposed", task_success=False,
+                     general_retrieval_miss=False, selection_failure=True),
+                dict(sample_id="c", strategy="proposed", task_success=True,
+                     general_retrieval_miss=None, selection_failure=None)]
+        metrics = aggregate_results(rows, bootstrap_iterations=100)[0]["metrics"]
+        for name in ("general_retrieval_miss", "selection_failure"):
+            self.assertEqual(metrics[name]["mean"], .5)
+            self.assertEqual(metrics[name]["n"], 2)
 
 
 class ConfigAndCliTests(unittest.TestCase):
