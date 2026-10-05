@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>run_demo 결과</title>
+<style>
+  body { margin: 0; background: #f6f7f9; color: #1c1917; font-family: "Malgun Gothic", sans-serif; }
+  main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+  h1 { margin: 0 0 8px; font-size: 28px; }
+  .counts { display: flex; gap: 8px; margin: 16px 0 20px; }
+  .counts span { background: white; border: 1px solid #e7e5e4; border-radius: 999px; padding: 6px 12px; font-weight: 700; }
+  article { background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 14px 16px; margin-top: 10px; }
+  .head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .id { font-size: 18px; }
+  .query { color: #57534e; margin-top: 4px; }
+  .badge { border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .pass { background: #e8f6ec; color: #166534; }
+  .skip { background: #f5f5f4; color: #57534e; }
+  .fail { background: #fde8e8; color: #991b1b; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-top: 1px solid #f0eeec; }
+  th { width: 140px; color: #78716c; font-weight: 600; }
+  .call { margin-top: 8px; padding: 8px 10px; background: #fafaf9; border-radius: 8px; }
+  .call b { display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>run_demo 결과</h1>
+  <div class="counts">
+    <span class="pass">통과 21</span>
+    <span class="skip">건너뜀 18</span>
+    <span class="fail">실패 0</span>
+  </div>
+  <article>
+  <div class="head"><b class="id">S01 현재 State 선택</b><span class="badge pass">통과</span></div>
+  <p class="query">2026-10-05T12:00:00+09:00 시점의 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_final.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S02 시간 미지정은 최신 State 선택</b><span class="badge pass">통과</span></div>
+  <p class="query">보고서 파일 알려줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_final.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S03 SUPERSEDED 과거 버전 선택</b><span class="badge pass">통과</span></div>
+  <p class="query">2026-08-20T00:00:00+09:00 시점의 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_v2.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S04 버전 전환 시각은 새 버전 선택</b><span class="badge pass">통과</span></div>
+  <p class="query">2026-08-15T00:00:00+09:00 시점의 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_v2.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S05 버전 전환 직전은 이전 버전 선택</b><span class="badge pass">통과</span></div>
+  <p class="query">2026-08-14T23:59:59+09:00 시점의 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_v1.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S06 최초 valid_from 포함</b><span class="badge pass">통과</span></div>
+  <p class="query">2026-06-01T00:00:00+09:00 시점의 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_v1.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S07 열린 종료 구간의 현재 버전</b><span class="badge pass">통과</span></div>
+  <p class="query">2026-10-01T00:00:00+09:00 시점의 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_final.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S08 상대 시점 해석</b><span class="badge pass">통과</span></div>
+  <p class="query">두 달 전에 사용하던 보고서 파일을 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_v1.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S09 이력 시작 전은 정보 부족</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">2024-08-01T00:00:00+09:00 당시 보고서 파일은?</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S10 버전 사이 공백은 정보 부족</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">2026-08-10T00:00:00+09:00 당시 보고서 파일은?</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S11 과거 후보에서 최신 버전 확장</b><span class="badge pass">통과</span></div>
+  <p class="query">현재 보고서 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_final.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S12 최신 후보에서 과거 버전 확장</b><span class="badge pass">통과</span></div>
+  <p class="query">8월 20일 보고서를 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_v2.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S13 일반 검색에서 누락된 승인 제약 보완</b><span class="badge pass">통과</span></div>
+  <p class="query">최신 보고서를 교수님께 보내줘.</p>
+  <div class="call"><b>email.request_approval · 성공</b><table><tr><th>승인 번호</th><td>approval_001</td></tr><tr><th>받는 사람</th><td>professor@example.test</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>상태</th><td>승인 대기</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S14 승인 완료 후 발송</b><span class="badge pass">통과</span></div>
+  <p class="query">최신 보고서를 교수님께 보내줘.</p>
+  <div class="call"><b>email.send_email · 성공</b><table><tr><th>메시지 번호</th><td>message_001</td></tr><tr><th>받는 사람</th><td>professor@example.test</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>승인 번호</th><td>approved_001</td></tr><tr><th>승인됨</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음, 맞춘 버전 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S15 과거 State와 현재 승인 규칙 분리</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">6월 보고서를 지금 교수님께 보내줘.</p>
+  <p>이번 벤치마크에서 제외된 시나리오</p>
+</article>
+<article>
+  <div class="head"><b class="id">S16 대체된 승인 제약은 현재 행동에 미적용</b><span class="badge pass">통과</span></div>
+  <p class="query">최신 보고서를 교수님께 보내줘.</p>
+  <div class="call"><b>email.send_email · 성공</b><table><tr><th>메시지 번호</th><td>message_001</td></tr><tr><th>받는 사람</th><td>professor@example.test</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>승인 번호</th><td>없음</td></tr><tr><th>승인됨</th><td>아니오</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S17 과거 제약 자체 조회</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">6월 당시 외부 이메일 발송 규칙은?</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S18 구체적인 예외 규칙 우선</b><span class="badge pass">통과</span></div>
+  <p class="query">최신 보고서를 professor@example.test에게 보내줘.</p>
+  <div class="call"><b>email.send_email · 성공</b><table><tr><th>메시지 번호</th><td>message_001</td></tr><tr><th>받는 사람</th><td>professor@example.test</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>승인 번호</th><td>없음</td></tr><tr><th>승인됨</th><td>아니오</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S19 구체적인 예외를 다른 대상에 확대하지 않음</b><span class="badge pass">통과</span></div>
+  <p class="query">최신 보고서를 partner@example.test에게 보내줘.</p>
+  <div class="call"><b>email.request_approval · 성공</b><table><tr><th>승인 번호</th><td>approval_001</td></tr><tr><th>받는 사람</th><td>partner@example.test</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>상태</th><td>승인 대기</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S20 동일 구체성은 최신 유효 규칙 우선</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">최신 보고서 이메일 보내줘.</p>
+  <p>기대 호출에 받는 사람 주소가 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S21 동일 Session/Key의 중복 ACTIVE 감지</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">현재 보고서 조회</p>
+  <p>이번 벤치마크에서 제외된 시나리오</p>
+</article>
+<article>
+  <div class="head"><b class="id">S22 Session 간 동일 Key는 충돌하지 않음</b><span class="badge pass">통과</span></div>
+  <p class="query">보고서 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_final.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S23 단일 Flexible Memory가 예산보다 큼</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">이메일 작성 참고 정보를 골라줘.</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S24 필수 Memory 합계 초과</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">보고서를 이메일로 보내줘.</p>
+  <p>필수 기억이 예산에 안 들어가서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S25 단일 Protected Memory 초과</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">보고서를 이메일로 보내줘.</p>
+  <p>필수 기억이 예산에 안 들어가서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S26 필수 State 단독 초과</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">보고서를 이메일로 보내줘.</p>
+  <p>필수 기억이 예산에 안 들어가서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S27 고정 입력만으로 예산 초과</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">보고서를 이메일로 보내줘.</p>
+  <p>고정 입력이 예산보다 커서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S28 필수 비용이 예산과 정확히 같음</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">예산 경계 검증</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S29 Memory 예산 0이고 필수 정보 없음</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">예산 경계 검증</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S30 포맷 초과로 Flexible 한 개 제거</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">현재 보고서와 참고 정보를 구성해줘.</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S31 재tokenize를 여러 번 반복</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">현재 보고서와 참고 정보를 구성해줘.</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S32 Flexible 전부 제거해도 포맷 초과</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">현재 보고서와 참고 정보를 구성해줘.</p>
+  <p>필수 기억이 예산에 안 들어가서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S33 Calendar 최신 일정과 시간 제약</b><span class="badge pass">통과</span></div>
+  <p class="query">Calendar 최신 일정과 시간 제약에 맞게 처리해줘.</p>
+  <div class="call"><b>calendar.create_event · 성공</b><table><tr><th>일정 번호</th><td>event_001</td></tr><tr><th>제목</th><td>event</td></tr><tr><th>시작</th><td>2026-10-06T10:00:00+09:00</td></tr><tr><th>종료</th><td>2026-10-06T11:00:00+09:00</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S34 File 보호 파일 삭제 금지</b><span class="badge pass">통과</span></div>
+  <p class="query">File 보호 파일 삭제 금지에 맞게 처리해줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>contract_original.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S35 Task 최신 담당자와 권한 제약</b><span class="badge pass">통과</span></div>
+  <p class="query">Task 최신 담당자와 권한 제약에 맞게 처리해줘.</p>
+  <div class="call"><b>task.update_task · 성공</b><table><tr><th>작업 번호</th><td>task_001</td></tr><tr><th>제목</th><td></td></tr><tr><th>상태</th><td>open</td></tr><tr><th>담당자</th><td>member_zelora</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S36 여러 State를 결합하는 발송</b><span class="badge pass">통과</span></div>
+  <p class="query">프로젝트 담당자에게 최신 보고서를 보내줘.</p>
+  <div class="call"><b>email.request_approval · 성공</b><table><tr><th>승인 번호</th><td>approval_001</td></tr><tr><th>받는 사람</th><td>zelora71@example.test</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>상태</th><td>승인 대기</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S37 Noise 사이의 오래된 단일 사실</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">Zelora-71의 데이터베이스 이름은?</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S38 무관 Protected Constraint 미적용</b><span class="badge pass">통과</span></div>
+  <p class="query">보고서 파일만 찾아줘.</p>
+  <div class="call"><b>file.find_file · 성공</b><table><tr><th>파일</th><td>report_final.pdf</td></tr><tr><th>목록에 있음</th><td>예</td></tr></table></div><p>응답: 시나리오의 기대 툴 호출을 마쳤습니다.</p><p>행동 판정 통과 · 정상 종료 · 남긴 기록 검색된 기억 없음</p>
+</article>
+<article>
+  <div class="head"><b class="id">S39 정보가 전혀 없는 질문에서 기권</b><span class="badge skip">건너뜀</span></div>
+  <p class="query">Zelora-71의 비밀번호는?</p>
+  <p>툴 호출 정답이 없어서 실행하지 않음</p>
+</article>
+</main>
+</body>
+</html>
