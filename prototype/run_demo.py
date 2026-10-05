@@ -25,6 +25,7 @@ from __future__ import annotations
 import inspect
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +37,10 @@ from agent.context import provisional_token_count
 from agent.evaluation import scenario_with_granted_approvals
 from agent.tools import CalendarTool, EmailTool, FileTool, TaskTool, ToolCall, ToolExecutor
 from benchmark.evaluator import evaluate
-from memory.selector import PipelineStatus
+import memory.selector as selector_module
+from memory.query_analyzer import QueryContext, TemporalIntent
+from memory.schema import MemoryItem, MemoryType
+from memory.selector import MemoryCandidate, PipelineStatus
 from memory.store import MemoryStore
 
 SYSTEM_PROMPT = "제약이 있으면 그 제약을 지키고, 상태에 적힌 파일을 사용한다."
@@ -181,7 +185,165 @@ def _run_skeleton() -> None:
         raise SystemExit("tiny budget must stop before planning")
     if blocked.tool_calls or blocked.goal_completed:
         raise SystemExit("budget failure must not call tools or count as success")
+    _run_hardcoded_memory()
     _check_scenario_tool_shapes()
+
+
+def _run_hardcoded_memory() -> None:
+    """비어 있는 기억 단계를 이 데모의 보고서 이력으로 고정하고 run_task를 돌린다."""
+    _install_hardcoded_selector()
+    agent = Agent(
+        _HardcodedStore(_demo_memories()),
+        system_prompt=SYSTEM_PROMPT,
+        tool_definitions=TOOL_DEFINITIONS,
+        executor=ToolExecutor(file=FileTool({"report_v1.pdf": "old", "report_v2.pdf": "mid", ATTACHMENT: "final"})),
+        planner=scripted_plan,
+        goal_checker=scripted_goal,
+    )
+    result = agent.run_task(TASK, SESSION_ID, context_budget=CONTEXT_BUDGET)
+    selection = result.selection_result
+    print("hardcoded memory")
+    print(f"  status: {result.status.value}")
+    print(f"  selected: {list(selection.selected_memory_ids) if selection else []}")
+    print(f"  rejected: {list(selection.rejected_memory_ids) if selection else []}")
+    if result.context_result and result.context_result.context:
+        for line in result.context_result.context.splitlines():
+            if line.startswith("- "):
+                print(f"  prompt: {line}")
+    _print_trace("  tools", result.response, result.tool_calls, result.tool_results)
+    print(f"  goal_completed: {result.goal_completed}")
+    if result.status != PipelineStatus.OK or not result.goal_completed:
+        raise SystemExit("hardcoded memory run did not finish the task")
+    if list(selection.selected_memory_ids) != ["approval", "final"]:
+        raise SystemExit(f"hardcoded selection was {selection.selected_memory_ids}")
+
+
+class _HardcodedStore:
+    """데모 한 번을 위한 고정 목록. MemoryStore 구현이 아니다."""
+
+    def __init__(self, memories: list[MemoryItem]) -> None:
+        self._memories = list(memories)
+
+    def find_all_by_key(self, session_id: str, memory_key: str) -> list[MemoryItem]:
+        return [
+            item for item in self._memories
+            if item.session_id == session_id and item.memory_key == memory_key
+        ]
+
+    def find_active_protected_constraints(self, session_id: str) -> list[MemoryItem]:
+        return [
+            item for item in self._memories
+            if item.session_id == session_id
+            and item.is_active
+            and item.is_protected
+            and item.memory_type == MemoryType.CONSTRAINT
+        ]
+
+    def list_session_memories(self, session_id: str) -> list[MemoryItem]:
+        return [item for item in self._memories if item.session_id == session_id]
+
+
+def _install_hardcoded_selector() -> None:
+    """selector가 아직 던지는 함수만 데모 답으로 바꾼다."""
+    selector_module.analyze_query = _hard_analyze
+    selector_module.retrieve_candidates = _hard_retrieve
+    selector_module.expand_version_chains = _hard_expand
+    selector_module.resolve_temporal_versions = _hard_resolve
+    selector_module.is_constraint_applicable = _hard_applicable
+    selector_module.resolve_required_states = _hard_states
+    selector_module.compute_utility = _hard_utility
+    selector_module.select_flexible = _hard_flexible
+
+
+def _hard_analyze(query: str, current_turn: int, current_time: datetime) -> QueryContext:
+    return QueryContext(
+        query=query,
+        temporal_intent=TemporalIntent.CURRENT,
+        target_time=current_time,
+        entities=("보고서",),
+        required_tools=("email",),
+        current_turn=current_turn,
+        current_time=current_time,
+    )
+
+
+def _hard_retrieve(query_context, memory_store, session_id: str, top_k: int) -> list[MemoryCandidate]:
+    del query_context, top_k
+    return [MemoryCandidate(item) for item in memory_store.list_session_memories(session_id)]
+
+
+def _hard_expand(candidates, memory_store) -> list[MemoryCandidate]:
+    expanded = list(candidates)
+    seen = {item.memory.memory_id for item in expanded}
+    for candidate in list(candidates):
+        key = candidate.memory.memory_key
+        if key is None:
+            continue
+        for memory in memory_store.find_all_by_key(candidate.memory.session_id, key):
+            if memory.memory_id in seen:
+                continue
+            seen.add(memory.memory_id)
+            expanded.append(MemoryCandidate(memory))
+    return expanded
+
+
+def _hard_resolve(candidates, query_context) -> list[MemoryCandidate]:
+    del query_context
+    return list(candidates)
+
+
+def _hard_applicable(constraint: MemoryItem, query_context) -> bool:
+    del query_context
+    return constraint.is_active and constraint.is_protected
+
+
+def _hard_states(candidates, query_context) -> list[MemoryItem]:
+    del query_context
+    return [
+        candidate.memory
+        for candidate in candidates
+        if candidate.memory.memory_type == MemoryType.STATE and candidate.memory.is_active
+    ]
+
+
+def _hard_utility(candidate: MemoryCandidate, query_context) -> float:
+    del query_context
+    return candidate.memory.importance
+
+
+def _hard_flexible(candidates, budget: int) -> list[MemoryCandidate]:
+    del candidates, budget
+    return []
+
+
+def _demo_memories() -> list[MemoryItem]:
+    def at(value: str) -> datetime:
+        return datetime.fromisoformat(value)
+
+    return [
+        MemoryItem(
+            "v1", SESSION_ID, 3, MemoryType.STATE, "report_v1.pdf", 30,
+            at("2026-06-01T00:00:00+09:00"), at("2026-06-01T00:00:00+09:00"),
+            at("2026-08-15T00:00:00+09:00"), memory_key="report.current_file",
+            is_active=False, superseded_by="v2",
+        ),
+        MemoryItem(
+            "v2", SESSION_ID, 60, MemoryType.STATE, "report_v2.pdf", 30,
+            at("2026-08-15T00:00:00+09:00"), at("2026-08-15T00:00:00+09:00"),
+            at("2026-09-20T00:00:00+09:00"), memory_key="report.current_file",
+            is_active=False, supersedes="v1", superseded_by="final",
+        ),
+        MemoryItem(
+            "final", SESSION_ID, 100, MemoryType.STATE, "report_final.pdf", 30,
+            at("2026-09-20T00:00:00+09:00"), at("2026-09-20T00:00:00+09:00"),
+            memory_key="report.current_file", is_active=True, supersedes="v2",
+        ),
+        MemoryItem(
+            "approval", SESSION_ID, 3, MemoryType.CONSTRAINT, "외부 이메일은 승인 후 발송한다.", 60,
+            at("2026-06-01T00:00:00+09:00"), at("2026-06-01T00:00:00+09:00"),
+            memory_key="email.external.requires_approval", is_active=True, is_protected=True,
+        ),
+    ]
 
 
 def load_scenarios(path: Path = SCENARIOS_PATH) -> list[dict]:
