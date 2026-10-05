@@ -164,19 +164,17 @@ class MemoryItem:
     content: str
     token_count: int
 
-    importance: float = 0.5
+    created_at: datetime
+    valid_from: datetime
+    valid_to: datetime | None = None
 
+    importance: float = 0.5
     is_active: bool = True
     is_protected: bool = False
 
-    memory_key: str | None = None
-
-    created_at: datetime | None = None
-    valid_from: datetime | None = None
-    valid_to: datetime | None = None
-
     supersedes: str | None = None
     superseded_by: str | None = None
+    memory_key: str | None = None
 ```
 
 ## `memory_key` 규칙
@@ -304,11 +302,11 @@ class QueryContext:
     target_time: datetime | None
     target_range: tuple[datetime, datetime] | None
 
-    entities: list[str]
-    required_tools: list[str]
+    entities: tuple[str, ...] = ()
+    required_tools: tuple[str, ...] = ()
 
-    current_turn: int
-    current_time: datetime
+    current_turn: int = 0
+    current_time: datetime | None = None
 ```
 
 예:
@@ -660,6 +658,7 @@ memory/selector.py
 def retrieve_candidates(
     query_context: QueryContext,
     memory_store: MemoryStore,
+    session_id: str,
     top_k: int
 ) -> list[MemoryCandidate]:
     ...
@@ -807,7 +806,8 @@ D-03 확정 사항이다.
 ```python
 def retrieve_protected(
     query_context: QueryContext,
-    memory_store: MemoryStore
+    memory_store: MemoryStore,
+    session_id: str
 ) -> list[MemoryItem]:
     ...
 ```
@@ -988,7 +988,7 @@ Required State
 class MandatorySelectionResult:
     status: PipelineStatus
 
-    memories: list[MemoryItem]
+    memories: tuple[MemoryItem, ...]
 
     used_tokens: int
     remaining_budget: int
@@ -1060,7 +1060,7 @@ Optional implementation:
 0/1 Knapsack
 ```
 
-어떤 방식을 사용할지는 Experiment Config에서 선택 가능하게 한다.
+어떤 방식을 사용할지는 Experiment Config에서 선택 가능하게 한다. 단, 선택된 후보들을 선택 우선순위가 높은 순서대로 반환해야 합니다.
 
 ---
 
@@ -1075,13 +1075,13 @@ Memory Selection 전체를 외부 모듈에서 호출할 때 사용하는 상위
 class SelectionResult:
     status: PipelineStatus
 
-    protected: list[MemoryItem]
-    states: list[MemoryItem]
-    flexible: list[MemoryItem]
+    protected: tuple[MemoryItem, ...]
+    states: tuple[MemoryItem, ...]
+    flexible: tuple[MemoryItem, ...]
 
-    retrieved_memory_ids: list[str]
-    selected_memory_ids: list[str]
-    rejected_memory_ids: list[str]
+    retrieved_memory_ids: tuple[str, ...]
+    selected_memory_ids: tuple[str, ...]
+    rejected_memory_ids: tuple[str, ...]
 
     memory_tokens: int
     remaining_budget: int
@@ -1097,7 +1097,9 @@ def select_memory(
     total_budget: int,
     fixed_tokens: int,
     current_turn: int,
-    current_time: datetime
+    current_time: datetime,
+    *,
+    top_k: int = 20
 ) -> SelectionResult:
     ...
 ```
@@ -1316,7 +1318,7 @@ class Agent:
 
 `goal_completed`는 `stopped_reason`이 `completed`이고 생성 시 넣은 `goal_checker`가 참일 때만 True다. checker가 없거나, 예산 초과·툴 실패·반복 한도로 멈추면 False다. 툴을 호출했다는 사실만으로 작업 성공이 되지 않는다.
 
-기억 선택이 아직 연결되지 않은 데모는 `act`만 호출할 수 있다.
+기억 선택 구현이 없는 환경에서는 완성된 Context를 `act`에 직접 넘길 수 있다. 현재 데모의 시나리오 실행은 미구현 선택기 함수를 결정적 구현으로 대체한 뒤 `run_task` 전체 흐름을 사용한다.
 
 ---
 
@@ -1570,31 +1572,30 @@ Benchmark는 Agent가 무엇을 해야 하는지에 대한 Ground Truth를 갖�
 
 ## Scenario
 
-```python
-@dataclass
-class Scenario:
-    scenario_id: str
-    session_id: str
+현재 Scenario는 별도 dataclass가 아니라 `benchmark/scenarios.json`의 JSON 객체로 전달한다. Evaluator가 사용하는 주요 필드는 다음과 같다.
 
-    interactions: list[Interaction]
+```text
+scenario_id
+session_id
+query
+context_budget
 
-    final_query: str
+target_memory_ids
+required_state_ids
+required_states
+applicable_constraint_ids
+constraint_rules
 
-    target_memory_ids: list[str]
+expected_tool_calls
+forbidden_tool_calls
+expected_answers
 
-    required_state_ids: list[str]
-
-    applicable_constraint_ids: list[str]
-
-    expected_tool_calls: list[dict]
-    forbidden_tool_calls: list[dict]
-
-    temporal_intent: TemporalIntent
-
-    target_time: datetime | None
-
-    context_budget: int
+temporal_version_required
+wrong_version_memory_ids
+metadata
 ```
+
+`required_state_ids`와 `required_states[*].memory_id`, `applicable_constraint_ids`와 `constraint_rules[*].constraint_id`는 각각 정확히 일치해야 한다.
 
 필요한 경우 추가 실험 변수:
 
@@ -1635,36 +1636,13 @@ Agent Action Success
 class EvaluationResult:
     sample_id: str
     strategy: str
-
+    repeat_id: int
+    pipeline_status: str
     task_success: bool
-
-    retrieved_memory_ids: list[str]
-    selected_memory_ids: list[str]
-    target_memory_ids: list[str]
-
-    retrieval_hit: bool
-
-    applicable_protected_recall: float
-
-    current_state_accuracy: float
-    temporal_version_correct: bool | None
-
-    constraint_violation: bool
-    stale_state_used: bool
-
-    state_omission_count: int
-    state_error_count: int
-
-    input_tokens: int
-    output_tokens: int
-
-    planning_latency_ms: float | None
-    total_latency_ms: float | None
-
-    total_llm_cost: float | None
-
-    pipeline_status: PipelineStatus
+    metrics: dict[str, Any]
 ```
+
+검색·상태·제약·토큰·지연시간 등의 세부 지표는 확장 가능한 `metrics`에 저장한다. `to_dict()`는 이 지표와 위 식별/결과 필드를 평탄화한 dict를 반환한다.
 
 ---
 
@@ -1672,11 +1650,17 @@ class EvaluationResult:
 
 ```python
 def evaluate(
-    scenario: Scenario,
-    run_result: AgentRunResult
+    scenario: Any,
+    run_result: Any,
+    *,
+    strategy: str | None = None,
+    k: int = 20,
+    repeat_id: int = 0
 ) -> EvaluationResult:
     ...
 ```
+
+`scenario`와 `run_result`는 mapping 또는 dataclass snapshot을 받을 수 있으며 Evaluator는 Memory Store, tokenizer, Agent를 호출하지 않는다.
 
 Evaluator는 다음 세 단계를 구분한다.
 

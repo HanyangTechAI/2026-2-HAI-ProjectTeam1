@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 최신 작업 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계 및 저장소 초기 구성 단계이다. 구현 파일과 의존성 목록은 비어 있으며, 아래 구조·실험·데모는 개발 계획이다.
+> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. Agent 실행 흐름, mock Tool, Context Builder, Evaluator와 시나리오 데모가 구현되어 있으며, Memory Store와 검색·선택 핵심 알고리즘 및 실제 LLM 연동은 아직 스켈레톤이다.
 
 ## 배경과 목표
 
@@ -109,7 +109,7 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 
 ## 데모 시나리오
 
-아래는 구현 예정인 예시이며, 측정 결과가 아니다.
+아래는 데모에 구현된 예시이며, 연구 실험의 측정 결과는 아니다.
 
 | 시점 | Interaction |
 | --- | --- |
@@ -122,7 +122,7 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 
 ## 저장소 구조
 
-아래는 현재 디렉터리 구성과 각 영역의 구현 예정 역할이다.
+아래는 현재 디렉터리 구성과 각 영역의 역할이다.
 
 ```text
 .
@@ -145,7 +145,7 @@ Agent 스켈레톤과 mock Tool 데모는 저장소 루트에서 다음으로 �
 python prototype/run_demo.py
 ```
 
-데모는 스크립트 planner로 파일 선택, 승인 요청, 발송 순서를 확인하고, 예산이 고정 입력보다 작으면 툴을 호출하지 않는지 확인한다. 이어서 `benchmark/scenarios.json`을 읽는다. 기억 선택은 이 데모 안에서 시나리오 `memory_snapshot`과 합성 토큰 수로 고정하고, 에이전트는 예산 중단, 기억 문장 답변, 기대 툴 호출을 실행한 뒤 evaluator에 넘긴다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다. LLM과 `memory/` 구현은 연결되지 않았다.
+데모는 스크립트 planner로 파일 선택, 승인 요청, 발송 순서를 확인하고, 예산이 고정 입력보다 작으면 툴을 호출하지 않는지 확인한다. 이어서 `benchmark/scenarios.json`을 읽는다. 기억 선택은 아직 미구현인 선택기 함수를 데모 내부의 결정적 구현으로 대체하여 시나리오 `memory_snapshot`과 합성 토큰 수로 실행한다. 에이전트는 예산 중단, 기억 문장 답변, 기대 툴 호출을 수행한 뒤 evaluator에 넘긴다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다. 실제 LLM은 아직 연결되지 않았다.
 
 ## 기술 스택 후보
 
