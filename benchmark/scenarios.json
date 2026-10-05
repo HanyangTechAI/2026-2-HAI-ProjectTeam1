@@ -1,0 +1,6470 @@
+{
+  "schema_version": "1.0",
+  "description": "EC/시간 경계/Tool 행동 검증용 최소 재현 시나리오. 실행 결과가 아닌 입력과 ground truth이다.",
+  "defaults": {
+    "timezone": "Asia/Seoul",
+    "fixture_loading": "restore_snapshot",
+    "retrieval_fixture_scope": "deterministic_unit_only",
+    "token_count_mode": "synthetic_fixture",
+    "integration_token_policy": "선정한 동일 Tokenizer로 고정 입력, Memory와 최종 Context를 다시 측정한다."
+  },
+  "policy_notes": [
+    "필수 Memory 초과는 최신 architecture/interfaces의 중단 정책을 따른다. edge_cases EC-01/EC-06의 과거 부분 선택 설명보다 EC-12를 우선한다.",
+    "EC-09는 후순위이며 benchmark_enabled=false이다.",
+    "Store consistency 오류는 PipelineStatus에 정의되어 있지 않아 expected_pipeline_status=null이며 별도 assertion으로 검증한다.",
+    "선택/포맷/Store assertion은 기존 evaluator가 검사하지 않으므로 실행기에서 별도로 검사해야 한다.",
+    "Synthetic token count와 scripted tokenizer count는 실제 모델 토큰 수나 실험 결과가 아니다."
+  ],
+  "experiment_axes": {
+    "context_budgets": [
+      1024,
+      2048,
+      4096,
+      8192
+    ],
+    "horizon_turns": [
+      10,
+      50,
+      100,
+      500
+    ],
+    "history_length_turns": [
+      120,
+      600,
+      1200
+    ],
+    "noise_memory_ratios": [
+      0,
+      0.5,
+      0.8
+    ],
+    "state_update_counts": [
+      0,
+      2,
+      5
+    ],
+    "constraint_counts": [
+      1,
+      3,
+      5
+    ],
+    "seeds": [
+      42,
+      123,
+      2026
+    ],
+    "strategies": [
+      "proposed",
+      "sliding_window",
+      "vector_top_k",
+      "utility_per_token",
+      "long_context_reference"
+    ],
+    "note": "확장 실험 입력 축이며 실제 history 생성 및 token 측정이 필요하다. 모든 전략에 동일 sample을 사용한다."
+  },
+  "scenarios": [
+    {
+      "scenario_id": "S01",
+      "title": "현재 State 선택",
+      "coverage": [
+        "EC-05"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-10-05T12:00:00+09:00 시점의 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "current",
+        "target_time": "2026-10-05T12:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "final"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_final.pdf",
+          "stale_values": [
+            "report_v1.pdf",
+            "report_v2.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "v2"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 20
+      }
+    },
+    {
+      "scenario_id": "S02",
+      "title": "시간 미지정은 최신 State 선택",
+      "coverage": [
+        "EC-05"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서 파일 알려줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "final"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_final.pdf",
+          "stale_values": [
+            "report_v1.pdf",
+            "report_v2.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "v2"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 20
+      }
+    },
+    {
+      "scenario_id": "S03",
+      "title": "SUPERSEDED 과거 버전 선택",
+      "coverage": [
+        "TV-01"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-08-20T00:00:00+09:00 시점의 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-08-20T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "v2"
+      ],
+      "required_state_ids": [
+        "v2"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v2",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_v2.pdf",
+          "stale_values": [
+            "report_v1.pdf",
+            "report_final.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_v2.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v2"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 60
+      }
+    },
+    {
+      "scenario_id": "S04",
+      "title": "버전 전환 시각은 새 버전 선택",
+      "coverage": [
+        "TV-02"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-08-15T00:00:00+09:00 시점의 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-08-15T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "v2"
+      ],
+      "required_state_ids": [
+        "v2"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v2",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_v2.pdf",
+          "stale_values": [
+            "report_v1.pdf",
+            "report_final.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_v2.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v2"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 60
+      }
+    },
+    {
+      "scenario_id": "S05",
+      "title": "버전 전환 직전은 이전 버전 선택",
+      "coverage": [
+        "TV-02"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-08-14T23:59:59+09:00 시점의 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-08-14T23:59:59+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "v1"
+      ],
+      "required_state_ids": [
+        "v1"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v1",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_v1.pdf",
+          "stale_values": [
+            "report_v2.pdf",
+            "report_final.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v2",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_v1.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v1"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S06",
+      "title": "최초 valid_from 포함",
+      "coverage": [
+        "TV-02"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-06-01T00:00:00+09:00 시점의 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-06-01T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "v1"
+      ],
+      "required_state_ids": [
+        "v1"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v1",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_v1.pdf",
+          "stale_values": [
+            "report_v2.pdf",
+            "report_final.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v2",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_v1.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v1"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S07",
+      "title": "열린 종료 구간의 현재 버전",
+      "coverage": [
+        "TV-02"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-10-01T00:00:00+09:00 시점의 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-10-01T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "final"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_final.pdf",
+          "stale_values": [
+            "report_v1.pdf",
+            "report_v2.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "v2"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 20
+      }
+    },
+    {
+      "scenario_id": "S08",
+      "title": "상대 시점 해석",
+      "coverage": [
+        "TEMPORAL-RELATIVE"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "두 달 전에 사용하던 보고서 파일을 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "relative_time",
+        "target_time": "2026-08-05T12:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "v1",
+            "semantic_score": 0.99
+          },
+          {
+            "memory_id": "final",
+            "semantic_score": 0.1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "v1"
+      ],
+      "required_state_ids": [
+        "v1"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v1",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_v1.pdf",
+          "stale_values": [
+            "report_v2.pdf",
+            "report_final.pdf"
+          ]
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v2",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_v1.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v1"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S09",
+      "title": "이력 시작 전은 정보 부족",
+      "coverage": [
+        "EC-03"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2024-08-01T00:00:00+09:00 당시 보고서 파일은?",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2024-08-01T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "no_fabricated_state": true
+      },
+      "metadata": {
+        "task_type": "abstention",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      },
+      "expected_answers": [
+        "Unknown / insufficient memory"
+      ]
+    },
+    {
+      "scenario_id": "S10",
+      "title": "버전 사이 공백은 정보 부족",
+      "coverage": [
+        "EC-03"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "2026-08-10T00:00:00+09:00 당시 보고서 파일은?",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-01T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-08-10T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "no_fabricated_state": true
+      },
+      "metadata": {
+        "task_type": "abstention",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      },
+      "expected_answers": [
+        "Unknown / insufficient memory"
+      ]
+    },
+    {
+      "scenario_id": "S11",
+      "title": "과거 후보에서 최신 버전 확장",
+      "coverage": [
+        "EC-08"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "현재 보고서 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "current",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "v2"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "expanded_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 20
+      }
+    },
+    {
+      "scenario_id": "S12",
+      "title": "최신 후보에서 과거 버전 확장",
+      "coverage": [
+        "EC-08"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "8월 20일 보고서를 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-08-20T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "v2"
+      ],
+      "required_state_ids": [
+        "v2"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v2",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_v2.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_v2.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v2"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "expanded_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 60
+      }
+    },
+    {
+      "scenario_id": "S13",
+      "title": "일반 검색에서 누락된 승인 제약 보완",
+      "coverage": [
+        "EC-07"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "최신 보고서를 교수님께 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "current",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "approval"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "request_approval"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "approval"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "approval",
+          "approval": {
+            "execution": {
+              "tool_name": "email",
+              "action": "send_email"
+            },
+            "request": {
+              "tool_name": "email",
+              "action": "request_approval"
+            },
+            "valid_approval_ids": [],
+            "request_required": true
+          }
+        }
+      ],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "v2"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "request_approval",
+          "arguments": {
+            "attachment": "report_final.pdf",
+            "recipient": "professor@example.test"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "approval"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "environment": {
+        "valid_approval_ids": []
+      }
+    },
+    {
+      "scenario_id": "S14",
+      "title": "승인 완료 후 발송",
+      "coverage": [
+        "APPROVAL-GRANTED"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "최신 보고서를 교수님께 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "current",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "approval"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "send_email"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "approval"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "approval",
+          "approval": {
+            "execution": {
+              "tool_name": "email",
+              "action": "send_email"
+            },
+            "request": {
+              "tool_name": "email",
+              "action": "request_approval"
+            },
+            "valid_approval_ids": [
+              "approved_001"
+            ],
+            "request_required": false
+          }
+        }
+      ],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v1",
+        "v2"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email",
+          "arguments": {
+            "attachment": "report_final.pdf",
+            "recipient": "professor@example.test",
+            "approval_id": "approved_001"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "approval"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "environment": {
+        "valid_approval_ids": [
+          "approved_001"
+        ]
+      }
+    },
+    {
+      "scenario_id": "S15",
+      "title": "과거 State와 현재 승인 규칙 분리",
+      "coverage": [
+        "EC-09"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": false,
+      "implementation_priority": "deferred",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "6월 보고서를 지금 교수님께 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-06-15T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ],
+        "state_target_time": "2026-06-15T00:00:00+09:00",
+        "action_time": "2026-10-05T12:00:00+09:00"
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "v1",
+        "approval"
+      ],
+      "required_state_ids": [
+        "v1"
+      ],
+      "required_states": [
+        {
+          "memory_id": "v1",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "request_approval"
+          },
+          "argument": "attachment",
+          "expected_value": "report_v1.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "approval"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "approval",
+          "approval": {
+            "execution": {
+              "tool_name": "email",
+              "action": "send_email"
+            },
+            "request": {
+              "tool_name": "email",
+              "action": "request_approval"
+            },
+            "valid_approval_ids": [],
+            "request_required": true
+          }
+        }
+      ],
+      "temporal_version_required": true,
+      "wrong_version_memory_ids": [
+        "v2",
+        "final"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "request_approval",
+          "arguments": {
+            "attachment": "report_v1.pdf",
+            "recipient": "professor@example.test"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "v1",
+          "approval"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "environment": {
+        "valid_approval_ids": []
+      }
+    },
+    {
+      "scenario_id": "S16",
+      "title": "대체된 승인 제약은 현재 행동에 미적용",
+      "coverage": [
+        "CONSTRAINT-UPDATE"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "최신 보고서를 교수님께 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 90,
+          "timestamp": "2026-09-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 없이 발송할 수 있다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-09-01T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "allow"
+        },
+        {
+          "memory_id": "allow",
+          "session_id": "session_main",
+          "turn_id": 90,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 없이 발송할 수 있다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-09-01T00:00:00+09:00",
+          "valid_from": "2026-09-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "approval",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final",
+          "approval"
+        ],
+        "protected_memory_ids": [
+          "allow"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "allow"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "send_email"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email",
+          "arguments": {
+            "attachment": "report_final.pdf",
+            "recipient": "professor@example.test"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "allow"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "excluded_memory_ids": [
+          "approval",
+          "v1",
+          "v2"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 3,
+        "history_length_turns": 120,
+        "horizon_turns": 30
+      }
+    },
+    {
+      "scenario_id": "S17",
+      "title": "과거 제약 자체 조회",
+      "coverage": [
+        "CONSTRAINT-HISTORICAL"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "6월 당시 외부 이메일 발송 규칙은?",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 90,
+          "timestamp": "2026-09-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 없이 발송할 수 있다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-09-01T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "allow"
+        },
+        {
+          "memory_id": "allow",
+          "session_id": "session_main",
+          "turn_id": 90,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 없이 발송할 수 있다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-09-01T00:00:00+09:00",
+          "valid_from": "2026-09-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "approval",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "historical",
+        "target_time": "2026-06-15T00:00:00+09:00",
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "approval"
+        ],
+        "protected_memory_ids": [
+          "allow"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "approval"
+      ],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "approval"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 1,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "expected_answers": [
+        "외부 이메일은 승인 후 발송한다."
+      ]
+    },
+    {
+      "scenario_id": "S18",
+      "title": "구체적인 예외 규칙 우선",
+      "coverage": [
+        "EC-04"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "최신 보고서를 professor@example.test에게 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "교수님에게 보내는 이메일은 승인 없이 발송할 수 있다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "exception",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "교수님에게 보내는 이메일은 승인 없이 발송할 수 있다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.professor.approval_exception",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval",
+          "exception"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "exception"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "send_email"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email",
+          "arguments": {
+            "attachment": "report_final.pdf",
+            "recipient": "professor@example.test"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "exception"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 2,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S19",
+      "title": "구체적인 예외를 다른 대상에 확대하지 않음",
+      "coverage": [
+        "EC-04"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "최신 보고서를 partner@example.test에게 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "교수님에게 보내는 이메일은 승인 없이 발송할 수 있다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "exception",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "교수님에게 보내는 이메일은 승인 없이 발송할 수 있다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.professor.approval_exception",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval",
+          "exception"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "approval"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "request_approval"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "approval"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "approval",
+          "approval": {
+            "execution": {
+              "tool_name": "email",
+              "action": "send_email"
+            },
+            "request": {
+              "tool_name": "email",
+              "action": "request_approval"
+            },
+            "valid_approval_ids": [],
+            "request_required": true
+          }
+        }
+      ],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "request_approval",
+          "arguments": {
+            "attachment": "report_final.pdf",
+            "recipient": "partner@example.test"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "approval"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 2,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S20",
+      "title": "동일 구체성은 최신 유효 규칙 우선",
+      "coverage": [
+        "EC-04"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "최신 보고서 이메일 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 90,
+          "timestamp": "2026-09-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 없이 발송할 수 있다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-09-01T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "allow"
+        },
+        {
+          "memory_id": "allow",
+          "session_id": "session_main",
+          "turn_id": 90,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 없이 발송할 수 있다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-09-01T00:00:00+09:00",
+          "valid_from": "2026-09-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "approval",
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final",
+          "approval"
+        ],
+        "protected_memory_ids": [
+          "allow"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "allow"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "send_email"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email",
+          "arguments": {
+            "attachment": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "allow"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 3,
+        "history_length_turns": 120,
+        "horizon_turns": 30
+      }
+    },
+    {
+      "scenario_id": "S21",
+      "title": "동일 Session/Key의 중복 ACTIVE 감지",
+      "coverage": [
+        "EC-02"
+      ],
+      "validation_scope": "store_consistency",
+      "benchmark_enabled": false,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "현재 보고서 조회",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_a.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_b.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "dup1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_a.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "dup2",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_b.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "dup1",
+          "dup2"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": null,
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": true,
+        "must_not_execute_tools": true,
+        "max_input_tokens": 512,
+        "store_consistency_error": true
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      },
+      "fixture_loading": "restore_corrupt_snapshot"
+    },
+    {
+      "scenario_id": "S22",
+      "title": "Session 간 동일 Key는 충돌하지 않음",
+      "coverage": [
+        "EC-02",
+        "SESSION-ISOLATION"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        },
+        {
+          "session_id": "session_other",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "other_session.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "other",
+          "session_id": "session_other",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "other_session.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final"
+      ],
+      "required_state_ids": [
+        "final"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "excluded_memory_ids": [
+          "other"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S23",
+      "title": "단일 Flexible Memory가 예산보다 큼",
+      "coverage": [
+        "EC-06"
+      ],
+      "validation_scope": "selection",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "이메일 작성 참고 정보를 골라줘.",
+      "context_budget": 140,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "간결한 이메일을 선호한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "지난 발송은 성공했다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "f1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "preference",
+          "content": "간결한 이메일을 선호한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "f2",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "experience",
+          "content": "지난 발송은 성공했다.",
+          "token_count": 20,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "f1",
+          "f2"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "f1",
+            "utility_score": 10
+          },
+          {
+            "memory_id": "f2",
+            "utility_score": 1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "f2"
+      ],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "f2"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 140,
+        "excluded_memory_ids": [
+          "f1"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S24",
+      "title": "필수 Memory 합계 초과",
+      "coverage": [
+        "EC-01",
+        "EC-12"
+      ],
+      "validation_scope": "budget",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서를 이메일로 보내줘.",
+      "context_budget": 200,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "개인정보 첨부 금지"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 50,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "privacy",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "개인정보 첨부 금지",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.privacy",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval",
+          "privacy"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "insufficient_context_budget",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": true,
+        "must_not_execute_tools": true,
+        "max_input_tokens": 200,
+        "mandatory_overflow": true,
+        "mandatory_memory_ids": [
+          "approval",
+          "final",
+          "privacy"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 2,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      }
+    },
+    {
+      "scenario_id": "S25",
+      "title": "단일 Protected Memory 초과",
+      "coverage": [
+        "EC-06",
+        "EC-12"
+      ],
+      "validation_scope": "budget",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서를 이메일로 보내줘.",
+      "context_budget": 200,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "승인 없이 발송 금지"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "large",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "승인 없이 발송 금지",
+          "token_count": 120,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [],
+        "protected_memory_ids": [
+          "large"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "insufficient_context_budget",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": true,
+        "must_not_execute_tools": true,
+        "max_input_tokens": 200,
+        "mandatory_overflow": true,
+        "mandatory_memory_ids": [
+          "large"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      }
+    },
+    {
+      "scenario_id": "S26",
+      "title": "필수 State 단독 초과",
+      "coverage": [
+        "EC-12"
+      ],
+      "validation_scope": "budget",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서를 이메일로 보내줘.",
+      "context_budget": 200,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "large_state",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 120,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "large_state"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "insufficient_context_budget",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": true,
+        "must_not_execute_tools": true,
+        "max_input_tokens": 200,
+        "mandatory_overflow": true,
+        "mandatory_memory_ids": [
+          "large_state"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      }
+    },
+    {
+      "scenario_id": "S27",
+      "title": "고정 입력만으로 예산 초과",
+      "coverage": [
+        "EC-11"
+      ],
+      "validation_scope": "budget",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서를 이메일로 보내줘.",
+      "context_budget": 99,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [],
+      "memory_snapshot": [],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "invalid_budget_configuration",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": true,
+        "must_not_execute_tools": true,
+        "max_input_tokens": 99,
+        "mandatory_overflow": false,
+        "mandatory_memory_ids": []
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      }
+    },
+    {
+      "scenario_id": "S28",
+      "title": "필수 비용이 예산과 정확히 같음",
+      "coverage": [
+        "BUDGET-BOUNDARY"
+      ],
+      "validation_scope": "budget",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "예산 경계 검증",
+      "context_budget": 200,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final"
+        ],
+        "protected_memory_ids": [
+          "approval"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "approval",
+        "final"
+      ],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "approval",
+          "final"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 200,
+        "memory_tokens": 100
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S29",
+      "title": "Memory 예산 0이고 필수 정보 없음",
+      "coverage": [
+        "BUDGET-BOUNDARY"
+      ],
+      "validation_scope": "budget",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "예산 경계 검증",
+      "context_budget": 100,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [],
+      "memory_snapshot": [],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 100,
+        "memory_tokens": 0
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      }
+    },
+    {
+      "scenario_id": "S30",
+      "title": "포맷 초과로 Flexible 한 개 제거",
+      "coverage": [
+        "EC-10"
+      ],
+      "validation_scope": "context_builder",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "현재 보고서와 참고 정보를 구성해줘.",
+      "context_budget": 200,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "수신자는 핵심 요약을 선호한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "과거 인사말 참고"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "high",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "preference",
+          "content": "수신자는 핵심 요약을 선호한다.",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "low",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "experience",
+          "content": "과거 인사말 참고",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final",
+          "high",
+          "low"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "high",
+            "utility_score": 3
+          },
+          {
+            "memory_id": "low",
+            "utility_score": 2
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "final",
+        "high"
+      ],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "high"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 200,
+        "removed_flexible_memory_ids": [
+          "low"
+        ],
+        "retokenize_count": 2,
+        "mandatory_memory_ids": [
+          "final"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "context_fixture": {
+        "initial_selected_memory_ids": [
+          "final",
+          "high",
+          "low"
+        ],
+        "flexible_removal_order": [
+          "low"
+        ],
+        "tokenizer_counts_after_each_build": [
+          220,
+          185
+        ]
+      }
+    },
+    {
+      "scenario_id": "S31",
+      "title": "재tokenize를 여러 번 반복",
+      "coverage": [
+        "EC-10"
+      ],
+      "validation_scope": "context_builder",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "현재 보고서와 참고 정보를 구성해줘.",
+      "context_budget": 170,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "수신자는 핵심 요약을 선호한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "과거 인사말 참고"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "부가 참고 메모"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "high",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "preference",
+          "content": "수신자는 핵심 요약을 선호한다.",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "low",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "experience",
+          "content": "과거 인사말 참고",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "lowest",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "fact",
+          "content": "부가 참고 메모",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final",
+          "high",
+          "low",
+          "lowest"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "high",
+            "utility_score": 3
+          },
+          {
+            "memory_id": "low",
+            "utility_score": 2
+          },
+          {
+            "memory_id": "lowest",
+            "utility_score": 1
+          }
+        ]
+      },
+      "target_memory_ids": [
+        "final",
+        "high"
+      ],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "high"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 170,
+        "removed_flexible_memory_ids": [
+          "lowest",
+          "low"
+        ],
+        "retokenize_count": 3,
+        "mandatory_memory_ids": [
+          "final"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "context_fixture": {
+        "initial_selected_memory_ids": [
+          "final",
+          "high",
+          "low",
+          "lowest"
+        ],
+        "flexible_removal_order": [
+          "lowest",
+          "low"
+        ],
+        "tokenizer_counts_after_each_build": [
+          230,
+          200,
+          165
+        ]
+      }
+    },
+    {
+      "scenario_id": "S32",
+      "title": "Flexible 전부 제거해도 포맷 초과",
+      "coverage": [
+        "EC-10",
+        "EC-12"
+      ],
+      "validation_scope": "context_builder",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "현재 보고서와 참고 정보를 구성해줘.",
+      "context_budget": 130,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "수신자는 핵심 요약을 선호한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "과거 인사말 참고"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "high",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "preference",
+          "content": "수신자는 핵심 요약을 선호한다.",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "low",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "experience",
+          "content": "과거 인사말 참고",
+          "token_count": 10,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "final",
+          "high",
+          "low"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": [
+          {
+            "memory_id": "high",
+            "utility_score": 3
+          },
+          {
+            "memory_id": "low",
+            "utility_score": 2
+          }
+        ]
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "insufficient_context_budget",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": true,
+        "must_not_execute_tools": true,
+        "max_input_tokens": 130,
+        "removed_flexible_memory_ids": [
+          "low",
+          "high"
+        ],
+        "retokenize_count": 3,
+        "mandatory_memory_ids": [
+          "final"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      },
+      "context_fixture": {
+        "initial_selected_memory_ids": [
+          "final",
+          "high",
+          "low"
+        ],
+        "flexible_removal_order": [
+          "low",
+          "high"
+        ],
+        "tokenizer_counts_after_each_build": [
+          195,
+          160,
+          140
+        ]
+      }
+    },
+    {
+      "scenario_id": "S33",
+      "title": "Calendar 최신 일정과 시간 제약",
+      "coverage": [
+        "TOOL-CALENDAR"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "Calendar 최신 일정과 시간 제약에 맞게 처리해줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "2026-10-06T10:00:00+09:00"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "오전 9시 이전에는 회의를 만들지 않는다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "state",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "2026-10-06T10:00:00+09:00",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "meeting.start",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "rule",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "오전 9시 이전에는 회의를 만들지 않는다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "meeting.start.constraint",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "calendar"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "state"
+        ],
+        "protected_memory_ids": [
+          "rule"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "state",
+        "rule"
+      ],
+      "required_state_ids": [
+        "state"
+      ],
+      "required_states": [
+        {
+          "memory_id": "state",
+          "tool_call": {
+            "tool_name": "calendar",
+            "action": "create_event"
+          },
+          "argument": "start_time",
+          "expected_value": "2026-10-06T10:00:00+09:00",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "rule"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "rule",
+          "forbidden_tool_calls": [
+            {
+              "tool_name": "calendar",
+              "action": "create_event",
+              "arguments": {
+                "start_time": "2026-10-06T08:00:00+09:00"
+              }
+            }
+          ]
+        }
+      ],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "calendar",
+          "action": "create_event",
+          "arguments": {
+            "start_time": "2026-10-06T10:00:00+09:00"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "calendar",
+          "action": "create_event",
+          "arguments": {
+            "start_time": "2026-10-06T08:00:00+09:00"
+          }
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "state",
+          "rule"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S34",
+      "title": "File 보호 파일 삭제 금지",
+      "coverage": [
+        "TOOL-FILE"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "File 보호 파일 삭제 금지에 맞게 처리해줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "contract_original.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "원본 계약서는 삭제하지 않는다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "state",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "contract_original.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "file.protected",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "rule",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "원본 계약서는 삭제하지 않는다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "file.protected.constraint",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "state"
+        ],
+        "protected_memory_ids": [
+          "rule"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "state",
+        "rule"
+      ],
+      "required_state_ids": [
+        "state"
+      ],
+      "required_states": [
+        {
+          "memory_id": "state",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "contract_original.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "rule"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "rule",
+          "forbidden_tool_calls": [
+            {
+              "tool_name": "file",
+              "action": "delete_file",
+              "arguments": {
+                "filename": "contract_original.pdf"
+              }
+            }
+          ]
+        }
+      ],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "contract_original.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "delete_file",
+          "arguments": {
+            "filename": "contract_original.pdf"
+          }
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "state",
+          "rule"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S35",
+      "title": "Task 최신 담당자와 권한 제약",
+      "coverage": [
+        "TOOL-TASK"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "Task 최신 담당자와 권한 제약에 맞게 처리해줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "member_zelora"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "Task 소유자를 임의 변경하지 않는다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "state",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "member_zelora",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "task.assignee",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "rule",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "Task 소유자를 임의 변경하지 않는다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "task.assignee.constraint",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "task"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "state"
+        ],
+        "protected_memory_ids": [
+          "rule"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "state",
+        "rule"
+      ],
+      "required_state_ids": [
+        "state"
+      ],
+      "required_states": [
+        {
+          "memory_id": "state",
+          "tool_call": {
+            "tool_name": "task",
+            "action": "update_task"
+          },
+          "argument": "assignee",
+          "expected_value": "member_zelora",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "rule"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "rule",
+          "forbidden_tool_calls": [
+            {
+              "tool_name": "task",
+              "action": "update_task",
+              "arguments": {
+                "owner": "outsider"
+              }
+            }
+          ]
+        }
+      ],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "task",
+          "action": "update_task",
+          "arguments": {
+            "assignee": "member_zelora"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "task",
+          "action": "update_task",
+          "arguments": {
+            "owner": "outsider"
+          }
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "state",
+          "rule"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S36",
+      "title": "여러 State를 결합하는 발송",
+      "coverage": [
+        "MULTI-HOP"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "프로젝트 담당자에게 최신 보고서를 보내줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v1.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "zelora71@example.test"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 60,
+          "timestamp": "2026-08-15T00:00:00+09:00",
+          "source": "user",
+          "content": "report_v2.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 100,
+          "timestamp": "2026-09-20T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "v1",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_v1.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": "2026-08-15T00:00:00+09:00",
+          "supersedes": null,
+          "superseded_by": "v2"
+        },
+        {
+          "memory_id": "v2",
+          "session_id": "session_main",
+          "turn_id": 60,
+          "memory_type": "state",
+          "content": "report_v2.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": false,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-08-15T00:00:00+09:00",
+          "valid_from": "2026-08-15T00:00:00+09:00",
+          "valid_to": "2026-09-20T00:00:00+09:00",
+          "supersedes": "v1",
+          "superseded_by": "final"
+        },
+        {
+          "memory_id": "final",
+          "session_id": "session_main",
+          "turn_id": 100,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-09-20T00:00:00+09:00",
+          "valid_from": "2026-09-20T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": "v2",
+          "superseded_by": null
+        },
+        {
+          "memory_id": "recipient",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "zelora71@example.test",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "project.contact",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "email"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "v1",
+          "v2",
+          "final",
+          "recipient"
+        ],
+        "protected_memory_ids": [
+          "approval"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "final",
+        "recipient",
+        "approval"
+      ],
+      "required_state_ids": [
+        "final",
+        "recipient"
+      ],
+      "required_states": [
+        {
+          "memory_id": "final",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "request_approval"
+          },
+          "argument": "attachment",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        },
+        {
+          "memory_id": "recipient",
+          "tool_call": {
+            "tool_name": "email",
+            "action": "request_approval"
+          },
+          "argument": "recipient",
+          "expected_value": "zelora71@example.test",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [
+        "approval"
+      ],
+      "constraint_rules": [
+        {
+          "constraint_id": "approval",
+          "approval": {
+            "execution": {
+              "tool_name": "email",
+              "action": "send_email"
+            },
+            "request": {
+              "tool_name": "email",
+              "action": "request_approval"
+            },
+            "valid_approval_ids": [],
+            "request_required": true
+          }
+        }
+      ],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "request_approval",
+          "arguments": {
+            "attachment": "report_final.pdf",
+            "recipient": "zelora71@example.test"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "send_email"
+        }
+      ],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "final",
+          "recipient",
+          "approval"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512
+      },
+      "metadata": {
+        "task_type": "multi_hop",
+        "constraint_count": 1,
+        "state_update_count": 2,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S37",
+      "title": "Noise 사이의 오래된 단일 사실",
+      "coverage": [
+        "SINGLE-FACT",
+        "NOISE",
+        "LONG-HORIZON"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "Zelora-71의 데이터베이스 이름은?",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "Zelora-71의 데이터베이스는 Database-X13이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 110,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-0의 파일은 report_noise_0.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 111,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-1의 파일은 report_noise_1.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 112,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-2의 파일은 report_noise_2.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 113,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-3의 파일은 report_noise_3.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 114,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-4의 파일은 report_noise_4.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 115,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-5의 파일은 report_noise_5.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 116,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-6의 파일은 report_noise_6.pdf이다."
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 117,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "무관 프로젝트 Noise-7의 파일은 report_noise_7.pdf이다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "fact",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "fact",
+          "content": "Zelora-71의 데이터베이스는 Database-X13이다.",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise0",
+          "session_id": "session_main",
+          "turn_id": 110,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-0의 파일은 report_noise_0.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise1",
+          "session_id": "session_main",
+          "turn_id": 111,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-1의 파일은 report_noise_1.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise2",
+          "session_id": "session_main",
+          "turn_id": 112,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-2의 파일은 report_noise_2.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise3",
+          "session_id": "session_main",
+          "turn_id": 113,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-3의 파일은 report_noise_3.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise4",
+          "session_id": "session_main",
+          "turn_id": 114,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-4의 파일은 report_noise_4.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise5",
+          "session_id": "session_main",
+          "turn_id": 115,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-5의 파일은 report_noise_5.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise6",
+          "session_id": "session_main",
+          "turn_id": 116,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-6의 파일은 report_noise_6.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "noise7",
+          "session_id": "session_main",
+          "turn_id": 117,
+          "memory_type": "fact",
+          "content": "무관 프로젝트 Noise-7의 파일은 report_noise_7.pdf이다.",
+          "token_count": 40,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": null,
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "fact",
+          "noise0",
+          "noise1",
+          "noise2",
+          "noise3",
+          "noise4",
+          "noise5",
+          "noise6",
+          "noise7"
+        ],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "fact"
+      ],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "fact"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "excluded_memory_ids": [
+          "noise0",
+          "noise1",
+          "noise2",
+          "noise3",
+          "noise4",
+          "noise5",
+          "noise6",
+          "noise7"
+        ]
+      },
+      "metadata": {
+        "task_type": "single_fact",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      },
+      "expected_answers": [
+        "Database-X13"
+      ]
+    },
+    {
+      "scenario_id": "S38",
+      "title": "무관 Protected Constraint 미적용",
+      "coverage": [
+        "CONSTRAINT-APPLICABILITY"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "보고서 파일만 찾아줘.",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "report_final.pdf"
+        },
+        {
+          "session_id": "session_main",
+          "turn_id": 3,
+          "timestamp": "2026-06-01T00:00:00+09:00",
+          "source": "user",
+          "content": "외부 이메일은 승인 후 발송한다."
+        }
+      ],
+      "memory_snapshot": [
+        {
+          "memory_id": "file",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "state",
+          "content": "report_final.pdf",
+          "token_count": 30,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": false,
+          "memory_key": "report.current_file",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        },
+        {
+          "memory_id": "approval",
+          "session_id": "session_main",
+          "turn_id": 3,
+          "memory_type": "constraint",
+          "content": "외부 이메일은 승인 후 발송한다.",
+          "token_count": 60,
+          "importance": 0.8,
+          "is_active": true,
+          "is_protected": true,
+          "memory_key": "email.external.requires_approval",
+          "created_at": "2026-06-01T00:00:00+09:00",
+          "valid_from": "2026-06-01T00:00:00+09:00",
+          "valid_to": null,
+          "supersedes": null,
+          "superseded_by": null
+        }
+      ],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": [
+          "file"
+        ]
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [
+          "file"
+        ],
+        "protected_memory_ids": [
+          "approval"
+        ],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [
+        "file"
+      ],
+      "required_state_ids": [
+        "file"
+      ],
+      "required_states": [
+        {
+          "memory_id": "file",
+          "tool_call": {
+            "tool_name": "file",
+            "action": "find_file"
+          },
+          "argument": "filename",
+          "expected_value": "report_final.pdf",
+          "stale_values": []
+        }
+      ],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [
+        {
+          "tool_name": "file",
+          "action": "find_file",
+          "arguments": {
+            "filename": "report_final.pdf"
+          }
+        }
+      ],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [
+          "file"
+        ],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "excluded_memory_ids": [
+          "approval"
+        ]
+      },
+      "metadata": {
+        "task_type": "temporal_update",
+        "constraint_count": 1,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 117
+      }
+    },
+    {
+      "scenario_id": "S39",
+      "title": "정보가 전혀 없는 질문에서 기권",
+      "coverage": [
+        "ABSTENTION"
+      ],
+      "validation_scope": "integration",
+      "benchmark_enabled": true,
+      "implementation_priority": "required",
+      "session_id": "session_main",
+      "current_turn": 120,
+      "current_time": "2026-10-05T12:00:00+09:00",
+      "query": "Zelora-71의 비밀번호는?",
+      "context_budget": 512,
+      "fixed_input_tokens": 100,
+      "token_count_mode": "synthetic_fixture",
+      "history": [],
+      "memory_snapshot": [],
+      "query_context": {
+        "temporal_intent": "unspecified",
+        "target_time": null,
+        "target_range": null,
+        "entities": [
+          "보고서"
+        ],
+        "required_tools": []
+      },
+      "retrieval_fixture": {
+        "general_memory_ids": [],
+        "protected_memory_ids": [],
+        "candidate_signals": []
+      },
+      "target_memory_ids": [],
+      "required_state_ids": [],
+      "required_states": [],
+      "applicable_constraint_ids": [],
+      "constraint_rules": [],
+      "temporal_version_required": false,
+      "wrong_version_memory_ids": [],
+      "expected_tool_calls": [],
+      "forbidden_tool_calls": [],
+      "expected_pipeline_status": "ok",
+      "assertions": {
+        "selected_memory_ids": [],
+        "must_not_execute_agent": false,
+        "must_not_execute_tools": false,
+        "max_input_tokens": 512,
+        "no_fabricated_state": true
+      },
+      "metadata": {
+        "task_type": "abstention",
+        "constraint_count": 0,
+        "state_update_count": 0,
+        "history_length_turns": 120,
+        "horizon_turns": 0
+      },
+      "expected_answers": [
+        "Unknown / insufficient memory"
+      ]
+    }
+  ]
+}

@@ -7,7 +7,7 @@
 - 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md)
 - 작성 기준: 2026-09-28에 확인한 설계 문서
 - EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. 구현 완료나 테스트 통과를 의미하지 않는다.
-- 추가 논의 항목은 아직 확정되지 않은 정책이며, 기존 알고리즘의 동작으로 간주하지 않는다.
+- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. 구현 완료나 테스트 통과를 의미하지 않는다. EC-09의 구현 및 Benchmark 포함 여부는 별도로 결정한다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.
 
 ## 2. 공통 검증 원칙
@@ -47,7 +47,7 @@
 
 **관련 모듈:** `memory/selector.py`, Context Builder, Execution Logger
 
-**미정 사항:** 필수 State 또는 행동 제약이 누락되었을 때 Agent 실행을 중단할지는 현재 문서에 명시되어 있지 않다. 누락 후 행동 정책은 별도 합의가 필요하다.
+**누락 후 행동 정책:** 행동에 필요한 제약 또는 State가 누락되면 EC-12에 따라 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다.
 
 ### EC-02. 동일 Key에 ACTIVE State가 여러 개 존재하는 경우
 
@@ -151,31 +151,61 @@
 
 **관련 모듈:** `memory/selector.py`, `agent/agent.py`, `agent/tools/email.py`, `benchmark/evaluator.py`
 
-## 4. 시간 해석의 경계 조건
+### EC-08. 올바른 버전이 Retrieval 후보에 없는 경우
 
-다음 항목은 기존 시간 유효성 규칙을 확인하는 추가 테스트이다.
+**상황:** 요청 시점에 유효한 버전이 Store에는 있으나 Retrieval 후보에는 이전 버전만 존재한다.
 
-| ID | 조건 | 기대 결과 |
-|---|---|---|
-| TV-01 | v1은 6월 1일 to 8월 15일, v2는 8월 15일 to 9월 20일, final은 9월 20일부터 유효. 8월 20일 버전 요청 | 현재 SUPERSEDED인 v2를 선택하며 Temporal Error로 판정하지 않음 |
-| TV-02 | v1의 `valid_to`와 v2의 `valid_from`이 같은 시각 T. 정확히 T의 버전 요청 | `valid_from <= T < valid_to` 규칙에 따라 v2 선택 |
+**입력 예시:** `report.current_file`의 이전 버전만 검색되고, 현재 유효한 `report_final.pdf`는 Store에만 존재한다. Query는 현재 보고서를 요청한다.
 
-시간값은 동일한 Timezone과 정밀도를 사용한다. 날짜 예시는 테스트에서 시각까지 고정한다.
+**기대 동작:** Retrieval에서 `memory_key`를 발견하면 Versioned type인지 확인한다. Versioned type이면 Store에서 해당 Session과 Key의 version chain을 조회하고, Temporal Resolver가 요청 시점에 맞는 버전을 선택한다.
 
-## 5. 추가 논의가 필요한 사례
+**통과 기준:** 검색 후보에 없는 `report_final.pdf`가 최종 State로 선택된다. 과거 요청에서도 같은 version chain을 대상으로 해당 시점에 유효한 버전을 선택한다.
 
-이 절은 설계 보완 제안이다. 팀 합의 전에는 확정된 구현 요구나 통과 기준으로 사용하지 않는다.
+**관련 모듈:** Retrieval, `memory/store.py`, Temporal Resolver
 
-| ID | 상황과 설계상 빈틈 | 제안 및 결정할 사항 |
-|---|---|---|
-| D-01 | 최신 State가 Store에는 있으나 검색 후보에는 이전 버전만 존재한다. 현재 Temporal Resolution은 후보 안에서 버전을 찾는다. | 해당 Key로 Store의 버전 이력을 추가 조회할지 결정한다. |
-| D-02 | “8월 보고서” 요청에서 8월 중간에 버전이 바뀌어 여러 버전이 해당한다. | 현재의 highest temporal relevance 기준을 구체화한다. 동점 처리, 날짜 재질문, 복수 버전 제시 중 정책을 정한다. |
-| D-03 | “6월 보고서를 지금 보내줘”에서 파일 기준 시점은 과거이고 행동 시점은 현재이다. | 과거 State의 조회 시점과 현재 발송 Constraint의 적용 시점을 분리할지 결정한다. 과거 규칙을 묻는 가정 질문과도 구분한다. |
-| D-04 | Memory 내용의 합은 예산 이내지만 제목·구분자 등 포맷을 포함한 최종 Prompt는 초과한다. | Context Builder의 ASSERT 실패 후 재선택 절차를 정한다. 출력 예약분을 포함한 Budget 계산 기준도 통일한다. |
-| D-05 | System Prompt, Tool 정의, Query 등 고정 비용만으로 전체 예산을 초과한다. | `B_memory < 0`일 때 설정 오류 반환 등 명시적인 실패 경로를 정한다. |
-| D-06 | Mandatory Overflow 때문에 행동에 필요한 제약 또는 State가 제외된다. | 실행 중단·정보 요청 등 Agent 정책을 정한다. Overflow 기록만으로 작업 성공을 의미하지 않도록 한다. |
+### EC-09. State 기준 시점과 행동 시점이 다른 경우
 
-## 6. 검증 및 기록 방법
+**상황:** “6월 보고서를 지금 보내줘”에서 State의 기준 시점은 과거이고 행동 시점은 현재이다.
+
+**기대 동작:** 시간 기준을 `state_target_time`과 `action_time`으로 분리한다. 보고서 버전은 `state_target_time`에 유효한 State를 선택하고, 발송 Constraint는 `action_time`에 유효한 규칙을 적용한다.
+
+**통과 기준:** 6월에 유효한 보고서를 선택하면서 현재 발송 시점에 적용되는 Constraint를 준수한다. 과거 보고서를 조회한다는 이유로 과거 발송 규칙을 적용하지 않는다.
+
+**관련 모듈:** Temporal Resolver, `memory/selector.py`, `agent/agent.py`, `benchmark/evaluator.py`
+
+**구현 및 평가 범위:** 시간 기준을 분리하는 정책은 확정한다. 구현은 시간 여유가 있을 때 진행하는 후순위 항목으로 두며, Benchmark에서 제외할지는 별도로 결정한다.
+
+### EC-10. 포맷을 포함한 최종 Context가 예산을 초과하는 경우
+
+**상황:** Memory 내용의 합은 예산 이내지만 제목·구분자 등 포맷을 포함한 최종 Context Token Count가 `B`를 초과한다.
+
+**기대 동작:** Flexible Memory를 낮은 우선순위부터 제거하고, Context를 다시 구성하여 tokenize한다. 최종 Context Token Count가 `B` 이하가 될 때까지 반복한다.
+
+**통과 기준:** 제거 순서가 Flexible Memory의 우선순위를 따르고, 매번 재구성한 Context의 실제 토큰 수를 측정한다. 최종 Context Token Count는 `B` 이하이다. 필수 Constraint와 State는 이 과정에서 제거하지 않는다.
+
+**실패 경로:** Flexible Memory를 모두 제거해도 예산을 충족하지 못하면, 고정 비용 초과는 EC-11, 행동에 필요한 제약 또는 State를 담을 수 없는 경우는 EC-12를 적용한다.
+
+**관련 모듈:** Context Builder, `memory/selector.py`
+
+### EC-11. 고정 비용만으로 전체 예산을 초과하는 경우
+
+**상황:** System Prompt, Tool 정의, Query 등 고정 비용만으로 전체 예산을 초과하여 `B_memory < 0`이다.
+
+**기대 동작:** `INVALID_BUDGET_CONFIGURATION`을 반환한다.
+
+**통과 기준:** 고정 비용 초과를 설정 오류로 반환하고, 예산을 초과한 Context로 Agent를 실행하지 않는다.
+
+**관련 모듈:** Budget 계산, Context Builder
+
+### EC-12. 행동에 필요한 필수 Memory를 예산에 담을 수 없는 경우
+
+**상황:** Mandatory Overflow 때문에 행동에 필요한 제약 또는 State가 제외된다.
+
+**기대 동작:** `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다.
+
+**통과 기준:** Mandatory Overflow를 기록하고, 필수 제약 또는 State가 누락된 Context로 요청한 행동을 실행하지 않는다. 오류 반환을 Task 성공으로 집계하지 않는다.
+
+**관련 모듈:** `memory/selector.py`, Context Builder, `agent/agent.py`, `benchmark/evaluator.py`
 
 ### 모듈 단위 검증
 
@@ -202,3 +232,14 @@
 - Constraint Violation, Temporal / Stale-State Error, Store Consistency Error 여부
 
 Memory 선택 검증과 Agent 행동 검증의 성공 여부는 구분해서 기록한다. Overflow 조건도 일반 조건과 별도로 집계하여 실패 원인을 비교할 수 있도록 한다.
+
+## 4. 시간 해석의 경계 조건
+
+다음 항목은 기존 시간 유효성 규칙을 확인하는 추가 테스트이다.
+
+| ID | 조건 | 기대 결과 |
+|---|---|---|
+| TV-01 | v1은 6월 1일 to 8월 15일, v2는 8월 15일 to 9월 20일, final은 9월 20일부터 유효. 8월 20일 버전 요청 | 현재 SUPERSEDED인 v2를 선택하며 Temporal Error로 판정하지 않음 |
+| TV-02 | v1의 `valid_to`와 v2의 `valid_from`이 같은 시각 T. 정확히 T의 버전 요청 | `valid_from <= T < valid_to` 규칙에 따라 v2 선택 |
+
+시간값은 동일한 Timezone과 정밀도를 사용한다. 날짜 예시는 테스트에서 시각까지 고정한다.
