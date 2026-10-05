@@ -22,9 +22,11 @@
 
 from __future__ import annotations
 
+import html
 import inspect
 import json
 import sys
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -80,6 +82,8 @@ ATTACHMENT = "report_final.pdf"
 CONTEXT_BUDGET = 2000
 SESSION_ID = "session_demo"
 SCENARIOS_PATH = ROOT / "benchmark" / "scenarios.json"
+RESULT_HTML = ROOT / "prototype" / "demo_result.html"
+REPORT: list[dict] = []
 
 
 def scripted_plan(context: str) -> AgentAction:
@@ -116,17 +120,19 @@ def main(argv: list[str] | None = None) -> None:
     if args == ["--list"]:
         _print_scenario_list(scenarios)
         return
-    if not args:
-        _run_skeleton()
-        _run_scenarios(scenarios, ["S13"])
-        print("demo ok")
-        return
-    if args == ["--all"]:
-        _run_scenarios(scenarios, [item["scenario_id"] for item in scenarios])
-        print("demo ok")
-        return
-    _run_scenarios(scenarios, args)
+    try:
+        if not args:
+            _run_skeleton()
+            _run_scenarios(scenarios, ["S13"])
+        elif args == ["--all"]:
+            _run_scenarios(scenarios, [item["scenario_id"] for item in scenarios])
+        else:
+            _run_scenarios(scenarios, args)
+    finally:
+        if REPORT:
+            _write_result_html()
     print("demo ok")
+    print(f"result html: {RESULT_HTML}")
 
 
 def _run_skeleton() -> None:
@@ -382,6 +388,7 @@ def _run_one_scenario(scenario: dict) -> bool:
     reason = _replay_skip_reason(scenario)
     if reason is not None:
         print(f"{scenario_id} skip: {reason}")
+        REPORT.append(_scenario_row(scenario, kind="skip", skip=reason))
         return True
 
     context = _scenario_context(scenario["query"])
@@ -406,6 +413,10 @@ def _run_one_scenario(scenario: dict) -> bool:
     _print_trace(scenario_id, acted.response, acted.tool_calls, acted.tool_results)
     if acted.input_tokens < fixed_tokens:
         print(f"{scenario_id} stopped: {acted.stopped_reason}")
+        REPORT.append(_scenario_row(
+            scenario, kind="fail", calls=acted.tool_calls, results=acted.tool_results,
+            response=acted.response, stopped=acted.stopped_reason,
+        ))
         return False
 
     usage = {
@@ -432,6 +443,16 @@ def _run_one_scenario(scenario: dict) -> bool:
         f"{scenario_id} task_success: {evaluation.task_success} "
         f"stopped: {acted.stopped_reason} failures: {failures}"
     )
+    REPORT.append(_scenario_row(
+        scenario,
+        kind="pass" if evaluation.task_success else "fail",
+        calls=acted.tool_calls,
+        results=acted.tool_results,
+        response=acted.response,
+        stopped=acted.stopped_reason,
+        task_success=evaluation.task_success,
+        failures=list(failures),
+    ))
     return bool(evaluation.task_success)
 
 
@@ -631,6 +652,190 @@ def _approval_id(context: str) -> str:
     if end < 0:
         raise ValueError("approval id was not terminated")
     return context[start:end]
+
+
+def _scenario_row(
+    scenario: dict,
+    *,
+    kind: str,
+    skip: str | None = None,
+    calls=(),
+    results=(),
+    response: str | None = None,
+    stopped: str | None = None,
+    task_success: bool | None = None,
+    failures: list[str] | None = None,
+) -> dict:
+    return {
+        "id": scenario["scenario_id"],
+        "title": scenario.get("title") or "",
+        "query": scenario.get("query") or "",
+        "kind": kind,
+        "skip": skip,
+        "calls": [
+            {"name": f"{call.tool_name}.{call.action}", "success": result.success, "output": dict(result.output), "error": result.error}
+            for call, result in zip(calls, results)
+        ],
+        "response": response,
+        "stopped": stopped,
+        "task_success": task_success,
+        "failures": failures or [],
+    }
+
+
+def _write_result_html() -> None:
+    passed = sum(item["kind"] == "pass" for item in REPORT)
+    skipped = sum(item["kind"] == "skip" for item in REPORT)
+    failed = sum(item["kind"] == "fail" for item in REPORT)
+    rows = "\n".join(_result_card(item) for item in REPORT)
+    RESULT_HTML.write_text(f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>run_demo 결과</title>
+<style>
+  body {{ margin: 0; background: #f6f7f9; color: #1c1917; font-family: "Malgun Gothic", sans-serif; }}
+  main {{ width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }}
+  h1 {{ margin: 0 0 8px; font-size: 28px; }}
+  .counts {{ display: flex; gap: 8px; margin: 16px 0 20px; }}
+  .counts span {{ background: white; border: 1px solid #e7e5e4; border-radius: 999px; padding: 6px 12px; font-weight: 700; }}
+  article {{ background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 14px 16px; margin-top: 10px; }}
+  .head {{ display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }}
+  .id {{ font-size: 18px; }}
+  .query {{ color: #57534e; margin-top: 4px; }}
+  .badge {{ border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }}
+  .pass {{ background: #e8f6ec; color: #166534; }}
+  .skip {{ background: #f5f5f4; color: #57534e; }}
+  .fail {{ background: #fde8e8; color: #991b1b; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }}
+  th, td {{ text-align: left; vertical-align: top; padding: 6px 8px; border-top: 1px solid #f0eeec; }}
+  th {{ width: 140px; color: #78716c; font-weight: 600; }}
+  .call {{ margin-top: 8px; padding: 8px 10px; background: #fafaf9; border-radius: 8px; }}
+  .call b {{ display: block; }}
+</style>
+</head>
+<body>
+<main>
+  <h1>run_demo 결과</h1>
+  <div class="counts">
+    <span class="pass">통과 {passed}</span>
+    <span class="skip">건너뜀 {skipped}</span>
+    <span class="fail">실패 {failed}</span>
+  </div>
+  {rows}
+</main>
+</body>
+</html>
+""", encoding="utf-8")
+    webbrowser.open(RESULT_HTML.as_uri())
+
+
+def _result_card(item: dict) -> str:
+    kind = item["kind"]
+    label = {"pass": "통과", "skip": "건너뜀", "fail": "실패"}[kind]
+    query = f'<p class="query">{html.escape(item["query"])}</p>' if item["query"] else ""
+    if kind == "skip":
+        body = f"<p>{html.escape(_skip_text(item['skip']))}</p>"
+    else:
+        calls = "\n".join(_call_block(call) for call in item["calls"]) or "<p>툴 호출 없음</p>"
+        verdict = []
+        if item["task_success"] is not None:
+            verdict.append(f"행동 판정 {'통과' if item['task_success'] else '실패'}")
+        if item["stopped"]:
+            verdict.append(html.escape(_stopped_text(item["stopped"])))
+        if item["failures"]:
+            verdict.append("남긴 기록 " + ", ".join(html.escape(_failure_text(name)) for name in item["failures"]))
+        response = f"<p>응답: {html.escape(item['response'])}</p>" if item["response"] else ""
+        body = calls + response + (f"<p>{' · '.join(verdict)}</p>" if verdict else "")
+    return f"""<article>
+  <div class="head"><b class="id">{html.escape(item["id"])} {html.escape(item["title"])}</b><span class="badge {kind}">{label}</span></div>
+  {query}
+  {body}
+</article>"""
+
+
+def _call_block(call: dict) -> str:
+    rows = "".join(
+        f"<tr><th>{html.escape(_field_name(key))}</th><td>{html.escape(_field_value(value))}</td></tr>"
+        for key, value in call["output"].items()
+    )
+    if call["error"]:
+        rows += f"<tr><th>오류</th><td>{html.escape(str(call['error']))}</td></tr>"
+    mark = "성공" if call["success"] else "실패"
+    return f'<div class="call"><b>{html.escape(call["name"])} · {mark}</b><table>{rows}</table></div>'
+
+
+def _field_name(key: str) -> str:
+    return {
+        "filename": "파일",
+        "found": "목록에 있음",
+        "recipient": "받는 사람",
+        "subject": "메일 제목",
+        "body": "본문",
+        "attachment": "첨부",
+        "approval_id": "승인 번호",
+        "approved": "승인됨",
+        "status": "상태",
+        "message_id": "메시지 번호",
+        "draft_id": "임시저장 번호",
+        "event_id": "일정 번호",
+        "title": "제목",
+        "start_time": "시작",
+        "end_time": "종료",
+        "task_id": "작업 번호",
+        "assignee": "담당자",
+        "owner": "소유자",
+    }.get(key, key)
+
+
+def _field_value(value) -> str:
+    if value is None:
+        return "없음"
+    if value is True:
+        return "예"
+    if value is False:
+        return "아니오"
+    if value == "pending":
+        return "승인 대기"
+    return str(value)
+
+
+def _stopped_text(reason: str) -> str:
+    return {
+        "completed": "정상 종료",
+        "context_budget": "예산 초과로 중단",
+        "tool_failure": "툴 실패로 중단",
+        "max_steps": "반복 한도로 중단",
+    }.get(reason, reason)
+
+
+def _skip_text(reason: str | None) -> str:
+    if reason == "no expected_tool_calls":
+        return "툴 호출 정답이 없어서 실행하지 않음"
+    if reason == "benchmark_enabled=false":
+        return "이번 벤치마크에서 제외된 시나리오"
+    if reason == "expected_pipeline_status=insufficient_context_budget":
+        return "필수 기억이 예산에 안 들어가서 실행하지 않음"
+    if reason == "expected_pipeline_status=invalid_budget_configuration":
+        return "고정 입력이 예산보다 커서 실행하지 않음"
+    if reason and "recipient" in reason:
+        return "기대 호출에 받는 사람 주소가 없어서 실행하지 않음"
+    return reason or ""
+
+
+def _failure_text(name: str) -> str:
+    return {
+        "retrieval_failure": "검색된 기억 없음",
+        "temporal_failure": "맞춘 버전 기억 없음",
+        "selection_failure": "선택에서 빠짐",
+        "constraint_failure": "제약 위반",
+        "approval_failure": "승인 실패",
+        "budget_failure": "예산 초과",
+        "state_omission": "상태 누락",
+        "stale_state_usage": "옛 상태 사용",
+        "state_error": "상태 값 오류",
+    }.get(name, name)
 
 
 def _print_trace(title, response, calls, results) -> None:
