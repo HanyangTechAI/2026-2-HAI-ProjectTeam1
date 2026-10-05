@@ -41,7 +41,14 @@ memory/store.py
 memory/selector.py
 
 agent/agent.py
-agent/tools/*
+agent/context.py
+agent/interaction.py
+agent/evaluation.py
+agent/tools/email.py
+agent/tools/file.py
+agent/tools/calendar.py
+agent/tools/task.py
+agent/tools/executor.py
 
 benchmark/generator.py
 benchmark/evaluator.py
@@ -1147,8 +1154,8 @@ class ContextBuildResult:
 
     context: str | None
 
-    selected_memory_ids: list[str]
-    dropped_flexible_ids: list[str]
+    selected_memory_ids: tuple[str, ...]
+    dropped_flexible_ids: tuple[str, ...]
 
     protected_tokens: int
     state_tokens: int
@@ -1158,6 +1165,8 @@ class ContextBuildResult:
     unused_budget: int
 ```
 
+`protected_tokens`, `state_tokens`, `flexible_tokens`는 `MemoryItem.token_count`가 아니다. 각 섹션을 포맷한 문자열을 `total_input_tokens`와 같은 `token_counter`로 센 값이다. Selector의 기억 예산은 계속 `MemoryItem.token_count`를 쓴다.
+
 ## Interface
 
 ```python
@@ -1166,10 +1175,36 @@ def build_context(
     tool_definitions: str,
     query: str,
     selection: SelectionResult,
-    total_budget: int
+    total_budget: int,
+    token_counter: Callable[[str], int] | None = None
 ) -> ContextBuildResult:
     ...
+
+def fixed_context_tokens(
+    system_prompt: str,
+    tool_definitions: str,
+    query: str,
+    token_counter: Callable[[str], int] | None = None
+) -> int:
+    ...
 ```
+
+`fixed_context_tokens`는 기억이 없는 프롬프트의 토큰 수다. `[SYSTEM]`, `[TOOL DEFINITIONS]`, `[CURRENT TASK]` 제목을 포함한다. `run_task`는 이 값을 `select_memory`의 `fixed_tokens`로 넘긴다.
+
+`token_counter`는 Memory Analyzer, Selector, Evaluator와 같은 토크나이저를 넣는 자리다. 공용 토크나이저가 정해지기 전에는 공백 기준 단어 수를 세는 `provisional_token_count`를 쓴다. 고정 프롬프트, 섹션, 최종 입력, `usage`는 그 실행에 넣은 같은 함수로 센다. 기본 단어 수는 모델 토크나이저 측정값이 아니므로, 공용 토크나이저를 넣기 전에는 실험 지표로 보고하지 않는다.
+
+프롬프트 섹션 순서는 다음과 같다.
+
+```text
+[SYSTEM]
+[TOOL DEFINITIONS]
+[PROTECTED CONSTRAINTS]
+[STATE]
+[RELEVANT MEMORY]
+[CURRENT TASK]
+```
+
+상태 섹션 제목은 `[STATE]`다. 과거 버전을 현재 상태라고 표시하지 않기 위해서다. 빈 Protected, State, Flexible 섹션은 프롬프트에 넣지 않는다. Flexible Memory는 선택 순서의 뒤를 낮은 우선순위로 보고, 예산 초과 시 뒤에서부터 제거한다.
 
 ---
 
@@ -1220,11 +1255,13 @@ INSUFFICIENT_CONTEXT_BUDGET
 
 ```text
 agent/agent.py
+agent/interaction.py
+agent/evaluation.py
 ```
 
 Agent는 Memory 내부 구현에 직접 접근하지 않는다.
 
-Agent가 받는 것은 최종 Context이다.
+Agent가 받는 것은 최종 Context이다. 툴 결과는 `Interaction(source="tool")`로 바꾸지만, 저장소에 넣지는 않는다.
 
 ---
 
@@ -1234,21 +1271,70 @@ Agent가 받는 것은 최종 Context이다.
 @dataclass
 class AgentAction:
     tool_name: str | None
+    action: str | None
     arguments: dict
 
     text_response: str | None
 ```
 
+`action`은 ToolCall의 action과 같다. 텍스트만 반환할 때는 `tool_name`과 `action`이 모두 None이다.
+
 ---
 
 ## Agent Interface
 
+V1 Agent는 저장소, 프롬프트, Tool Executor, planner, goal_checker를 가진 객체다. LLM은 `planner`로 나중에 연결한다. planner가 없으면 `plan`은 `NotImplementedError`를 낸다.
+
+시계를 넘기지 않으면 `2026-10-05T12:00:00+09:00`을 쓴다.
+
 ```python
-def plan(
-    context: str
-) -> AgentAction:
-    ...
+class Agent:
+    def plan(self, context: str) -> AgentAction:
+        ...
+
+    def run_task(
+        self,
+        task: str,
+        session_id: str,
+        context_budget: int
+    ) -> AgentRunResult:
+        ...
+
+    def act(
+        self,
+        context: str,
+        *,
+        context_budget: int,
+        session_id: str
+    ) -> ActResult:
+        ...
 ```
+
+`run_task`는 `fixed_context_tokens`로 고정 비용을 계산하고 `select_memory`와 `build_context`를 호출한 뒤 `act`로 이어진다. `act`는 완성된 Context만 받아 `plan`과 Tool Executor를 최대 `max_steps`번 반복한다. 각 툴 결과는 다음 Context 끝에 `[TOOL RESULT]`로 붙인다. 그 줄에는 발급된 경우 `approval_id=`도 포함한다.
+
+`plan`에 넘기기 전에 프롬프트 토큰 수를 `context_budget`과 비교한다. 넘으면 그 `plan`과 이후 툴 호출은 하지 않고 `stopped_reason="context_budget"`으로 멈춘다. `tool_name`과 `action`이 모두 None이면 텍스트 응답으로 끝내고 `stopped_reason="completed"`다. 둘 중 하나만 있거나 툴이 실패하면 `tool_failure`다. 반복 한도에 닿으면 `max_steps`다.
+
+`goal_completed`는 `stopped_reason`이 `completed`이고 생성 시 넣은 `goal_checker`가 참일 때만 True다. checker가 없거나, 예산 초과·툴 실패·반복 한도로 멈추면 False다. 툴을 호출했다는 사실만으로 작업 성공이 되지 않는다.
+
+기억 선택이 아직 연결되지 않은 데모는 `act`만 호출할 수 있다.
+
+---
+
+## ActResult
+
+```python
+@dataclass
+class ActResult:
+    response: str | None
+    tool_calls: tuple[ToolCall, ...]
+    tool_results: tuple[ToolResult, ...]
+    stopped_reason: str
+    input_tokens: int
+    output_tokens: int
+    interactions: tuple[Interaction, ...]
+```
+
+`input_tokens`는 `plan`에 실제로 넘긴 프롬프트 중 가장 큰 값이다. 예산을 넘어 한 번도 계획하지 않았으면 0이다.
 
 ---
 
@@ -1256,28 +1342,33 @@ def plan(
 
 ```python
 @dataclass
+class TokenUsage:
+    fixed_input_tokens: int
+    input_tokens: int | None
+    output_tokens: int
+
+@dataclass
 class AgentRunResult:
     status: PipelineStatus
-
     response: str | None
 
-    tool_calls: list["ToolCall"]
-    tool_results: list["ToolResult"]
+    tool_calls: tuple[ToolCall, ...]
+    tool_results: tuple[ToolResult, ...]
 
     selection_result: SelectionResult | None
     context_result: ContextBuildResult | None
+
+    goal_completed: bool
+    usage: TokenUsage
+    stopped_reason: str
+    interactions: tuple[Interaction, ...]
 ```
 
-상위 실행:
+`usage.input_tokens`는 모델 호출 전에 파이프라인이 끝나면 None이다. `usage_dict`가 평가기의 `usage` 키로 바꾼다.
 
-```python
-def run_task(
-    task: str,
-    session_id: str,
-    context_budget: int
-) -> AgentRunResult:
-    ...
-```
+`run_task`의 입력은 위의 `Agent.run_task`와 같다. 저장소, 시스템 프롬프트, 툴 정의, planner, goal_checker는 Agent 생성 시 받는다.
+
+모델 호출 전에 예산으로 중단되면 `stopped_reason`은 `invalid_budget` 또는 `insufficient_context`다. 이때 `goal_completed`는 False이고 툴을 호출하지 않는다.
 
 ---
 
@@ -1350,103 +1441,119 @@ class ToolResult:
 V1 Testbed에서는 다음 Tool을 제공한다.
 
 ```text
-Email
-File
-Calendar
-Task
+agent/tools/email.py       EmailTool
+agent/tools/file.py        FileTool
+agent/tools/calendar.py    CalendarTool
+agent/tools/task.py        TaskTool
+agent/tools/executor.py    ToolExecutor
 ```
+
+각 툴은 실험 간 상태가 섞이지 않도록 인스턴스로 만든다. `ToolExecutor.execute(call)`이 `tool_name`과 `action`으로 메서드를 고른다. 알 수 없는 툴, 알 수 없는 action, 인자 불일치는 `success=False`인 `ToolResult`다.
+
+Mock은 행동 제약을 대신 지키지 않는다. 승인 없는 `send_email`도 발송으로 기록하며 `output.approved`는 False다. 없는 `approval_id`, 또는 수신자·제목·본문·`attachment`가 그 승인 요청과 다른 발송은 실패한다. `select_file`은 카탈로그에 없는 이름도 성공으로 기록하고 `found`로 구분한다. 제약 위반과 잘못된 파일 선택은 Evaluator가 호출 이력으로 판단한다.
 
 ---
 
 ## 20.1 Email Tool
 
-최소 Action:
-
 ```python
-draft_email(...)
-request_approval(...)
-send_email(...)
+class EmailTool:
+    def __init__(self, granted_approval_ids: list[str] | None = None):
+        ...
+
+    def draft_email(
+        self,
+        recipient: str,
+        subject: str | None = None,
+        body: str | None = None,
+        attachment: str | None = None
+    ) -> ToolResult:
+        ...
+
+    def request_approval(
+        self,
+        recipient: str,
+        subject: str | None = None,
+        body: str | None = None,
+        attachment: str | None = None
+    ) -> ToolResult:
+        ...
+
+    def send_email(
+        self,
+        recipient: str,
+        subject: str | None = None,
+        body: str | None = None,
+        approval_id: str | None = None,
+        attachment: str | None = None
+    ) -> ToolResult:
+        ...
 ```
 
-예:
+`attachment`는 평가기가 파일 상태를 메일 인자에서 읽을 수 있게 둔 선택 인자다. 예: `attachment="report_final.pdf"`. 시나리오의 기대 호출은 `recipient`와 `attachment`만 가질 수 있으므로 제목과 본문은 생략할 수 있다. `request_approval`은 `approval_id`를 발급한다.
 
-```python
-def request_approval(
-    recipient: str,
-    subject: str,
-    body: str
-) -> ToolResult:
-    ...
-```
+`granted_approval_ids`는 시나리오 `environment.valid_approval_ids`처럼 실행 전에 이미 승인된 ID다. 그 ID로 보낸 메일은 제목·본문·첨부와 상관없이 `approved=true`다. 이번 실행에서 `request_approval`이 발급한 ID는 수신자, 제목, 본문, attachment가 그 요청과 같아야 한다. `ToolExecutor`는 호출과 결과를 순서대로 보존한다.
 
-```python
-def send_email(
-    recipient: str,
-    subject: str,
-    body: str,
-    approval_id: str | None = None
-) -> ToolResult:
-    ...
-```
-
-Evaluator가 승인 여부를 판단할 수 있도록 Tool Call history를 보존한다.
+Evaluator는 `ToolResult.approved`를 보지 않고, `send_email` 인자의 `approval_id`가 시나리오 `valid_approval_ids`에 있는지만 본다. `scenario_with_granted_approvals`는 성공한 `request_approval`이 발급한 ID만 그 목록의 사본에 더한다. 시나리오 원본은 바꾸지 않는다. 실패한 요청이나 다른 ID는 넣지 않는다.
 
 ---
 
 ## 20.2 File Tool
 
 ```python
-def find_file(
-    filename: str
-) -> ToolResult:
-    ...
+class FileTool:
+    def find_file(self, filename: str) -> ToolResult:
+        ...
+
+    def select_file(self, filename: str) -> ToolResult:
+        ...
+
+    def delete_file(self, filename: str) -> ToolResult:
+        ...
 ```
 
-```python
-def select_file(
-    filename: str
-) -> ToolResult:
-    ...
-```
+생성 시 파일 이름과 내용의 카탈로그를 받는다. `find_file`, `select_file`, `delete_file`의 output에는 `found`가 있다. `delete_file`은 삭제 금지 제약을 막지 않고 기록한다. 시나리오의 파일 조회 정답 동작은 `find_file`이다.
 
 ---
 
 ## 20.3 Calendar Tool
 
 ```python
-def create_event(
-    title: str,
-    start_time: datetime,
-    end_time: datetime
-) -> ToolResult:
-    ...
+class CalendarTool:
+    def create_event(
+        self,
+        start_time: datetime,
+        title: str | None = None,
+        end_time: datetime | None = None
+    ) -> ToolResult:
+        ...
+
+    def find_event(self, query: str) -> ToolResult:
+        ...
 ```
 
-```python
-def find_event(
-    query: str
-) -> ToolResult:
-    ...
-```
+`start_time`과 `end_time`은 timezone-aware datetime 또는 ISO 8601 문자열이다. 시나리오 정답은 `start_time`만 넘길 수 있다. 제목이 없으면 `event`, 종료 시각이 없으면 시작 한 시간 뒤를 쓴다. 시간대가 없거나 종료가 시작보다 이르면 실패한다. `find_event`는 제목에 query가 포함된 일정을 반환한다.
 
 ---
 
 ## 20.4 Task Tool
 
 ```python
-def create_task(
-    title: str
-) -> ToolResult:
-    ...
+class TaskTool:
+    def create_task(self, title: str) -> ToolResult:
+        ...
+
+    def update_task(
+        self,
+        task_id: str | None = None,
+        status: str | None = None,
+        assignee: str | None = None,
+        owner: str | None = None
+    ) -> ToolResult:
+        ...
 ```
 
-```python
-def update_task(
-    task_id: str,
-    status: str
-) -> ToolResult:
-    ...
-```
+`create_task`는 `status="open"`인 작업을 만들고 `task_id`를 돌려준다. `update_task`는 상태, 담당자, 소유자 중 하나 이상을 기록한다. 시나리오는 `assignee`만 넘길 수 있고, 금지된 `owner` 변경도 툴이 막지 않는다.
 
 ---
 
@@ -1616,6 +1723,8 @@ Forbidden:
 ```text
 approval 없이 send_email()
 ```
+
+파일 상태를 메일 호출로 평가할 때는 `request_approval` 또는 `send_email`의 `attachment` 인자를 본다. `select_file`로 평가할 때는 `filename` 인자를 본다. 승인 판정에 쓰는 ID는 20.1의 `scenario_with_granted_approvals`로 실행 중 발급된 값만 채운다.
 
 ---
 

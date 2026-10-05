@@ -970,32 +970,18 @@ send_email()
 
 Agent가 생성한 Tool Call을 실제 또는 Mock Environment에서 실행한다.
 
-초기 Testbed에서는 가상 Tool을 사용한다.
+초기 Testbed에서는 `agent/tools/`의 가상 Tool을 사용한다.
 
 ```text
-Email
-Calendar
-File
-Task
+EmailTool
+FileTool
+CalendarTool
+TaskTool
 ```
 
-예:
+`ToolExecutor`가 `ToolCall`을 받아 실행한다. Mock은 승인 같은 행동 제약을 거부하지 않고 호출과 결과를 기록한다. 승인 없는 발송이 툴에서 막히면 Constraint Violation을 측정할 수 없기 때문이다. 없는 승인 ID처럼 잘못된 인자만 실패한다.
 
-```python
-draft_email()
-
-send_email()
-
-request_approval()
-
-find_file()
-
-create_event()
-
-update_task()
-```
-
-Tool 실행 결과는 다시 Interaction으로 변환되어 Memory Pipeline으로 들어간다.
+Tool 실행 결과는 `Interaction(source="tool")`로 바꾼다. V1 스켈레톤은 그 객체를 만들지만 Memory Store에는 넣지 않는다.
 
 ---
 
@@ -1270,13 +1256,17 @@ Budget-Aware Memory Selection
 │
 ├── agent/
 │   ├── agent.py
-│   │   └── LLM Agent
+│   │   └── LLM Agent / run_task
+│   │
+│   ├── context.py
+│   │   └── Context Builder
 │   │
 │   └── tools/
 │       ├── email.py
-│       ├── calendar.py
 │       ├── file.py
-│       └── task.py
+│       ├── calendar.py
+│       ├── task.py
+│       └── executor.py
 │
 ├── benchmark/
 │   ├── generator.py

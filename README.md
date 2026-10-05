@@ -139,7 +139,13 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 └── README.md
 ```
 
-연구 질문 외의 설계 Markdown 문서와 구현 파일은 현재 비어 있다. 실행 가능한 데모와 의존성이 준비되면 설치·실행 방법을 추가할 예정이다.
+Agent 스켈레톤과 mock Tool 데모는 저장소 루트에서 다음으로 실행한다.
+
+```text
+python prototype/run_demo.py
+```
+
+데모는 스크립트 planner로 파일 선택, 승인 요청, 발송 순서를 확인하고, 예산이 고정 입력보다 작으면 툴을 호출하지 않는지 확인한다. 이어서 `benchmark/scenarios.json`의 S13을 읽어 기대 툴 호출을 mock 툴로 실행하고 evaluator에 넘긴다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다. LLM과 기억 선택 파이프라인은 아직 연결되지 않았다.
 
 ## 기술 스택 후보
 
