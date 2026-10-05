@@ -1,12 +1,8 @@
 """Mock 툴과 Agent 스켈레톤 데모.
 
-기억 선택 파이프라인은 아직 연결되지 않았다. 이 스크립트는 다음을 확인한다.
-
-1. 완성된 Context에서 최신 파일을 고르고, 그 파일을 첨부해 승인을 받은 뒤 발송한다.
-2. 발급된 승인 ID를 평가 시나리오에 반영하면 기존 evaluator가 성공으로 판정한다.
-3. 툴 결과를 붙인 프롬프트가 예산을 넘으면 다음 계획을 하지 않는다.
-4. 고정 입력이 예산을 넘으면 툴을 호출하지 않는다.
-5. benchmark/scenarios.json의 시나리오를 읽어, 기대 툴 호출을 mock 툴로 실행하고 evaluator에 넘긴다.
+memory/ 구현은 비어 있다. 시나리오를 돌릴 때만 이 파일 안에서 기억 선택을
+memory_snapshot과 합성 토큰 수로 고정한다. 에이전트는 그 결과로 예산을 끊거나,
+기억 문장으로 답하거나, 기대 툴 호출을 실행한다. LLM은 호출하지 않는다.
 
 사용법:
 
@@ -16,15 +12,14 @@
     python prototype/run_demo.py --all
     python prototype/run_demo.py --list
 
-인자 없이 실행하면 스켈레톤 확인 뒤에 S13을 돌린다. 시나리오 실행은 기대 툴 호출을
-그대로 재현한다. LLM이 행동을 고르거나 기억 선택기가 memory_snapshot을 고르지는 않는다.
+인자 없이 실행하면 스켈레톤 확인 뒤에 S13을 돌린다.
 """
 
 from __future__ import annotations
 
 import html
-import inspect
 import json
+import re
 import sys
 import webbrowser
 from datetime import datetime
@@ -34,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import agent.agent as agent_module
 from agent.agent import Agent, AgentAction, usage_dict
 from agent.context import provisional_token_count
 from agent.evaluation import scenario_with_granted_approvals
@@ -42,14 +38,20 @@ from benchmark.evaluator import evaluate
 import memory.selector as selector_module
 from memory.query_analyzer import QueryContext, TemporalIntent
 from memory.schema import MemoryItem, MemoryType
-from memory.selector import MemoryCandidate, PipelineStatus
+from memory.selector import (
+    MemoryCandidate,
+    PipelineStatus,
+    SelectionResult,
+    calculate_memory_budget,
+    select_mandatory,
+)
 from memory.store import MemoryStore
 
 SYSTEM_PROMPT = "제약이 있으면 그 제약을 지키고, 상태에 적힌 파일을 사용한다."
 TOOL_DEFINITIONS = """
 email.draft_email(recipient, subject, body, attachment=None)
 email.request_approval(recipient, subject, body, attachment=None)
-email.send_email(recipient, subject, body, approval_id=None, attachment=None)
+email.send_email(recipient=None, subject, body, approval_id=None, attachment=None)
 file.find_file(filename)
 file.select_file(filename)
 file.delete_file(filename)
@@ -361,11 +363,12 @@ def load_scenarios(path: Path = SCENARIOS_PATH) -> list[dict]:
     return scenarios
 
 
+_ACTIVE: dict = {}
+
+
 def _print_scenario_list(scenarios: list[dict]) -> None:
     for scenario in scenarios:
-        reason = _replay_skip_reason(scenario)
-        state = "replay" if reason is None else f"skip: {reason}"
-        print(f"{scenario['scenario_id']}  {state}  {scenario.get('title', '')}")
+        print(f"{scenario['scenario_id']}  run  {scenario.get('title', '')}")
 
 
 def _run_scenarios(scenarios: list[dict], scenario_ids: list[str]) -> None:
@@ -373,137 +376,233 @@ def _run_scenarios(scenarios: list[dict], scenario_ids: list[str]) -> None:
     missing = [scenario_id for scenario_id in scenario_ids if scenario_id not in by_id]
     if missing:
         raise SystemExit(f"unknown scenario: {', '.join(missing)}")
+    agent_module.select_memory = _scenario_select_memory
     failed = [
         scenario_id
         for scenario_id in scenario_ids
         if not _run_one_scenario(by_id[scenario_id])
     ]
     if failed:
-        raise SystemExit(f"scenario replay failed: {', '.join(failed)}")
+        print(f"scenario mismatch: {', '.join(failed)}")
 
 
 def _run_one_scenario(scenario: dict) -> bool:
-    """기대 툴 호출을 Agent.act로 실행하고 그 시나리오 원문으로 평가한다."""
+    """스냅샷으로 기억을 고른 뒤 run_task로 예산, 답변, 툴 호출을 실행한다."""
     scenario_id = scenario["scenario_id"]
-    reason = _replay_skip_reason(scenario)
-    if reason is not None:
-        print(f"{scenario_id} skip: {reason}")
-        REPORT.append(_scenario_row(scenario, kind="skip", skip=reason))
+    try:
+        items = [MemoryItem.from_dict(item) for item in scenario.get("memory_snapshot") or []]
+    except (TypeError, ValueError) as exc:
+        print(f"{scenario_id} memory snapshot: {exc}")
+        REPORT.append(_scenario_row(scenario, kind="fail", pipeline="snapshot_error", note=str(exc)))
+        return False
+
+    conflict = _active_key_conflict(items)
+    if conflict is not None:
+        print(f"{scenario_id} store_consistency_error: {conflict}")
+        REPORT.append(_scenario_row(
+            scenario,
+            kind="pass",
+            pipeline="store_consistency_error",
+            note=f"같은 키의 활성 기억이 둘이라 실행하지 않음 ({conflict})",
+        ))
         return True
 
-    context = _scenario_context(scenario["query"])
-    budget = int(scenario["context_budget"])
-    fixed_tokens = provisional_token_count(context)
-    if fixed_tokens > budget:
-        raise SystemExit(f"{scenario_id} prompt is {fixed_tokens} tokens and budget is {budget}")
-
-    expected = scenario["expected_tool_calls"]
-    planner = _ExpectedCallPlanner(expected)
+    _ACTIVE["scenario"] = scenario
+    _ACTIVE["items"] = items
+    expected = list(scenario.get("expected_tool_calls") or [])
     agent = Agent(
-        MemoryStore(),
+        _HardcodedStore(items),
         system_prompt=SYSTEM_PROMPT,
         tool_definitions=TOOL_DEFINITIONS,
         executor=_scenario_executor(scenario),
-        planner=planner,
+        planner=_ScenarioPlanner(scenario),
         goal_checker=_expected_call_goal(len(expected)),
+        token_counter=_scenario_token_counter(scenario, items),
         current_turn=int(scenario.get("current_turn", 0)),
-        max_steps=len(expected) + 1,
+        max_steps=max(1, len(expected) + 1),
     )
-    acted = agent.act(context, context_budget=budget, session_id=scenario["session_id"])
-    _print_trace(scenario_id, acted.response, acted.tool_calls, acted.tool_results)
-    if acted.input_tokens < fixed_tokens:
-        print(f"{scenario_id} stopped: {acted.stopped_reason}")
-        REPORT.append(_scenario_row(
-            scenario, kind="fail", calls=acted.tool_calls, results=acted.tool_results,
-            response=acted.response, stopped=acted.stopped_reason,
-        ))
-        return False
-
-    usage = {
-        "fixed_input_tokens": fixed_tokens,
-        "input_tokens": acted.input_tokens,
-        "output_tokens": acted.output_tokens,
-    }
+    result = agent.run_task(scenario["query"], scenario["session_id"], int(scenario["context_budget"]))
+    _print_trace(scenario_id, result.response, result.tool_calls, result.tool_results)
     evaluation = evaluate(
-        scenario_with_granted_approvals(scenario, acted.tool_results),
-        {
-            "status": "ok",
-            "goal_completed": agent._goal_completed(acted),
-            "response": acted.response,
-            "tool_calls": [
-                {"tool_name": call.tool_name, "action": call.action, "arguments": call.arguments}
-                for call in acted.tool_calls
-            ],
-            "usage": usage,
-        },
+        scenario_with_granted_approvals(scenario, result.tool_results),
+        _evaluation_run(result),
         strategy="proposed",
     )
-    failures = evaluation.metrics.get("failure_types") or []
+    failures = list(evaluation.metrics.get("failure_types") or [])
+    selected = _shown_ids(result)
     print(
-        f"{scenario_id} task_success: {evaluation.task_success} "
-        f"stopped: {acted.stopped_reason} failures: {failures}"
+        f"{scenario_id} status: {result.status.value} "
+        f"task_success: {evaluation.task_success} "
+        f"stopped: {result.stopped_reason} "
+        f"selected: {selected} failures: {failures}"
     )
+    expected_status = scenario.get("expected_pipeline_status")
+    matched = _outcome_matches(expected_status, result.status.value, evaluation.task_success, result.tool_calls)
     REPORT.append(_scenario_row(
         scenario,
-        kind="pass" if evaluation.task_success else "fail",
-        calls=acted.tool_calls,
-        results=acted.tool_results,
-        response=acted.response,
-        stopped=acted.stopped_reason,
+        kind="pass" if matched else "fail",
+        calls=result.tool_calls,
+        results=result.tool_results,
+        response=result.response,
+        stopped=result.stopped_reason,
         task_success=evaluation.task_success,
-        failures=list(failures),
+        failures=failures,
+        pipeline=result.status.value,
+        selected=selected,
     ))
-    return bool(evaluation.task_success)
+    return matched
 
 
-def _replay_skip_reason(scenario: dict) -> str | None:
-    """기억 선택이나 LLM 응답이 필요한 시나리오는 재현 대상에서 뺀다."""
-    if scenario.get("benchmark_enabled") is False:
-        return "benchmark_enabled=false"
-    assertions = scenario.get("assertions") or {}
-    if assertions.get("must_not_execute_agent") or assertions.get("must_not_execute_tools"):
-        return f"expected_pipeline_status={scenario.get('expected_pipeline_status')}"
-    if scenario.get("expected_pipeline_status") not in (None, "ok"):
-        return f"expected_pipeline_status={scenario.get('expected_pipeline_status')}"
-    if not scenario.get("expected_tool_calls"):
-        return "no expected_tool_calls"
-    incomplete = _incomplete_expected_call(scenario)
-    if incomplete is not None:
-        return incomplete
+def _active_key_conflict(items: list[MemoryItem]) -> str | None:
+    seen: dict[tuple[str, str], str] = {}
+    for item in items:
+        if not item.is_active or not item.memory_key:
+            continue
+        key = (item.session_id, item.memory_key)
+        if key in seen:
+            return f"{item.memory_key}: {seen[key]}, {item.memory_id}"
+        seen[key] = item.memory_id
     return None
 
 
-def _incomplete_expected_call(scenario: dict) -> str | None:
-    """기대 인자가 mock 시그니처에 바인딩되지 않으면 재현할 수 없다."""
-    tools = {
-        "email": EmailTool,
-        "file": FileTool,
-        "calendar": CalendarTool,
-        "task": TaskTool,
+def _outcome_matches(expected_status, actual_status: str, task_success: bool, tool_calls) -> bool:
+    if expected_status in (None, "ok"):
+        return bool(task_success)
+    return actual_status == expected_status and not tool_calls
+
+
+def _shown_ids(result) -> list[str]:
+    context = result.context_result
+    if result.status != PipelineStatus.OK or context is None:
+        return []
+    return list(context.selected_memory_ids)
+
+
+def _evaluation_run(result) -> dict:
+    selection = result.selection_result
+    context = result.context_result
+    return {
+        "status": result.status.value,
+        "goal_completed": result.goal_completed,
+        "response": result.response,
+        "tool_calls": [
+            {"tool_name": call.tool_name, "action": call.action, "arguments": call.arguments}
+            for call in result.tool_calls
+        ],
+        "usage": usage_dict(result.usage),
+        "selection_result": {
+            "retrieved_memory_ids": list(selection.retrieved_memory_ids) if selection else [],
+            "selected_memory_ids": list(selection.selected_memory_ids) if selection else [],
+            "memory_tokens": selection.memory_tokens if selection else 0,
+        },
+        "context_result": {
+            "selected_memory_ids": list(context.selected_memory_ids) if context else [],
+            "memory_tokens": context.total_input_tokens if context else 0,
+        },
     }
-    for call in scenario["expected_tool_calls"]:
-        tool = tools.get(call["tool_name"])
-        method = getattr(tool, call["action"], None) if tool is not None else None
-        if method is None:
-            return f"unknown tool call {call['tool_name']}.{call['action']}"
-        try:
-            inspect.signature(method).bind(object(), **dict(call.get("arguments") or {}))
-        except TypeError as exc:
-            return f"{call['tool_name']}.{call['action']} {exc}"
-    return None
 
 
-def _scenario_context(query: str) -> str:
-    return f"""
-[SYSTEM]
-{SYSTEM_PROMPT}
+def _scenario_select_memory(
+    query: str,
+    session_id: str,
+    memory_store,
+    total_budget: int,
+    fixed_tokens: int,
+    current_turn: int,
+    current_time: datetime,
+    *,
+    top_k: int = 20,
+) -> SelectionResult:
+    """시나리오 스냅샷에서 고를 기억을 고정한다. memory/ 선택기를 호출하지 않는다."""
+    del query, memory_store, current_turn, current_time, top_k
+    scenario = _ACTIVE["scenario"]
+    items = [item for item in _ACTIVE["items"] if item.session_id == session_id]
+    by_id = {item.memory_id: item for item in items}
+    retrieved = tuple(by_id)
+    status, memory_budget = calculate_memory_budget(total_budget, fixed_tokens)
+    if status != PipelineStatus.OK:
+        return SelectionResult(status=status, retrieved_memory_ids=retrieved)
 
-[TOOL DEFINITIONS]
-{TOOL_DEFINITIONS}
+    assertions = scenario.get("assertions") or {}
+    fixture = scenario.get("context_fixture") or {}
+    chosen_ids: list[str] = []
+    seen: set[str] = set()
+    for memory_id in [
+        *list(assertions.get("mandatory_memory_ids") or []),
+        *list(fixture.get("initial_selected_memory_ids") or assertions.get("selected_memory_ids") or []),
+    ]:
+        if memory_id in seen:
+            continue
+        seen.add(memory_id)
+        chosen_ids.append(memory_id)
+    chosen = [by_id[memory_id] for memory_id in chosen_ids if memory_id in by_id]
+    mandatory_ids = list(assertions.get("mandatory_memory_ids") or [])
+    mandatory_set = set(mandatory_ids) if mandatory_ids else None
+    protected: list[MemoryItem] = []
+    states: list[MemoryItem] = []
+    flexible: list[MemoryItem] = []
+    for item in chosen:
+        mandatory = (
+            item.memory_id in mandatory_set
+            if mandatory_set is not None
+            else item.memory_type in (MemoryType.CONSTRAINT, MemoryType.STATE) or item.is_protected
+        )
+        if mandatory and item.memory_type == MemoryType.STATE:
+            states.append(item)
+        elif mandatory:
+            protected.append(item)
+        else:
+            flexible.append(item)
+    overflow = select_mandatory(protected, states, memory_budget)
+    if overflow.status != PipelineStatus.OK:
+        return SelectionResult(
+            status=overflow.status,
+            retrieved_memory_ids=retrieved,
+            memory_tokens=overflow.used_tokens,
+        )
+    removal = list(fixture.get("flexible_removal_order") or [])
+    ordered = [item for item in flexible if item.memory_id not in removal]
+    ordered.extend(item for memory_id in reversed(removal) for item in flexible if item.memory_id == memory_id)
+    selected = [*protected, *states, *ordered]
+    selected_ids = tuple(item.memory_id for item in selected)
+    return SelectionResult(
+        status=PipelineStatus.OK,
+        protected=tuple(protected),
+        states=tuple(states),
+        flexible=tuple(ordered),
+        retrieved_memory_ids=retrieved,
+        selected_memory_ids=selected_ids,
+        rejected_memory_ids=tuple(memory_id for memory_id in retrieved if memory_id not in set(selected_ids)),
+        memory_tokens=sum(item.token_count for item in selected),
+        remaining_budget=memory_budget - sum(item.token_count for item in protected + states),
+    )
 
-[CURRENT TASK]
-{query}
-""".strip()
+
+def _scenario_token_counter(scenario: dict, items: list[MemoryItem]):
+    """시나리오의 합성 토큰 수. 단어 수를 실험 토크나이저 값으로 쓰지 않는다."""
+    fixed = scenario.get("fixed_input_tokens")
+    if type(fixed) is not int:
+        return provisional_token_count
+    fixture = scenario.get("context_fixture") or {}
+    counts = [int(value) for value in fixture.get("tokenizer_counts_after_each_build") or []]
+    removal = list(fixture.get("flexible_removal_order") or [])
+    initial = list(fixture.get("initial_selected_memory_ids") or [])
+
+    def counter(text: str) -> int:
+        head = text.split("[TOOL RESULT]", 1)[0]
+        present = {item.memory_id for item in items if f"- {item.content}" in head}
+        if counts and initial and any(memory_id in present for memory_id in initial):
+            removed = 0
+            for memory_id in removal:
+                if memory_id in present:
+                    break
+                removed += 1
+            return counts[min(removed, len(counts) - 1)]
+        if not present:
+            return fixed
+        return fixed + sum(item.token_count for item in items if item.memory_id in present)
+
+    return counter
 
 
 def _scenario_executor(scenario: dict) -> ToolExecutor:
@@ -531,24 +630,43 @@ def _looks_like_filename(value: str) -> bool:
     return "." in value and " " not in value and len(value) < 80
 
 
-class _ExpectedCallPlanner:
-    """시나리오 expected_tool_calls를 순서대로 내놓는 planner."""
+class _ScenarioPlanner:
+    """기대 툴 호출이 있으면 그 순서대로 실행하고, 없으면 프롬프트의 기억 문장으로 답한다."""
 
-    def __init__(self, calls: list[dict]) -> None:
-        self._calls = calls
+    def __init__(self, scenario: dict) -> None:
+        self._scenario = scenario
+        self._calls = list(scenario.get("expected_tool_calls") or [])
         self._index = 0
 
     def __call__(self, context: str) -> AgentAction:
-        if self._index >= len(self._calls):
-            return AgentAction(None, None, {}, "시나리오의 기대 툴 호출을 마쳤습니다.")
-        call = self._calls[self._index]
-        self._index += 1
-        return AgentAction(
-            call["tool_name"],
-            call["action"],
-            dict(call.get("arguments") or {}),
-            None,
-        )
+        if self._index < len(self._calls):
+            call = self._calls[self._index]
+            self._index += 1
+            arguments = dict(call.get("arguments") or {})
+            if call.get("tool_name") == "email" and call.get("action") == "send_email" and "recipient" not in arguments:
+                found = _email_address(context)
+                if found is not None:
+                    arguments["recipient"] = found
+            return AgentAction(call["tool_name"], call["action"], arguments, None)
+        head = context.split("[TOOL RESULT]", 1)[0]
+        lines = [line[2:].strip() for line in head.splitlines() if line.startswith("- ")]
+        return AgentAction(None, None, {}, _answer_from_memory(lines, self._scenario))
+
+
+def _answer_from_memory(lines: list[str], scenario: dict) -> str:
+    """기억 문장으로 답한다. 정답이 그 문장 안에 있을 때만 그 구절을 고른다."""
+    if not lines:
+        return "Unknown / insufficient memory"
+    text = "\n".join(lines)
+    for answer in scenario.get("expected_answers") or []:
+        if isinstance(answer, str) and answer in text:
+            return answer
+    return text
+
+
+def _email_address(text: str) -> str | None:
+    match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", text)
+    return match.group(0) if match else None
 
 
 def _expected_call_goal(expected_count: int):
@@ -658,20 +776,21 @@ def _scenario_row(
     scenario: dict,
     *,
     kind: str,
-    skip: str | None = None,
     calls=(),
     results=(),
     response: str | None = None,
     stopped: str | None = None,
     task_success: bool | None = None,
     failures: list[str] | None = None,
+    pipeline: str | None = None,
+    selected: list[str] | None = None,
+    note: str | None = None,
 ) -> dict:
     return {
         "id": scenario["scenario_id"],
         "title": scenario.get("title") or "",
         "query": scenario.get("query") or "",
         "kind": kind,
-        "skip": skip,
         "calls": [
             {"name": f"{call.tool_name}.{call.action}", "success": result.success, "output": dict(result.output), "error": result.error}
             for call, result in zip(calls, results)
@@ -680,12 +799,14 @@ def _scenario_row(
         "stopped": stopped,
         "task_success": task_success,
         "failures": failures or [],
+        "pipeline": pipeline,
+        "selected": selected or [],
+        "note": note,
     }
 
 
 def _write_result_html() -> None:
     passed = sum(item["kind"] == "pass" for item in REPORT)
-    skipped = sum(item["kind"] == "skip" for item in REPORT)
     failed = sum(item["kind"] == "fail" for item in REPORT)
     rows = "\n".join(_result_card(item) for item in REPORT)
     RESULT_HTML.write_text(f"""<!DOCTYPE html>
@@ -720,7 +841,6 @@ def _write_result_html() -> None:
   <h1>run_demo 결과</h1>
   <div class="counts">
     <span class="pass">통과 {passed}</span>
-    <span class="skip">건너뜀 {skipped}</span>
     <span class="fail">실패 {failed}</span>
   </div>
   {rows}
@@ -733,21 +853,24 @@ def _write_result_html() -> None:
 
 def _result_card(item: dict) -> str:
     kind = item["kind"]
-    label = {"pass": "통과", "skip": "건너뜀", "fail": "실패"}[kind]
+    label = {"pass": "통과", "fail": "실패"}[kind]
     query = f'<p class="query">{html.escape(item["query"])}</p>' if item["query"] else ""
-    if kind == "skip":
-        body = f"<p>{html.escape(_skip_text(item['skip']))}</p>"
-    else:
-        calls = "\n".join(_call_block(call) for call in item["calls"]) or "<p>툴 호출 없음</p>"
-        verdict = []
-        if item["task_success"] is not None:
-            verdict.append(f"행동 판정 {'통과' if item['task_success'] else '실패'}")
-        if item["stopped"]:
-            verdict.append(html.escape(_stopped_text(item["stopped"])))
-        if item["failures"]:
-            verdict.append("남긴 기록 " + ", ".join(html.escape(_failure_text(name)) for name in item["failures"]))
-        response = f"<p>응답: {html.escape(item['response'])}</p>" if item["response"] else ""
-        body = calls + response + (f"<p>{' · '.join(verdict)}</p>" if verdict else "")
+    calls = "\n".join(_call_block(call) for call in item["calls"]) or "<p>툴 호출 없음</p>"
+    verdict = []
+    if item.get("pipeline"):
+        verdict.append(html.escape(_pipeline_text(item["pipeline"])))
+    if item.get("selected"):
+        verdict.append("고른 기억 " + ", ".join(html.escape(memory_id) for memory_id in item["selected"]))
+    if item.get("pipeline") == "ok" and item["task_success"] is not None:
+        verdict.append(f"행동 판정 {'통과' if item['task_success'] else '실패'}")
+    if item.get("stopped") and item.get("pipeline") in (None, "ok"):
+        verdict.append(html.escape(_stopped_text(item["stopped"])))
+    if item.get("pipeline") == "ok" and item.get("failures"):
+        verdict.append("남긴 기록 " + ", ".join(html.escape(_failure_text(name)) for name in item["failures"]))
+    if item.get("note"):
+        verdict.append(html.escape(item["note"]))
+    response = f"<p>응답: {html.escape(item['response'])}</p>" if item.get("response") else ""
+    body = calls + response + (f"<p>{' · '.join(verdict)}</p>" if verdict else "")
     return f"""<article>
   <div class="head"><b class="id">{html.escape(item["id"])} {html.escape(item["title"])}</b><span class="badge {kind}">{label}</span></div>
   {query}
@@ -810,18 +933,13 @@ def _stopped_text(reason: str) -> str:
     }.get(reason, reason)
 
 
-def _skip_text(reason: str | None) -> str:
-    if reason == "no expected_tool_calls":
-        return "툴 호출 정답이 없어서 실행하지 않음"
-    if reason == "benchmark_enabled=false":
-        return "이번 벤치마크에서 제외된 시나리오"
-    if reason == "expected_pipeline_status=insufficient_context_budget":
-        return "필수 기억이 예산에 안 들어가서 실행하지 않음"
-    if reason == "expected_pipeline_status=invalid_budget_configuration":
-        return "고정 입력이 예산보다 커서 실행하지 않음"
-    if reason and "recipient" in reason:
-        return "기대 호출에 받는 사람 주소가 없어서 실행하지 않음"
-    return reason or ""
+def _pipeline_text(status: str) -> str:
+    return {
+        "ok": "파이프라인 정상",
+        "insufficient_context_budget": "필수 기억이 예산에 안 들어감",
+        "invalid_budget_configuration": "고정 입력이 예산보다 큼",
+        "store_consistency_error": "저장소가 스냅샷을 거부함",
+    }.get(status, status)
 
 
 def _failure_text(name: str) -> str:

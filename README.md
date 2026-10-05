@@ -145,7 +145,7 @@ Agent 스켈레톤과 mock Tool 데모는 저장소 루트에서 다음으로 �
 python prototype/run_demo.py
 ```
 
-데모는 스크립트 planner로 파일 선택, 승인 요청, 발송 순서를 확인하고, 예산이 고정 입력보다 작으면 툴을 호출하지 않는지 확인한다. 이어서 `benchmark/scenarios.json`의 S13을 읽어 기대 툴 호출을 mock 툴로 실행하고 evaluator에 넘긴다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다. LLM과 기억 선택 파이프라인은 아직 연결되지 않았다.
+데모는 스크립트 planner로 파일 선택, 승인 요청, 발송 순서를 확인하고, 예산이 고정 입력보다 작으면 툴을 호출하지 않는지 확인한다. 이어서 `benchmark/scenarios.json`을 읽는다. 기억 선택은 이 데모 안에서 시나리오 `memory_snapshot`과 합성 토큰 수로 고정하고, 에이전트는 예산 중단, 기억 문장 답변, 기대 툴 호출을 실행한 뒤 evaluator에 넘긴다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다. LLM과 `memory/` 구현은 연결되지 않았다.
 
 ## 기술 스택 후보
 

@@ -1481,7 +1481,7 @@ class EmailTool:
 
     def send_email(
         self,
-        recipient: str,
+        recipient: str | None = None,
         subject: str | None = None,
         body: str | None = None,
         approval_id: str | None = None,
@@ -1490,7 +1490,7 @@ class EmailTool:
         ...
 ```
 
-`attachment`는 평가기가 파일 상태를 메일 인자에서 읽을 수 있게 둔 선택 인자다. 예: `attachment="report_final.pdf"`. 시나리오의 기대 호출은 `recipient`와 `attachment`만 가질 수 있으므로 제목과 본문은 생략할 수 있다. `request_approval`은 `approval_id`를 발급한다.
+`attachment`는 평가기가 파일 상태를 메일 인자에서 읽을 수 있게 둔 선택 인자다. 예: `attachment="report_final.pdf"`. 시나리오의 기대 호출은 `attachment`만 가질 수 있으므로 `send_email`의 수신자, 제목, 본문은 생략할 수 있다. `draft_email`과 `request_approval`의 수신자는 여전히 필수다. `request_approval`은 `approval_id`를 발급한다.
 
 `granted_approval_ids`는 시나리오 `environment.valid_approval_ids`처럼 실행 전에 이미 승인된 ID다. 그 ID로 보낸 메일은 제목·본문·첨부와 상관없이 `approved=true`다. 이번 실행에서 `request_approval`이 발급한 ID는 수신자, 제목, 본문, attachment가 그 요청과 같아야 한다. `ToolExecutor`는 호출과 결과를 순서대로 보존한다.
 

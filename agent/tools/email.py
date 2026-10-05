@@ -72,7 +72,7 @@ class EmailTool:
 
     def send_email(
         self,
-        recipient: str,
+        recipient: str | None = None,
         subject: str | None = None,
         body: str | None = None,
         approval_id: str | None = None,
@@ -85,7 +85,9 @@ class EmailTool:
         같아야 한다. 시나리오 environment에 있던 ID는 메시지 내용과 무관하게
         이미 승인된 것이다.
         """
-        error = _message_error(recipient, subject, body, attachment)
+        if recipient is not None and (not isinstance(recipient, str) or not recipient.strip()):
+            return _fail("send_email", "recipient must be a non-empty string or omitted")
+        error = _optional_text_error(subject, body, attachment)
         if error:
             return _fail("send_email", error)
         if approval_id is not None and not str(approval_id).strip():
@@ -136,6 +138,17 @@ class EmailTool:
             })
 
 
+def _optional_text_error(
+    subject: str | None,
+    body: str | None,
+    attachment: str | None,
+) -> str | None:
+    for name, value in (("subject", subject), ("body", body), ("attachment", attachment)):
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            return f"{name} must be a non-empty string or omitted"
+    return None
+
+
 def _message_error(
     recipient: str,
     subject: str | None,
@@ -144,10 +157,7 @@ def _message_error(
 ) -> str | None:
     if not isinstance(recipient, str) or not recipient.strip():
         return "recipient must be a non-empty string"
-    for name, value in (("subject", subject), ("body", body), ("attachment", attachment)):
-        if value is not None and (not isinstance(value, str) or not value.strip()):
-            return f"{name} must be a non-empty string or omitted"
-    return None
+    return _optional_text_error(subject, body, attachment)
 
 
 def _ok(action: str, output: dict) -> ToolResult:
