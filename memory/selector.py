@@ -273,6 +273,11 @@ def select_memory(
         candidate
         for candidate in resolved
         if candidate.memory.memory_id not in mandatory_ids
+        and not (
+            candidate.memory.memory_type == MemoryType.CONSTRAINT
+            and candidate.memory.is_active
+            and candidate.memory.is_protected
+        )
     ]
 
     for candidate in flexible_candidates:
