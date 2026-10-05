@@ -157,7 +157,7 @@
 
 | ID | 조건 | 기대 결과 |
 |---|---|---|
-| TV-01 | v1은 6월 1일~8월 15일, v2는 8월 15일~9월 20일, final은 9월 20일부터 유효. 8월 20일 버전 요청 | 현재 SUPERSEDED인 v2를 선택하며 Temporal Error로 판정하지 않음 |
+| TV-01 | v1은 6월 1일 to 8월 15일, v2는 8월 15일 to 9월 20일, final은 9월 20일부터 유효. 8월 20일 버전 요청 | 현재 SUPERSEDED인 v2를 선택하며 Temporal Error로 판정하지 않음 |
 | TV-02 | v1의 `valid_to`와 v2의 `valid_from`이 같은 시각 T. 정확히 T의 버전 요청 | `valid_from <= T < valid_to` 규칙에 따라 v2 선택 |
 
 시간값은 동일한 Timezone과 정밀도를 사용한다. 날짜 예시는 테스트에서 시각까지 고정한다.
