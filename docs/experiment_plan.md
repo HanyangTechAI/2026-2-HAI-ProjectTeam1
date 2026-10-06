@@ -200,7 +200,12 @@ Stale-State Usage는 오래된 Memory의 검색 여부가 아니라 **최종 행
 
 External Memory 방식에서는 최종 답변뿐만 아니라 **필요한 memory를 실제로 retrieval했는지**도 평가한다.
 
-가능한 경우 각 evaluation sample에 정답과 관련된 `target_memory_id`를 기록한다.
+가능한 경우 각 evaluation sample에 필요한 전체 `target_memory_ids`를 기록한다.
+최초 General Retrieval Top-K는 별도 Protected Retrieval을 포함하지 않으므로,
+Recall@k, Precision@k, Hit@k, MRR은 전체 target 중 `applicable_constraint_ids`를
+제외한 일반 검색 대상만으로 계산한다. 일반 검색 대상이 없으면 해당 지표는
+적용하지 않는다. 보호 제약의 최종 Context 포함 여부는
+`applicable_protected_recall`로 별도 평가한다.
 
 평가 후보:
 
@@ -209,15 +214,12 @@ External Memory 방식에서는 최종 답변뿐만 아니라 **필요한 memory
 - Hit@k
 - MRR
 
-이를 통해 다음 두 실패를 구분한다.
+최초 일반 검색에서 필요한 항목을 놓쳤는지는 `general_retrieval_miss`로 기록한다.
+이후 버전 확장이나 별도 보호 검색으로 복구될 수 있으므로, 최초 검색 누락만으로
+최종 실패 원인을 확정하지 않는다. 최종 Context에서 필수 항목이 빠지면
+`selection_failure`로 기록하고, 예산 누락 근거가 있으면
+`budget_selection_failure`도 기록한다. 행동 성공 여부는 별도로 평가한다.
 
-```text
-Retrieval Failure
-필요한 memory 자체를 찾지 못함
-
-Reasoning Failure
-필요한 memory를 찾았지만 LLM이 정답 생성에 실패함
-```
 ### 4.5 Temporal Version Accuracy
 
 State update가 존재하는 sample에서는 retrieval 이후 실제 LLM context에 포함된 Memory가 해당 시점에 유효한 버전인지 평가한다.
@@ -233,7 +235,8 @@ Temporal Version Accuracy (TVA)는 temporal version 판단이 필요한 sample�
 
 TVA = 올바른 temporal version을 선택한 sample 수 / temporal version 판단이 필요한 sample 수
 
-이를 통해 필요한 Memory 자체를 검색하지 못한 Retrieval Failure와, 필요한 버전이 후보에 존재하지만 잘못된 버전을 선택한 Temporal Failure를 구분한다.
+`temporal_version_correct=false`이면 `temporal_failure`를 기록한다. 이 값만으로
+검색, 버전 해석, 예산 선택 중 어느 단계가 원인인지 확정하지 않는다.
 
 ---
 
@@ -478,61 +481,62 @@ History Length와 Token Budget을 독립적으로 변화시키는 full-factorial
 
 ## 9. Evaluation Output Format
 
-`evaluator.py`는 최소한 다음 결과를 기록할 수 있도록 구현한다.
+다음은 `evaluator.py`가 출력하는 주요 필드의 발췌 예시다. 최초 일반 검색에서는
+과거 버전만 찾았지만, 버전 확장과 별도 보호 검색을 거쳐 필요한 기억이 최종
+Context에 모두 포함되고 행동도 성공한 경우다. 전체 입력 계약은
+[evaluation_usage.md](evaluation_usage.md)를 따른다.
 
 ```json
 {
-  "sample_id": "sample_001",
-  "strategy": "external_memory",
+  "sample_id": "seed42_report_001",
+  "strategy": "proposed",
+  "repeat_id": 0,
+  "pipeline_status": "ok",
   "context_token_budget": 2048,
   "fixed_input_tokens": 310,
   "available_memory_tokens": 1738,
-  "history_length_tokens": 12000,
-  "horizon_turns": 100,
-  "constraint_count": 3,
+  "history_length_tokens": 10000,
+  "horizon_turns": 50,
+  "constraint_count": 1,
   "state_update_count": 2,
   "noise_memory_ratio": 0.5,
-  "retrieved_memories": [
-    {
-      "memory_id": "mem_001",
-      "is_active": false,
-      "is_protected": true,
-      "supersedes": null,
-      "superseded_by": "mem_002",
-      "token_count": 10
-    }
-  ],
-  "retrieved_memory_ids": ["mem_001"],
-  "selected_memory_ids": ["mem_001"],
-  "target_memory_ids": ["mem_002"],
-
+  "retrieved_memory_ids": ["report_v1"],
+  "selected_memory_ids": ["report_final", "approval_rule"],
+  "target_memory_ids": ["report_final", "approval_rule"],
   "retrieval_hit": false,
-  "active_target_hit": false,
-
+  "recall_at_k": 0.0,
+  "general_retrieval_miss": true,
+  "general_retrieval_missing_target_ids": ["report_final"],
+  "recovered_target_ids": ["report_final"],
+  "selection_failure": false,
+  "missing_selected_target_ids": [],
+  "budget_selection_failure": false,
+  "applicable_protected_recall": 1.0,
   "temporal_version_required": true,
-  "temporal_version_correct": false,
-
+  "temporal_version_correct": true,
   "stale_memory_count": 1,
-  "stale_selected_memory_count": 1,
-
-  "task_success": false,
+  "stale_selected_memory_count": 0,
+  "task_success": true,
   "constraint_violation_count": 0,
   "constraint_violation_rate": 0.0,
-  "current_state_accuracy": 0.0,
-  "stale_state_used": true,
+  "current_state_accuracy": 1.0,
+  "stale_state_used": false,
   "state_omission_count": 0,
   "state_error_count": 0,
-  "approval_behavior_correct": null,
-  "mandatory_memory_overflow": false,
-  "protected_memory_recall": 1.0,
-  "retrieval_tokens": 10,
-  "input_tokens": 320,
+  "approval_behavior_correct": true,
+  "mandatory_memory_overflow": null,
+  "input_tokens": 390,
   "output_tokens": 18,
   "planning_latency_ms": 250,
   "total_latency_ms": 1200,
-  "total_llm_cost": 0.0012
+  "total_llm_cost": null,
+  "failure_types": []
 }
 ```
+
+최초 검색 누락이 복구됐으므로 `general_retrieval_miss`는 true지만,
+`selection_failure`와 `task_success`는 각각 false와 true다.
+
 ## Memory Schema와 Evaluation Schema의 분리 이유
 
 공통 Memory schema와 Evaluation output schema는 저장 대상과 목적이 서로 다르므로 동일한 형태를 사용하지 않는다.
@@ -547,7 +551,10 @@ History Length와 Token Budget을 독립적으로 변화시키는 full-factorial
 - 설정된 최대 토큰과 실제 사용 토큰이 얼마인지
 - 최종 응답과 retrieval 성능이 어떠했는지
 
-Evaluation schema의 `retrieved_memories`는 별도의 Memory schema가 아니라, 공통 Memory schema에서 평가에 필요한 필드만 가져온 **검색 시점의 상태 snapshot**이다.
+Evaluation schema의 선택적 `retrieved_memories`는 별도의 Memory schema가 아니라,
+공통 Memory schema에서 평가에 필요한 필드만 가져온 **최초 일반 검색 시점의 상태
+snapshot**이다. 현재 evaluator는 이 snapshot을 입력에서 출력으로 보존하지만,
+deterministic 판정에는 직접 사용하지 않는다.
 
 ```json
 {
@@ -564,15 +571,16 @@ Evaluation schema의 `retrieved_memories`는 별도의 Memory schema가 아니�
 
 `retrieved_memory_ids`와 `retrieved_memories`를 모두 기록하는 이유는 다음과 같다.
 
-- `retrieved_memory_ids`: Recall@k, Precision@k, Hit@k, MRR 등 ID 기반 metric 계산
-- `retrieved_memories`: Temporal Failure, stale retrieval, protected memory 누락 등 상태 기반 failure analysis
+- `retrieved_memory_ids`: 최초 General Retrieval Top-K의 ID 순서. 일반 검색 대상에 대한 Recall@k, Precision@k, Hit@k, MRR 계산에 사용
+- `retrieved_memories`: 제공된 경우 최초 검색 당시 상태 snapshot을 보존해 사후 분석에 사용. 현재 stale 판정은 이 snapshot 대신 `wrong_version_memory_ids`와 ID 교집합으로 계산
 - `target_memory_ids`: evaluation sample의 정답 Memory 집합
 - `context_token_budget`: 해당 실험 실행에 설정된 전체 Agent 입력 Context의 token 상한
 - `fixed_input_tokens`: System Prompt, 현재 요청과 Tool 정의 등 고정 입력의 token 수
 - `available_memory_tokens`: 전체 Context 상한에서 고정 입력을 제외한 Memory 가용 token 수
-- `retrieval_tokens`: 검색된 Memory가 실제 사용한 토큰
-- `input_tokens`, `output_tokens`: 전체 LLM 요청의 실제 토큰 사용량
--  `selected_memory_ids`: retrieval된 후보 중 temporal resolution 및 budget selection 이후 실제 LLM context에 포함된 Memory 집합
+- `retrieval_tokens`: 실행 adapter가 제공한 경우에만 기록하는 검색 token 수
+- `input_tokens`: 실행기가 제공한 실제 입력 측정값. 현재 Agent에서는 여러 호출 중 최대 단일 입력 크기이며, 누적 비용용 입력 합계가 아님
+- `output_tokens`: 실행기가 제공한 출력 token 수. 현재 Agent에서는 실행 전체의 누적 출력이 아님
+- `selected_memory_ids`: 일반 검색, 버전 확장, 보호 검색 및 예산 선택 이후 실제 LLM Context에 포함된 Memory 집합
 - `temporal_version_required`: 해당 sample에서 State version 선택이 필요한지 여부
 - `temporal_version_correct`: 실제 선택된 Memory가 해당 시점의 올바른 State version인지 여부
 - `stale_selected_memory_count`: 실제 LLM context에 포함된 Memory 중 superseded된 stale Memory의 수
@@ -594,13 +602,11 @@ Evaluation Metrics
 Evaluation Result
 ```
 
-이 구조를 통해 공통 Memory schema와의 호환성을 유지하면서도 다음 실패를 구분할 수 있다.
-
-- 필요한 Memory를 검색하지 못한 Retrieval Failure
-- 대체된 Memory를 검색한 Temporal/Stale Failure
-- 보호 Memory를 누락한 Protected Memory Failure
-- 필요한 Memory를 검색했지만 답변에 실패한 Reasoning Failure
-- 최대 토큰 조건을 초과한 Budget Failure
+이 구조에서 최초 일반 검색 누락(`general_retrieval_miss`), 최종 Context의 필수
+Memory 누락(`selection_failure`), 근거가 확인된 예산 누락
+(`budget_selection_failure`)을 별도로 기록한다. 시점 버전 선택 오류
+(`temporal_failure`)와 실제 행동에서의 오래된 State 사용(`stale_state_usage`)도
+구분한다. 원인 추정에 필요한 중간 기록이 없으면 원인을 단정하지 않는다.
 
 External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
@@ -650,38 +656,26 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
 ## 11. Failure Analysis
 
-단순 평균 성능뿐만 아니라 실패 원인을 분석한다.
+단순 평균 성능뿐만 아니라 실패 지표를 분석한다. `failure_types`에 기록되는
+현재 코드의 명칭은 다음과 같다. 여러 유형이 한 실행에 동시에 기록될 수 있다.
 
-실패 유형 예시:
+| 유형 | 기록 조건 |
+|---|---|
+| `budget_failure` | 파이프라인이 중단됐거나 입력 예산을 넘은 경우 |
+| `selection_failure` | 필수 target이 최종 Context에서 빠진 경우 |
+| `budget_selection_failure` | 최종 누락에 예산 원인 기록이 있는 경우 |
+| `temporal_failure` | 필요한 버전 선택이 틀린 경우 |
+| `constraint_failure` | 금지 행동 또는 적용 제약 위반이 있는 경우 |
+| `approval_failure` | 승인 없이 실행했거나 필요한 승인 요청이 없는 경우 |
+| `state_omission` | 행동에 필요한 State 값을 누락한 경우 |
+| `stale_state_usage` | 행동에 잘못된 과거 State 값을 사용한 경우 |
+| `state_error` | 행동에 기대값이나 과거 버전 값이 아닌 잘못된 State 값을 사용한 경우 |
+| `reasoning_action_failure` | 다른 기록된 실패 없이 작업이 성공하지 못한 경우 |
 
-```text
-Retrieval Failure
-  필요한 memory 검색 실패
-
-Context Failure
-  필요한 정보가 context에 있었지만 활용 실패
-
-Reasoning Failure
-  필요한 정보를 제공받았지만 추론 실패
-
-Temporal Failure
-  과거 정보와 최신 정보를 잘못 구분
-
-Constraint Failure
-  적용되는 제약을 누락하거나 위반
-
-State Omission
-  행동에 필요한 State를 사용하지 않음
-
-State Fabrication/Error
-  History에 없거나 어떤 유효 버전과도 일치하지 않는 State를 사용
-
-Approval Failure
-  승인이 필요한 행동을 승인 없이 실행하거나 필요한 승인 요청을 하지 않음
-
-Hallucination
-  제공되지 않은 정보를 생성
-```
+`general_retrieval_miss`는 최초 검색의 진단 지표이며 `failure_types`에는 넣지
+않는다. `reasoning_action_failure`도 실제 원인이 추론인지, Tool 실행인지 등을
+확정하는 값은 아니다. `Context Failure`, `Hallucination`, `active_target_hit`,
+`protected_memory_recall`은 현재 evaluator의 출력 유형이나 필드가 아니다.
 
 실험 결과에서는 각 strategy가 어떤 유형의 failure에 취약한지 분석한다.
 

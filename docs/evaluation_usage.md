@@ -148,9 +148,12 @@ python -m unittest discover -s tests -p "test_evaluator.py"
 
 TSR은 목표 달성, 기대 호출 충족, 금지 행동 없음, 제약 준수, 올바른 State,
 승인 행동, 예산 준수를 모두 요구한다. 해당하지 않는 지표는 null이며 집계에서
-제외한다. precision@k 분모는 실제 반환된 고유 ID 수(최대 k)이다. MRR도 k 안에서
-계산한다. CSA/CVR/SSUR 집계는 실행별 비율의 macro 평균이다.
-검색 지표는 최초 General Retrieval Top-K만 평가하므로 최종 행동이 성공해도
+제외한다. Recall@k, Precision@k, Hit@k, MRR의 정답 집합은
+`target_memory_ids`에서 `applicable_constraint_ids`를 제외한 일반 검색 대상이다.
+일반 검색 대상이 없으면 이 지표들은 null이다. precision@k 분모는 실제 반환된
+고유 ID 수(최대 k)이고, MRR도 k 안에서 계산한다. 보호 제약의 최종 포함 여부는
+`applicable_protected_recall`로 평가한다. CSA/CVR/SSUR 집계는 실행별 비율의
+macro 평균이다. 검색 지표는 최초 General Retrieval Top-K만 평가하므로 최종 행동이 성공해도
 Recall@k가 낮을 수 있다. 다음 두 결과를 분리한다.
 
 - `general_retrieval_miss`: 일반 검색 대상 target(적용 제약 ID 제외)을 하나라도

@@ -356,7 +356,8 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     if status == "ok" and not success and set(targets) <= set(selected) and not failures:
         failures.append("reasoning_action_failure")
     metrics = dict(scenario.get("metadata", {}))
-    metrics.update(retrieval_metrics(retrieved, targets if retrieval_applicable else [], k))
+    # General Retrieval does not search the separately resolved protected constraints.
+    metrics.update(retrieval_metrics(retrieved, sorted(general_targets) if retrieval_applicable else [], k))
     metrics.update(answer_scores)
     metrics.update(selection_diagnostics)
     metrics.update(
