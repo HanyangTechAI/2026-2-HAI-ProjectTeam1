@@ -120,6 +120,80 @@ class EvaluationResult:
                     task_success=self.task_success)
 
 
+def _selection_diagnostics(run: dict, selection: dict, context: dict,
+                           targets: set[str], selected: set[str]) -> dict:
+    """Use execution traces to distinguish discovered targets from budget drops.
+
+    rejected_memory_ids proves rejection, but not its cause. Budget attribution
+    needs an explicit selection trace or the Context Builder's budget-drop log.
+    Missing traces remain unknown; they are never treated as an empty log.
+    """
+    trace = run.get("selection_trace") or {}
+
+    def ids(source: dict, key: str) -> set[str]:
+        values = source.get(key)
+        if values is None:
+            return set()
+        if not isinstance(values, list) or not all(isinstance(mid, str) and mid for mid in values):
+            raise ValueError(f"{key} must be a list of non-empty memory IDs")
+        return set(values)
+
+    before_context = ids(selection, "selected_memory_ids")
+    rejected = ids(selection, "rejected_memory_ids")
+    dropped = ids(context, "dropped_flexible_ids")
+    budget_rejected = ids(trace, "budget_rejected_memory_ids")
+    candidates = ids(trace, "candidate_memory_ids")
+    if before_context & rejected:
+        raise ValueError("selection selected and rejected IDs must be disjoint")
+    if budget_rejected & (before_context | selected):
+        raise ValueError("budget-rejected IDs cannot be selected")
+    if dropped & selected:
+        raise ValueError("context-dropped IDs cannot be in the final context")
+    if selection.get("selected_memory_ids") is not None and not dropped <= before_context:
+        raise ValueError("context-dropped IDs must have been selected before formatting")
+    # An explicit pool is after temporal/applicability resolution, before budget
+    # selection. Do not mix initial Top-K (possibly wrong versions) into it.
+    if trace.get("candidate_memory_ids") is not None:
+        if not (before_context | rejected | budget_rejected) <= candidates:
+            raise ValueError("candidate_memory_ids must cover selection evidence")
+    known_candidates = candidates | before_context | rejected | budget_rejected | dropped | selected
+    missing = targets - selected
+    selection_budget_targets = missing & budget_rejected
+    context_budget_targets = missing & dropped
+    budget_targets = selection_budget_targets | context_budget_targets
+    complete_budget_trace = (trace.get("budget_rejected_memory_ids") is not None
+                             and context.get("dropped_flexible_ids") is not None)
+    budget_failure = (bool(budget_targets) if budget_targets or not missing or complete_budget_trace
+                      else None) if targets else None
+    # Reasons may be multiple per target; explicit budget evidence takes
+    # precedence over a generic rejection record.
+    reasons = {}
+    for mid in sorted(missing):
+        evidence = []
+        if mid in selection_budget_targets:
+            evidence.append("selection_budget")
+        if mid in context_budget_targets:
+            evidence.append("context_budget")
+        if not evidence and mid in rejected:
+            evidence.append("selection_rejection_unspecified")
+        reasons[mid] = evidence or ["unknown"]
+    return dict(
+        selection_candidate_memory_ids=sorted(known_candidates),
+        selection_candidate_trace_complete=trace.get("candidate_memory_ids") is not None,
+        pre_context_selected_memory_ids=sorted(before_context),
+        rejected_memory_ids=sorted(rejected), dropped_flexible_ids=sorted(dropped),
+        budget_rejected_memory_ids=sorted(budget_rejected),
+        found_but_unselected_target_ids=sorted(missing & known_candidates),
+        selection_rejected_target_ids=sorted(missing & rejected),
+        selection_budget_omitted_target_ids=sorted(selection_budget_targets),
+        context_budget_omitted_target_ids=sorted(context_budget_targets),
+        budget_omitted_target_ids=sorted(budget_targets),
+        budget_selection_failure=budget_failure,
+        budget_omission_trace_complete=complete_budget_trace,
+        target_omission_reasons=reasons,
+    )
+
+
 def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
              k: int = 20, repeat_id: int = 0) -> EvaluationResult:
     """Evaluate mappings or dataclass snapshots without accessing a MemoryStore.
@@ -140,6 +214,8 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         raise ValueError("a recognized pipeline status is required")
     selection = run.get("selection_result") or {}
     context = run.get("context_result") or {}
+    # Interface contract: initial General Retrieval Top-K, before version
+    # expansion/temporal resolution, excluding the separate protected path.
     retrieved = list(selection.get("retrieved_memory_ids", run.get("retrieved_memory_ids", [])))
     # Formatting can drop flexible memories; the context snapshot is authoritative.
     selected = list(context.get("selected_memory_ids", selection.get(
@@ -251,10 +327,20 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     retrieval_applicable = strategy not in {"sliding_window", "long_context", "full_context", "long_context_reference"}
     if status != "ok" or budget_exceeded or invalid_fixed_budget:
         failures.append("budget_failure")
-    if retrieval_applicable and set(targets) - set(retrieved):
-        failures.append("retrieval_failure")
-    if retrieval_applicable and (set(targets) & set(retrieved)) - set(selected):
+    # Initial General Retrieval misses are diagnostic metrics, not failures:
+    # version expansion/protected retrieval can still supply the final context.
+    # Selection failure means final target omission, not a causal attribution
+    # to the selection algorithm (retrieval or budget may be the actual cause).
+    general_targets = set(targets) - constraint_ids
+    general_missing = general_targets - set(retrieved)
+    general_retrieval_miss = bool(general_missing) if retrieval_applicable and general_targets else None
+    missing_selected = set(targets) - set(selected)
+    selection_failure = bool(missing_selected) if targets else None
+    if selection_failure:
         failures.append("selection_failure")
+    selection_diagnostics = _selection_diagnostics(run, selection, context, set(targets), set(selected))
+    if selection_diagnostics["budget_selection_failure"] is True:
+        failures.append("budget_selection_failure")
     if temporal_correct is False:
         failures.append("temporal_failure")
     if violated or forbidden_hit:
@@ -272,12 +358,17 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     metrics = dict(scenario.get("metadata", {}))
     metrics.update(retrieval_metrics(retrieved, targets if retrieval_applicable else [], k))
     metrics.update(answer_scores)
+    metrics.update(selection_diagnostics)
     metrics.update(
         context_token_budget=budget, fixed_input_tokens=fixed_tokens,
         available_memory_tokens=budget - fixed_tokens if fixed_tokens is not None else None,
         retrieved_memory_ids=retrieved, selected_memory_ids=selected, target_memory_ids=targets,
         retrieved_memories=run.get("retrieved_memories", []),
         retrieval_k=k, retrieval_applicable=retrieval_applicable,
+        general_retrieval_miss=general_retrieval_miss,
+        general_retrieval_missing_target_ids=sorted(general_missing) if retrieval_applicable else [],
+        recovered_target_ids=sorted(general_missing & set(selected)) if retrieval_applicable else [],
+        selection_failure=selection_failure, missing_selected_target_ids=sorted(missing_selected),
         selected_target_recall=len(set(targets) & set(selected)) / len(set(targets)) if targets else None,
         applicable_protected_recall=len(constraint_ids & set(selected)) / len(constraint_ids) if constraint_ids else None,
         constraint_violation=bool(violated), constraint_violation_count=len(violated),
@@ -304,6 +395,7 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
 
 SUMMARY_METRICS = (
     "task_success", "constraint_violation_rate", "current_state_accuracy",
+    "general_retrieval_miss", "selection_failure", "budget_selection_failure",
     "stale_state_usage_rate", "temporal_version_correct", "recall_at_k",
     "state_omission_rate", "state_error_rate",
     "precision_at_k", "mrr", "answer_normalized_exact_match", "answer_f1",
