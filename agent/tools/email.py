@@ -72,7 +72,7 @@ class EmailTool:
 
     def send_email(
         self,
-        recipient: str | None = None,
+        recipient: str,
         subject: str | None = None,
         body: str | None = None,
         approval_id: str | None = None,
@@ -85,9 +85,7 @@ class EmailTool:
         같아야 한다. 시나리오 environment에 있던 ID는 메시지 내용과 무관하게
         이미 승인된 것이다.
         """
-        if recipient is not None and (not isinstance(recipient, str) or not recipient.strip()):
-            return _fail("send_email", "recipient must be a non-empty string or omitted")
-        error = _optional_text_error(subject, body, attachment)
+        error = _message_error(recipient, subject, body, attachment)
         if error:
             return _fail("send_email", error)
         if approval_id is not None and not str(approval_id).strip():

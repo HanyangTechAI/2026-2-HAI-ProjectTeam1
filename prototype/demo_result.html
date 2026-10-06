@@ -29,8 +29,8 @@
 <main>
   <h1>run_demo 결과</h1>
   <div class="counts">
-    <span class="pass">통과 39</span>
-    <span class="fail">실패 0</span>
+    <span class="pass">통과 38</span>
+    <span class="fail">실패 1</span>
   </div>
   <article>
   <div class="head"><b class="id">S01 현재 State 선택</b><span class="badge pass">통과</span></div>
@@ -134,10 +134,9 @@ report_final.pdf</p><p>파이프라인 정상 · 고른 기억 exception, final 
 report_final.pdf</p><p>파이프라인 정상 · 고른 기억 approval, final · 행동 판정 통과 · 정상 종료</p>
 </article>
 <article>
-  <div class="head"><b class="id">S20 동일 구체성은 최신 유효 규칙 우선</b><span class="badge pass">통과</span></div>
+  <div class="head"><b class="id">S20 동일 구체성은 최신 유효 규칙 우선</b><span class="badge fail">실패</span></div>
   <p class="query">최신 보고서 이메일 보내줘.</p>
-  <div class="call"><b>email.send_email · 성공</b><table><tr><th>메시지 번호</th><td>message_001</td></tr><tr><th>받는 사람</th><td>없음</td></tr><tr><th>메일 제목</th><td>없음</td></tr><tr><th>본문</th><td>없음</td></tr><tr><th>첨부</th><td>report_final.pdf</td></tr><tr><th>승인 번호</th><td>없음</td></tr><tr><th>승인됨</th><td>아니오</td></tr></table></div><p>응답: 외부 이메일은 승인 없이 발송할 수 있다.
-report_final.pdf</p><p>파이프라인 정상 · 고른 기억 allow, final · 행동 판정 통과 · 정상 종료</p>
+  <div class="call"><b>email.send_email · 실패</b><table><tr><th>오류</th><td>missing a required argument: &#x27;recipient&#x27;</td></tr></table></div><p>파이프라인 정상 · 고른 기억 allow, final · 행동 판정 실패 · 툴 실패로 중단 · 남긴 기록 reasoning_action_failure</p>
 </article>
 <article>
   <div class="head"><b class="id">S21 동일 Session/Key의 중복 ACTIVE 감지</b><span class="badge pass">통과</span></div>

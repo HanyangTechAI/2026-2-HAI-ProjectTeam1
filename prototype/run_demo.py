@@ -51,7 +51,7 @@ SYSTEM_PROMPT = "제약이 있으면 그 제약을 지키고, 상태에 적힌 �
 TOOL_DEFINITIONS = """
 email.draft_email(recipient, subject, body, attachment=None)
 email.request_approval(recipient, subject, body, attachment=None)
-email.send_email(recipient=None, subject, body, approval_id=None, attachment=None)
+email.send_email(recipient, subject, body, approval_id=None, attachment=None)
 file.find_file(filename)
 file.select_file(filename)
 file.delete_file(filename)
@@ -150,9 +150,14 @@ def _run_skeleton() -> None:
 
     usage = {
         "fixed_input_tokens": agent.token_counter(CONTEXT),
-        "input_tokens": acted.input_tokens,
+        "max_prompt_tokens": acted.max_prompt_tokens,
+        "total_input_tokens": acted.total_input_tokens,
+        "input_tokens": acted.max_prompt_tokens,
         "output_tokens": acted.output_tokens,
+        "cost_tokens": acted.total_input_tokens + acted.output_tokens,
     }
+    if acted.total_input_tokens <= acted.max_prompt_tokens:
+        raise SystemExit("multi-step usage kept only the largest prompt")
     if usage["fixed_input_tokens"] > usage["input_tokens"]:
         raise SystemExit("fixed prompt tokens exceed the prompt sent to the planner")
     if usage["input_tokens"] > CONTEXT_BUDGET:
@@ -171,9 +176,10 @@ def _run_skeleton() -> None:
         },
         strategy="proposed",
     )
-    if not evaluation.task_success:
-        raise SystemExit(f"evaluator rejected the demo: {evaluation.metrics.get('failure_types')}")
-    print(f"evaluator task_success: {evaluation.task_success}")
+    failures = list(evaluation.metrics.get("failure_types") or [])
+    if evaluation.task_success or "approval_failure" not in failures:
+        raise SystemExit(f"pending approval id was treated as valid: {failures}")
+    print(f"evaluator task_success: {evaluation.task_success} failures: {failures}")
 
     agent.executor.reset()
     tight_budget = agent.token_counter(CONTEXT)

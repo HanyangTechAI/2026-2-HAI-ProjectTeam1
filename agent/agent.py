@@ -11,6 +11,7 @@ INSUFFICIENT_CONTEXT_BUDGET이면 LLM과 Tool Executor를 호출하지 않는다
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -48,13 +49,23 @@ class AgentAction:
 class TokenUsage:
     """한 실행에서 같은 token_counter로 센 입력과 출력.
 
-    input_tokens는 plan에 실제로 넘긴 프롬프트 중 가장 큰 값이다.
-    파이프라인이 모델 호출 전에 끝나면 None이다.
+    max_prompt_tokens는 plan에 넘긴 프롬프트 중 가장 큰 값이다. 문맥 예산과
+    비교하는 값이다. total_input_tokens는 그 실행의 모든 모델 호출 입력을
+    더한 값이다. 비용은 total_input_tokens와 output_tokens의 합이다.
+    파이프라인이 모델 호출 전에 끝나면 둘 다 None이다.
     """
 
     fixed_input_tokens: int
-    input_tokens: int | None
+    max_prompt_tokens: int | None
+    total_input_tokens: int | None
     output_tokens: int
+
+    @property
+    def cost_tokens(self) -> int | None:
+        """비용에 쓰는 토큰. 모든 모델 호출의 입력과 출력을 더한다."""
+        if self.total_input_tokens is None:
+            return None
+        return self.total_input_tokens + self.output_tokens
 
 
 @dataclass(frozen=True)
@@ -65,7 +76,8 @@ class ActResult:
     tool_calls: tuple[ToolCall, ...]
     tool_results: tuple[ToolResult, ...]
     stopped_reason: str
-    input_tokens: int
+    max_prompt_tokens: int
+    total_input_tokens: int
     output_tokens: int
     interactions: tuple[Interaction, ...]
 
@@ -194,7 +206,12 @@ class Agent:
             selection_result=selection,
             context_result=context_result,
             goal_completed=self._goal_completed(acted),
-            usage=TokenUsage(fixed_tokens, acted.input_tokens, acted.output_tokens),
+            usage=TokenUsage(
+                fixed_tokens,
+                acted.max_prompt_tokens,
+                acted.total_input_tokens,
+                acted.output_tokens,
+            ),
             stopped_reason=acted.stopped_reason,
             interactions=acted.interactions,
         )
@@ -211,7 +228,8 @@ class Agent:
         results: list[ToolResult] = []
         transcript = context
         response: str | None = None
-        input_tokens = 0
+        max_prompt_tokens = 0
+        total_input_tokens = 0
         output_tokens = 0
         stopped = "max_steps"
         timestamp = self.clock()
@@ -221,11 +239,21 @@ class Agent:
             if prompt_tokens > context_budget:
                 stopped = "context_budget"
                 break
-            action = self.plan(transcript)
-            input_tokens = max(input_tokens, prompt_tokens)
+            try:
+                action = self.plan(transcript)
+            finally:
+                recorded = _consume_model_calls(self.planner)
+            max_prompt_tokens = max(max_prompt_tokens, prompt_tokens)
+            step_input, step_output = _step_tokens(
+                self.token_counter,
+                prompt_tokens,
+                action,
+                recorded,
+            )
+            total_input_tokens += step_input
+            output_tokens += step_output
             if action.tool_name is None and action.action is None:
                 response = action.text_response
-                output_tokens = self.token_counter(response or "")
                 stopped = "completed"
                 break
             if action.tool_name is None or action.action is None:
@@ -238,7 +266,6 @@ class Agent:
             transcript = _append_tool_result(transcript, result)
             if not result.success:
                 response = action.text_response
-                output_tokens = self.token_counter(response or "")
                 stopped = "tool_failure"
                 break
 
@@ -247,7 +274,8 @@ class Agent:
             tool_calls=tuple(calls),
             tool_results=tuple(results),
             stopped_reason=stopped,
-            input_tokens=input_tokens,
+            max_prompt_tokens=max_prompt_tokens,
+            total_input_tokens=total_input_tokens,
             output_tokens=output_tokens,
             interactions=interactions_from_tool_results(
                 session_id,
@@ -279,7 +307,7 @@ class Agent:
             selection_result=selection,
             context_result=context_result,
             goal_completed=False,
-            usage=TokenUsage(fixed_tokens, None, 0),
+            usage=TokenUsage(fixed_tokens, None, None, 0),
             stopped_reason=stopped_reason,
             interactions=(),
         )
@@ -298,9 +326,60 @@ def _append_tool_result(context: str, result: ToolResult) -> str:
 
 
 def usage_dict(usage: TokenUsage) -> dict[str, int | None]:
-    """평가기가 읽는 usage 키."""
+    """평가기가 읽는 usage 키.
+
+    input_tokens는 문맥 예산과 비교하는 가장 큰 프롬프트다.
+    비용은 cost_tokens, 즉 모든 호출의 입력과 출력 합이다.
+    """
     return {
         "fixed_input_tokens": usage.fixed_input_tokens,
-        "input_tokens": usage.input_tokens,
+        "max_prompt_tokens": usage.max_prompt_tokens,
+        "total_input_tokens": usage.total_input_tokens,
+        "input_tokens": usage.max_prompt_tokens,
         "output_tokens": usage.output_tokens,
+        "cost_tokens": usage.cost_tokens,
     }
+
+
+def _consume_model_calls(planner: Callable[..., AgentAction] | None) -> list[tuple[str, str]]:
+    """planner가 이번 plan 안에서 실제로 보낸 모델 호출을 꺼낸다."""
+    consume = getattr(planner, "consume_model_calls", None)
+    if consume is None:
+        return []
+    calls = consume()
+    if not isinstance(calls, list):
+        return []
+    return [
+        (request, response)
+        for request, response in calls
+        if isinstance(request, str) and isinstance(response, str)
+    ]
+
+
+def _step_tokens(
+    token_counter: Callable[[str], int],
+    prompt_tokens: int,
+    action: AgentAction,
+    recorded: list[tuple[str, str]],
+) -> tuple[int, int]:
+    """한 plan의 입력·출력 토큰. 재시도가 있으면 그 호출까지 더한다."""
+    if recorded:
+        return (
+            sum(token_counter(request) for request, _ in recorded),
+            sum(token_counter(response) for _, response in recorded),
+        )
+    return prompt_tokens, token_counter(_action_text(action))
+
+
+def _action_text(action: AgentAction) -> str:
+    if action.tool_name is None and action.action is None:
+        return action.text_response or ""
+    return json.dumps(
+        {
+            "tool_name": action.tool_name,
+            "action": action.action,
+            "arguments": action.arguments,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
