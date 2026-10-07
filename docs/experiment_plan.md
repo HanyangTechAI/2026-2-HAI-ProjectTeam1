@@ -169,7 +169,7 @@ Task Success는 단순한 최종 답변 일치가 아니라 다음 조건을 모
 
 1. Task의 목표를 완료한다.
 2. 해당 시점에 적용되는 Constraint를 위반하지 않는다.
-3. 행동에 필요한 최신 Current State를 사용한다.
+3. 행동에 필요한 State를 Task가 요구하는 시점·버전에 맞게 사용한다.
 4. 승인이 필요한 Task에서는 승인 전 실행하지 않고 올바르게 승인을 요청한다.
 
 sample별 성공 여부를 이진 값으로 기록하고, 조건별 `Task Success Rate (TSR)`를 계산한다. Task별 세부 성공 조건과 ground truth는 실험 전에 고정한다.
@@ -177,12 +177,27 @@ sample별 성공 여부를 이진 값으로 기록하고, 조건별 `Task Succes
 ### 4.2 Constraint 및 State 지표
 
 - **Constraint Violation Rate (CVR):** 적용 대상 Constraint 가운데 Agent 행동이 위반한 비율. 실행 단위 위반 여부도 함께 기록한다.
-- **Current-State Accuracy (CSA):** 행동에 필요한 State 항목 가운데 최신 유효 값을 올바르게 사용한 비율.
-- **Stale-State Usage Rate (SSUR):** 최신 State가 존재하지만 Agent가 superseded된 이전 값을 행동에 사용한 비율.
+- **Required-State Accuracy (RSA):** 행동에 필요한 State 항목 가운데 Task가 요구하는 시점·버전의 값을 올바르게 사용한 비율. 현재 값 요청과 과거 버전 요청을 모두 포함한다.
+- **Stale-State Usage Rate (SSUR):** 현재 값을 요구하는 State 항목 가운데, 최신 유효 값 대신 superseded된 이전 값을 행동에 사용한 비율. 과거 시점·버전을 명시적으로 요청한 항목은 분모와 분자에서 제외한다.
 - **State Omission Rate:** 필요한 State를 행동에서 누락한 비율.
-- **State Fabrication/Error Rate:** History에 없는 값 또는 최신·과거 버전 모두와 일치하지 않는 값을 사용한 비율.
+- **State Error Rate:** 필요한 State 항목 가운데 기대값과 다르고 SSUR의 stale 사용으로 분류되지 않는 값을 사용한 비율. 과거 버전 요청에 최신 값을 사용한 경우도 포함하며, History에 없는 값만을 뜻하지 않는다.
 
-Stale-State Usage는 오래된 Memory의 검색 여부가 아니라 **최종 행동에서 이전 State를 실제 사용했는지**를 기준으로 판정한다. 따라서 stale retrieval과 stale usage를 별도 필드로 기록한다.
+각 `required_states` 항목에 `state_scope=current|historical`을 지정한다. 기존 입력은
+생략 시 `current`로 처리하지만 과거 버전 요청은 반드시 `historical`로 명시한다.
+`expected_value`와 정답 Memory ID는 Task가 요구한 버전으로 설정한다. 예를 들어
+"이전 보고서 v1을 찾아줘"에서 v1 사용은 정답이고 최신 v2 사용은 `state_error`다.
+"현재 보고서를 보내줘"에서 superseded된 v1 사용은 `stale_state_usage`다.
+버전 비교 Task는 현재·과거 항목을 각각 정의하고 호출 pattern으로 구분한다.
+
+RSA는 올바르게 사용한 항목 수 / 모든 필수 State 항목 수로 계산한다.
+SSUR은 이전 값을 잘못 사용한 현재 항목 수 / 현재 값을 요구하는 항목 수로
+계산한다. 현재 항목이 없으면 SSUR은 null이며 집계에서 제외한다. 실행별 비율의
+macro 평균과 해당 실행 수를 보고한다.
+
+Stale-State Usage는 오래된 Memory의 검색 여부가 아니라 **현재 값을 요구하는
+최종 행동에서 이전 State를 실제 사용했는지**를 기준으로 판정한다.
+`stale_values`는 현재 항목의 superseded된 값만 지정하며 과거 항목에서는 무시한다.
+검색·선택의 버전 오류와 행동의 stale usage는 별도 필드로 기록한다.
 
 ### 4.3 Answer Accuracy
 
@@ -229,7 +244,7 @@ State update가 존재하는 sample에서는 retrieval 이후 실제 LLM context
 * `selected_memory_ids`: retrieval 이후 temporal resolution 및 budget selection을 거쳐 실제 LLM context에 포함된 Memory ID
 * `temporal_version_required`: 해당 sample에서 동일 State의 여러 버전 중 올바른 버전을 선택해야 하는지 여부
 * `temporal_version_correct`: 필요한 temporal version을 올바르게 선택했는지 여부
-* `stale_selected_memory_count`: 최종 선택된 Memory 가운데 이미 superseded된 stale Memory의 수
+* `stale_selected_memory_count`: 최종 선택된 Memory 가운데 Task가 요구한 버전에 부합하지 않는 `wrong_version_memory_ids`의 수. 과거 요청에서는 최신 버전도 포함될 수 있으며, superseded 여부만으로 판정하지 않는다.
 
 Temporal Version Accuracy (TVA)는 temporal version 판단이 필요한 sample만 대상으로 다음과 같이 계산한다.
 
@@ -384,7 +399,8 @@ Memory Corruption은 저장 장치의 물리적 손상이 아니라 필요한 �
 
 #### Temporal / Update
 
-시간에 따라 변경된 정보에서 현재 유효한 값을 찾아야 하는 문제.
+시간에 따라 변경된 정보에서 Task가 요구하는 현재 값 또는 특정 과거 버전을
+찾아야 하는 문제. 현재·과거 버전 비교도 포함한다.
 
 #### Abstention
 
@@ -444,10 +460,10 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
 
 | RQ | 비교 및 통제 | 독립 변수 | 주요 종속 변수 | 분석 |
 |---|---|---|---|---|
-| RQ1 | Proposed vs Sliding Window vs Vector Top-k vs Utility-per-Token; Agent, Task, History, Budget 고정 | Memory strategy | TSR, CVR, CSA | 동일 Budget에서 strategy별 평균과 95% CI 비교 |
+| RQ1 | Proposed vs Sliding Window vs Vector Top-k vs Utility-per-Token; Agent, Task, History, Budget 고정 | Memory strategy | TSR, CVR, RSA | 동일 Budget에서 strategy별 평균과 95% CI 비교 |
 | RQ2 | Long Context와 External Memory 계열 비교 | Constraint 수, State update 횟수, Noise Memory ratio, Horizon | TSR, failure type, stale usage | corruption 유형별 강건성 비교 |
-| RQ3 | History와 Task 난이도 고정 | Budget 1K/2K/4K/8K | CVR, SSUR, CSA, omission/error rate | Budget 감소에 따른 오류 증가 추세와 Proposed의 완화 효과 |
-| RQ4 | 모든 Memory strategy에 동일한 교차 조건 적용 | History Length × Budget; Horizon 별도 기록 | TSR, CVR, CSA, tokens, cost, planning latency | 성능 저하 구간과 성능·비용·신뢰성 trade-off 분석 |
+| RQ3 | History와 Task 난이도 고정 | Budget 1K/2K/4K/8K | CVR, SSUR, RSA, omission/error rate | Budget 감소에 따른 오류 증가 추세와 Proposed의 완화 효과 |
+| RQ4 | 모든 Memory strategy에 동일한 교차 조건 적용 | History Length × Budget; Horizon 별도 기록 | TSR, CVR, RSA, tokens, cost, planning latency | 성능 저하 구간과 성능·비용·신뢰성 trade-off 분석 |
 | RQ5 | Proposed와 각 baseline을 쌍별 비교 | Budget `B`, Horizon `H` | `ΔSuccess(B,H)` | Budget 고정/Horizon 변화와 Horizon 고정/Budget 변화의 성공률 격차 및 CI 분석 |
 
 ### 8.1 RQ4 교차 실험
@@ -476,7 +492,7 @@ History Length와 Token Budget을 독립적으로 변화시키는 full-factorial
 2. State Versioning 제거
 3. Budget Optimization 제거
 
-각 ablation은 완전한 Proposed 방식과 TSR, CVR, CSA, SSUR, TVA 및 token usage를 비교한다.
+각 ablation은 완전한 Proposed 방식과 TSR, CVR, RSA, SSUR, TVA 및 token usage를 비교한다.
 ---
 
 ## 9. Evaluation Output Format
@@ -519,7 +535,11 @@ Context에 모두 포함되고 행동도 성공한 경우다. 전체 입력 계�
   "task_success": true,
   "constraint_violation_count": 0,
   "constraint_violation_rate": 0.0,
+  "required_state_accuracy": 1.0,
   "current_state_accuracy": 1.0,
+  "current_state_requirement_count": 1,
+  "stale_state_usage_count": 0,
+  "stale_state_usage_rate": 0.0,
   "stale_state_used": false,
   "state_omission_count": 0,
   "state_error_count": 0,
@@ -536,6 +556,10 @@ Context에 모두 포함되고 행동도 성공한 경우다. 전체 입력 계�
 
 최초 검색 누락이 복구됐으므로 `general_retrieval_miss`는 true지만,
 `selection_failure`와 `task_success`는 각각 false와 true다.
+`current_state_accuracy`는 `required_state_accuracy`와 동일 값인 호환용 출력
+필드다. 새 집계에서는 `required_state_accuracy`를 사용한다. 과거 항목만 있는
+실행에서는 `current_state_requirement_count=0`, `stale_state_usage_count=0`이고
+`stale_state_usage_rate`와 `stale_state_used`는 null이다.
 
 ## Memory Schema와 Evaluation Schema의 분리 이유
 
@@ -583,7 +607,7 @@ deterministic 판정에는 직접 사용하지 않는다.
 - `selected_memory_ids`: 일반 검색, 버전 확장, 보호 검색 및 예산 선택 이후 실제 LLM Context에 포함된 Memory 집합
 - `temporal_version_required`: 해당 sample에서 State version 선택이 필요한지 여부
 - `temporal_version_correct`: 실제 선택된 Memory가 해당 시점의 올바른 State version인지 여부
-- `stale_selected_memory_count`: 실제 LLM context에 포함된 Memory 중 superseded된 stale Memory의 수
+- `stale_selected_memory_count`: 실제 LLM context에 포함된 Memory 중 `wrong_version_memory_ids`에 속하는 수. 과거 요청의 정답은 superseded되어도 제외
 
 따라서 Evaluation schema는 공통 Memory schema를 대체하거나 새롭게 정의하는 것이 아니다. 공통 Memory schema를 입력으로 사용하고, 그중 평가에 필요한 상태를 snapshot으로 보존한 뒤 실험 조건과 계산된 metric을 추가한 실행 결과 schema이다.
 
@@ -630,7 +654,7 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
 실험 종료 후 최소한 다음 결과를 strategy별로 집계한다.
 
-| Strategy | TSR | CVR | CSA | SSUR | TVA | Recall@k | Avg. Input Tokens | Avg. Planning Latency | Cost |
+| Strategy | TSR | CVR | RSA | SSUR | TVA | Recall@k | Avg. Input Tokens | Avg. Planning Latency | Cost |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Proposed | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Sliding Window | TBD | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
@@ -668,8 +692,8 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 | `constraint_failure` | 금지 행동 또는 적용 제약 위반이 있는 경우 |
 | `approval_failure` | 승인 없이 실행했거나 필요한 승인 요청이 없는 경우 |
 | `state_omission` | 행동에 필요한 State 값을 누락한 경우 |
-| `stale_state_usage` | 행동에 잘못된 과거 State 값을 사용한 경우 |
-| `state_error` | 행동에 기대값이나 과거 버전 값이 아닌 잘못된 State 값을 사용한 경우 |
+| `stale_state_usage` | 현재 값을 요구하는 행동에 superseded된 이전 State 값을 사용한 경우 |
+| `state_error` | 행동에 기대값과 다르고 stale 사용으로 분류되지 않는 값을 사용한 경우. 과거 요청에 최신 값을 사용한 경우도 포함 |
 | `reasoning_action_failure` | 다른 기록된 실패 없이 작업이 성공하지 못한 경우 |
 
 `general_retrieval_miss`는 최초 검색의 진단 지표이며 `failure_types`에는 넣지

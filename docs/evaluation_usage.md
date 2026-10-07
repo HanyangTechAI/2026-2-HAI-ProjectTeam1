@@ -70,6 +70,7 @@ python -m unittest discover -s tests -p "test_evaluator.py"
       "memory_id": "report_final",
       "tool_call": {"tool_name": "email", "action": "request_approval"},
       "argument": "attachment",
+      "state_scope": "current",
       "expected_value": "report_final.pdf",
       "stale_values": ["report_v1.pdf"]
     }],
@@ -129,9 +130,17 @@ python -m unittest discover -s tests -p "test_evaluator.py"
 - State는 관련 Tool 호출의 argument에서 평가한다. 여러 호출에서 한 번이라도
   잘못 사용하면 그 항목은 실패이다. stale 값과 임의 값이 모두 사용되면 stale과
   error 둘 다 기록되므로 두 비율은 상호 배타적이지 않다.
-- 과거 질문에서는 `expected_value`와 `required_state_ids`를 해당 시점의 정답으로
-  지정한다. `wrong_version_memory_ids`는 질문 시점에 틀린 버전만 넣는다.
-  단순한 비활성 여부로 stale 오류를 판정하지 않는다.
+- 각 `required_states` 항목의 `state_scope`는 `current` 또는 `historical`이다.
+  기존 입력과의 호환을 위해 생략하면 `current`로 처리한다. 과거 시점·버전 요청은
+  반드시 `historical`로 지정한다. 현재와 과거 버전 비교는 항목을 각각 정의하고,
+  `tool_call` pattern으로 각 버전에 해당하는 호출을 구분한다.
+- `expected_value`, `required_state_ids`, `target_memory_ids`는 태스크가 요구하는
+  시점·버전의 정답으로 지정한다. `stale_values`는 현재 값을 요구하는 항목에서
+  superseded된 이전 값만 넣는다. 과거 항목에서는 이 목록을 판정에 사용하지 않으며,
+  기대값과 다른 값은 최신 버전이더라도 `state_error`로 기록한다.
+  `wrong_version_memory_ids`는 태스크가 요구한 버전에 부합하지 않는 ID만 넣는다.
+  단순한 비활성 여부로 stale 오류를 판정하지 않는다. 비교에 필요한 버전들은
+  정답 집합에 함께 넣고 `wrong_version_memory_ids`에서는 제외한다.
 - `context_result.selected_memory_ids`가 있으면 formatting 후 실제 context를
   기준으로 평가한다. 없으면 `selection_result.selected_memory_ids`를 사용한다.
   예산 오류로 중단된 실행은 최종 선택을 빈 집합으로 평가한다.
@@ -144,6 +153,34 @@ python -m unittest discover -s tests -p "test_evaluator.py"
   전달한다. 누락된 latency/cost/overflow는 null로 유지한다. 필수 기억 초과와
   formatting 초과를 구분할 수 없으므로 overflow를 status만으로 추정하지 않는다.
 
+## 과거 버전 요청 예시
+
+"이전 보고서 v1을 찾아줘"의 State 정답은 다음처럼 지정한다. 나머지 실행 입력은
+위 최소 예시의 계약을 따르되 Tool pattern과 실제 호출은 해당 Task에 맞춘다.
+
+```json
+{
+  "target_memory_ids": ["report_v1"],
+  "required_state_ids": ["report_v1"],
+  "temporal_version_required": true,
+  "wrong_version_memory_ids": ["report_final"],
+  "required_states": [{
+    "memory_id": "report_v1",
+    "state_scope": "historical",
+    "tool_call": {"tool_name": "report", "action": "find"},
+    "argument": "filename",
+    "expected_value": "report_v1.pdf",
+    "stale_values": []
+  }]
+}
+```
+
+v1을 최종 Context에 선택하고 해당 값으로 행동하면 RSA는 1.0, SSUR은 null이다.
+최신 보고서 값으로 행동하면 RSA는 0.0이고 `state_error`가 기록되며 SSUR은
+여전히 null이다. 최종 Context에도 잘못된 버전만 선택했다면 별도로
+`temporal_failure`가 기록된다. 단순 응답 Task의 정확도는 `expected_answers`로
+평가하며, Tool 행동이 없는 Task에는 `required_states`를 억지로 지정하지 않는다.
+
 ## 집계
 
 TSR은 목표 달성, 기대 호출 충족, 금지 행동 없음, 제약 준수, 올바른 State,
@@ -152,8 +189,16 @@ TSR은 목표 달성, 기대 호출 충족, 금지 행동 없음, 제약 준수,
 `target_memory_ids`에서 `applicable_constraint_ids`를 제외한 일반 검색 대상이다.
 일반 검색 대상이 없으면 이 지표들은 null이다. precision@k 분모는 실제 반환된
 고유 ID 수(최대 k)이고, MRR도 k 안에서 계산한다. 보호 제약의 최종 포함 여부는
-`applicable_protected_recall`로 평가한다. CSA/CVR/SSUR 집계는 실행별 비율의
-macro 평균이다. 검색 지표는 최초 General Retrieval Top-K만 평가하므로 최종 행동이 성공해도
+`applicable_protected_recall`로 평가한다. RSA/CVR/SSUR 집계는 실행별 비율의
+macro 평균이다. `required_state_accuracy` (RSA)의 분모는 현재·과거를 포함한 모든
+필수 State 항목이다. `current_state_accuracy`는 기존 소비자를 위한 동일 값의
+호환용 출력 필드이며, 새 집계는 `required_state_accuracy`를 사용한다.
+SSUR의 분모는 `state_scope=current`인 항목 수
+(`current_state_requirement_count`), 분자는 그중 이전 값을 잘못 사용한 항목 수
+(`stale_state_usage_count`)다. 현재 항목이 없으면 `stale_state_usage_rate`와
+`stale_state_used`는 null이며 SSUR 집계에서 제외한다. 과거 항목을 올바르게
+사용한 경우 RSA/TSR은 성공으로 평가하되 SSUR의 분모·분자에는 포함하지 않는다.
+검색 지표는 최초 General Retrieval Top-K만 평가하므로 최종 행동이 성공해도
 Recall@k가 낮을 수 있다. 다음 두 결과를 분리한다.
 
 - `general_retrieval_miss`: 일반 검색 대상 target(적용 제약 ID 제외)을 하나라도

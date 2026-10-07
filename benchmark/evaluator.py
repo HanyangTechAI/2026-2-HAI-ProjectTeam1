@@ -198,8 +198,10 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
              k: int = 20, repeat_id: int = 0) -> EvaluationResult:
     """Evaluate mappings or dataclass snapshots without accessing a MemoryStore.
 
-    Required states use scenario.required_states with explicit tool argument
-    values, and constraints use scenario.constraint_rules. ID-only ground truth
+    Required states use scenario.required_states with task-specific tool argument
+    values and state_scope (current or historical; defaults to current for legacy
+    inputs). Historical states are excluded from stale-state usage metrics.
+    Constraints use scenario.constraint_rules. ID-only ground truth
     cannot establish whether an action was compliant and is rejected.
     """
     scenario, run = _record(scenario), _record(run_result)
@@ -256,8 +258,16 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
             if unauthorized:
                 violated.add(rule["constraint_id"])
 
-    correct_states = stale_states = omissions = errors = 0
+    correct_states = stale_states = omissions = errors = current_states = 0
     for state in states:
+        scope = state.get("state_scope", "current")
+        if scope not in {"current", "historical"}:
+            raise ValueError("state_scope must be current or historical")
+        current_states += scope == "current"
+        # Only current-state requirements can misuse a superseded value.
+        # For a historical request, even a newer version is a task-specific
+        # state error rather than stale-state usage.
+        stale_values = state.get("stale_values", []) if scope == "current" else []
         relevant = [call for call in calls if _matches(call, state["tool_call"])]
         values = [call.get("arguments", {})[state["argument"]] for call in relevant
                   if state["argument"] in call.get("arguments", {})]
@@ -269,10 +279,10 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         if values:
             # Any wrong use fails this state, even if a later call corrects it.
             wrong = [value for value in values if not _matches(value, state["expected_value"])]
-            if any(any(_matches(value, old) for old in state.get("stale_values", []))
+            if any(any(_matches(value, old) for old in stale_values)
                    for value in wrong):
                 stale_states += 1
-            if any(not any(_matches(value, old) for old in state.get("stale_values", []))
+            if any(not any(_matches(value, old) for old in stale_values)
                    for value in wrong):
                 errors += 1
 
@@ -374,8 +384,13 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         applicable_protected_recall=len(constraint_ids & set(selected)) / len(constraint_ids) if constraint_ids else None,
         constraint_violation=bool(violated), constraint_violation_count=len(violated),
         constraint_violation_rate=len(violated) / len(rules) if rules else None,
-        violated_constraint_ids=sorted(violated), current_state_accuracy=correct_states / len(states) if states else None,
-        stale_state_used=bool(stale_states), stale_state_usage_rate=stale_states / len(states) if states else None,
+        violated_constraint_ids=sorted(violated),
+        required_state_accuracy=correct_states / len(states) if states else None,
+        # Deprecated output alias for consumers of the original evaluator.
+        current_state_accuracy=correct_states / len(states) if states else None,
+        current_state_requirement_count=current_states, stale_state_usage_count=stale_states,
+        stale_state_used=bool(stale_states) if current_states else None,
+        stale_state_usage_rate=stale_states / current_states if current_states else None,
         state_omission_count=omissions, state_error_count=errors,
         state_omission_rate=omissions / len(states) if states else None,
         state_error_rate=errors / len(states) if states else None,
@@ -395,7 +410,7 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
 
 
 SUMMARY_METRICS = (
-    "task_success", "constraint_violation_rate", "current_state_accuracy",
+    "task_success", "constraint_violation_rate", "required_state_accuracy",
     "general_retrieval_miss", "selection_failure", "budget_selection_failure",
     "stale_state_usage_rate", "temporal_version_correct", "recall_at_k",
     "state_omission_rate", "state_error_rate",
