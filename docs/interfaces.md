@@ -1253,21 +1253,47 @@ INSUFFICIENT_CONTEXT_BUDGET
 
 # 18. Agent Interface
 
-담당 파일:
+담당 영역:
 
 ```text
-agent/agent.py
-agent/interaction.py
-agent/evaluation.py
+Context Builder의 context
+        ↓
+Planner / Agent
+        ↓
+Tool Executor
+        ↓
+Interaction        AgentRunResult
+(Memory Analyzer)  (Evaluator)
 ```
 
-Agent는 Memory 내부 구현에 직접 접근하지 않는다.
+역할:
 
-Agent가 받는 것은 최종 Context이다. 툴 결과는 `Interaction(source="tool")`로 바꾸지만, 저장소에 넣지는 않는다.
+```text
+완성된 Context로 다음 행동 하나를 결정한다.
+Tool Executor에 ToolCall을 넘기고 ToolResult를 받는다.
+Memory Analyzer에는 Interaction만 넘긴다.
+Evaluator에는 AgentRunResult를 넘긴다.
+```
+
+Agent가 다른 모듈과 주고받는 값은 아래 입력과 출력뿐이다. 기억 선택, 프롬프트 조립, 토큰 계산, 예산 검사는 Selector와 Context Builder의 Interface에 남긴다.
+
+```text
+MemoryStore
+SelectionResult
+ContextBuildResult
+system_prompt
+tool_definitions
+token_counter
+context_budget
+```
+
+위 값은 Agent 생성자와 `plan`, `run_task`, `act`의 인자가 아니다.
 
 ---
 
 ## AgentAction
+
+Planner가 Agent에, Agent가 Tool Executor에 넘기는 행동 하나다.
 
 ```python
 @dataclass
@@ -1279,18 +1305,58 @@ class AgentAction:
     text_response: str | None
 ```
 
-`action`은 ToolCall의 action과 같다. 텍스트만 반환할 때는 `tool_name`과 `action`이 모두 None이다.
+`action`은 `ToolCall.action`과 같다. 텍스트만 반환할 때는 `tool_name`과 `action`이 모두 `None`이다.
 
 ---
 
-## Agent Interface
+## Planner
 
-V1 Agent는 저장소, 프롬프트, Tool Executor, planner, goal_checker를 가진 객체다. LLM은 `planner`로 나중에 연결한다. planner가 없으면 `plan`은 `NotImplementedError`를 낸다.
-
-시계를 넘기지 않으면 `2026-10-05T12:00:00+09:00`을 쓴다.
+모델이 붙는 자리다. Context Builder가 만든 문자열만 받고, 행동 하나를 돌려준다.
 
 ```python
+class Planner:
+    def plan(self, context: str) -> AgentAction:
+        ...
+```
+
+## Input
+
+```text
+context: str
+```
+
+## Output
+
+```text
+AgentAction
+```
+
+툴 실행은 Planner의 출력이 아니다. `Agent`가 이 `AgentAction`을 `ToolCall`로 바꾸어 Tool Executor에 넘긴다.
+
+---
+
+## Agent
+
+생성 시 연결하는 이웃 모듈은 Tool Executor와 Planner다. Planner를 넘기지 않으면 `Planner`를 붙인다.
+
+```python
+GoalChecker = Callable[
+    [str | None, tuple[ToolCall, ...], tuple[ToolResult, ...]],
+    bool,
+]
+
 class Agent:
+    def __init__(
+        self,
+        *,
+        executor: ToolExecutor | None = None,
+        planner: Planner | None = None,
+        goal_checker: GoalChecker | None = None,
+        current_turn: int = 0,
+        max_steps: int = 8,
+    ) -> None:
+        ...
+
     def plan(self, context: str) -> AgentAction:
         ...
 
@@ -1298,7 +1364,6 @@ class Agent:
         self,
         task: str,
         session_id: str,
-        context_budget: int
     ) -> AgentRunResult:
         ...
 
@@ -1306,23 +1371,47 @@ class Agent:
         self,
         context: str,
         *,
-        context_budget: int,
-        session_id: str
+        session_id: str,
     ) -> ActResult:
         ...
 ```
 
-`run_task`는 `fixed_context_tokens`로 고정 비용을 계산하고 `select_memory`와 `build_context`를 호출한 뒤 `act`로 이어진다. `act`는 완성된 Context만 받아 `plan`과 Tool Executor를 최대 `max_steps`번 반복한다. 각 툴 결과는 다음 Context 끝에 `[TOOL RESULT]`로 붙인다. 그 줄에는 발급된 경우 `approval_id=`도 포함한다.
+`plan`의 입력은 `Planner.plan`의 입력과 같다. `Agent.plan`은 그 문자열을 Planner에 그대로 넘긴다.
 
-`plan`에 넘기기 전에 프롬프트 토큰 수를 `context_budget`과 비교한다. 넘으면 그 `plan`과 이후 툴 호출은 하지 않고 `stopped_reason="context_budget"`으로 멈춘다. `tool_name`과 `action`이 모두 None이면 텍스트 응답으로 끝내고 `stopped_reason="completed"`다. 둘 중 하나만 있거나 툴이 실패하면 `tool_failure`다. 반복 한도에 닿으면 `max_steps`다.
+`max_steps`는 1 이상이다.
 
-`goal_completed`는 `stopped_reason`이 `completed`이고 생성 시 넣은 `goal_checker`가 참일 때만 True다. checker가 없거나, 예산 초과·툴 실패·반복 한도로 멈추면 False다. 툴을 호출했다는 사실만으로 작업 성공이 되지 않는다.
+## Input
 
-기억 선택 구현이 없는 환경에서는 완성된 Context를 `act`에 직접 넘길 수 있다. 현재 데모의 시나리오 실행은 미구현 선택기 함수를 결정적 구현으로 대체한 뒤 `run_task` 전체 흐름을 사용한다.
+```text
+plan
+  context: str
+
+act
+  context: str
+  session_id: str
+
+run_task
+  task: str
+  session_id: str
+```
+
+`context`는 Context Builder가 확정한 최종 문자열이다. `task`는 이번 실행의 과제다.
+
+## Output
+
+```text
+plan     → AgentAction
+act      → ActResult
+run_task → AgentRunResult
+```
+
+`goal_completed`는 `run_task` 출력의 한 칸이다. `goal_checker`가 있으면 응답, `ToolCall`, `ToolResult`를 받아 그 칸을 채운다. 툴을 호출했다는 사실 자체가 이 값의 참은 아니다. Evaluator는 이 값을 과제 성공의 한 조건으로 읽고, 선택 결과와 행동 평가는 Evaluator Interface에서 따로 한다.
 
 ---
 
 ## ActResult
+
+`act`가 Tool Executor와 주고받은 한 단계의 출력이다.
 
 ```python
 @dataclass
@@ -1331,64 +1420,93 @@ class ActResult:
     tool_calls: tuple[ToolCall, ...]
     tool_results: tuple[ToolResult, ...]
     stopped_reason: str
-    input_tokens: int
-    output_tokens: int
     interactions: tuple[Interaction, ...]
 ```
 
-`input_tokens`는 `plan`에 실제로 넘긴 프롬프트 중 가장 큰 값이다. 예산을 넘어 한 번도 계획하지 않았으면 0이다.
+`tool_calls`는 Tool Executor에 넘긴 호출이다. `tool_results`는 Tool Executor가 돌려준 결과다. `interactions`는 같은 결과를 Memory Analyzer 입력으로 바꾼 값이다.
 
 ---
 
 ## AgentRunResult
 
+`run_task`가 Evaluator에 넘기는 출력이다.
+
 ```python
 @dataclass
-class TokenUsage:
-    fixed_input_tokens: int
-    input_tokens: int | None
-    output_tokens: int
-
-@dataclass
 class AgentRunResult:
-    status: PipelineStatus
     response: str | None
-
     tool_calls: tuple[ToolCall, ...]
     tool_results: tuple[ToolResult, ...]
-
-    selection_result: SelectionResult | None
-    context_result: ContextBuildResult | None
-
     goal_completed: bool
-    usage: TokenUsage
     stopped_reason: str
     interactions: tuple[Interaction, ...]
 ```
 
-`usage.input_tokens`는 모델 호출 전에 파이프라인이 끝나면 None이다. `usage_dict`가 평가기의 `usage` 키로 바꾼다.
-
-`run_task`의 입력은 위의 `Agent.run_task`와 같다. 저장소, 시스템 프롬프트, 툴 정의, planner, goal_checker는 Agent 생성 시 받는다.
-
-모델 호출 전에 예산으로 중단되면 `stopped_reason`은 `invalid_budget` 또는 `insufficient_context`다. 이때 `goal_completed`는 False이고 툴을 호출하지 않는다.
+Evaluator가 이 결과에서 읽는 행동은 `tool_calls`와 `tool_results`다. 기억 선택과 프롬프트 조립의 출력은 `SelectionResult`, `ContextBuildResult`로 Selector와 Context Builder가 따로 넘긴다.
 
 ---
 
-## 실행 실패
+## Interaction 출력
 
-Memory Pipeline이:
+툴 결과를 Memory Analyzer의 입력인 `Interaction`으로 바꾸는 Interface다. `Interaction` 필드는 3.3절과 같다. `source`는 `"tool"`이다.
 
-```text
-INVALID_BUDGET_CONFIGURATION
+```python
+def interactions_from_tool_results(
+    session_id: str,
+    turn_id: int,
+    results: tuple[ToolResult, ...] | list[ToolResult],
+    timestamp: datetime,
+) -> tuple[Interaction, ...]:
+    ...
 ```
 
-또는:
+## Input
 
 ```text
-INSUFFICIENT_CONTEXT_BUDGET
+session_id
+turn_id
+ToolResult 목록
+timestamp
 ```
 
-을 반환하면 LLM Agent와 Tool Executor를 호출하지 않는다.
+## Output
+
+```text
+tuple[Interaction, ...]
+```
+
+저장은 Memory Store Interface의 `insert`가 담당한다. 이 함수의 출력은 `Interaction`까지다.
+
+---
+
+## Evaluator에 넘기는 승인 목록
+
+Evaluator는 `send_email` 인자의 `approval_id`가 시나리오 `valid_approval_ids`에 있는지로 승인 발송을 본다. Agent는 그 목록을 평가기에 넘기기 전에, 이번 실행의 `pending` 번호를 뺀 사본을 만든다.
+
+```python
+def scenario_with_granted_approvals(
+    scenario: Mapping[str, Any],
+    tool_results: Sequence[ToolResult],
+) -> dict[str, Any]:
+    ...
+```
+
+## Input
+
+```text
+scenario
+tool_results
+```
+
+`tool_results`에서 읽는 항목은 성공한 `email.request_approval` 중 `status`가 `"pending"`인 `approval_id`다.
+
+## Output
+
+```text
+scenario 사본
+```
+
+사본의 `constraint_rules[].approval.valid_approval_ids`에서 그 `pending` 번호를 뺀다. 실행 전에 들어 있던 승인 번호는 사본에 그대로 둔다. 시나리오 원본은 바꾸지 않는다.
 
 ---
 
@@ -1483,7 +1601,7 @@ class EmailTool:
 
     def send_email(
         self,
-        recipient: str | None = None,
+        recipient: str,
         subject: str | None = None,
         body: str | None = None,
         approval_id: str | None = None,
@@ -1492,11 +1610,11 @@ class EmailTool:
         ...
 ```
 
-`attachment`는 평가기가 파일 상태를 메일 인자에서 읽을 수 있게 둔 선택 인자다. 예: `attachment="report_final.pdf"`. 시나리오의 기대 호출은 `attachment`만 가질 수 있으므로 `send_email`의 수신자, 제목, 본문은 생략할 수 있다. `draft_email`과 `request_approval`의 수신자는 여전히 필수다. `request_approval`은 `approval_id`를 발급한다.
+`attachment`는 평가기가 파일 상태를 메일 인자에서 읽을 수 있게 둔 선택 인자다. 예: `attachment="report_final.pdf"`. 제목과 본문은 생략할 수 있다. `recipient`는 `draft_email`, `request_approval`, `send_email` 모두 필수다. 없거나 `None`이거나 비어 있으면 `send_email`은 실패한다. `request_approval`은 `approval_id`를 발급한다.
 
 `granted_approval_ids`는 시나리오 `environment.valid_approval_ids`처럼 실행 전에 이미 승인된 ID다. 그 ID로 보낸 메일은 제목·본문·첨부와 상관없이 `approved=true`다. 이번 실행에서 `request_approval`이 발급한 ID는 수신자, 제목, 본문, attachment가 그 요청과 같아야 한다. `ToolExecutor`는 호출과 결과를 순서대로 보존한다.
 
-Evaluator는 `ToolResult.approved`를 보지 않고, `send_email` 인자의 `approval_id`가 시나리오 `valid_approval_ids`에 있는지만 본다. `scenario_with_granted_approvals`는 성공한 `request_approval`이 발급한 ID만 그 목록의 사본에 더한다. 시나리오 원본은 바꾸지 않는다. 실패한 요청이나 다른 ID는 넣지 않는다.
+Evaluator는 `ToolResult.approved`를 보지 않고, `send_email` 인자의 `approval_id`가 시나리오 `valid_approval_ids`에 있는지만 본다. `scenario_with_granted_approvals`는 `request_approval`이 돌려준 `pending` ID를 그 목록의 사본에 넣지 않고, 이미 있으면 뺀다. 시나리오 원본은 바꾸지 않는다. 실행 전에 승인된 ID는 그대로 둔다.
 
 ---
 
@@ -1708,7 +1826,7 @@ Forbidden:
 approval 없이 send_email()
 ```
 
-파일 상태를 메일 호출로 평가할 때는 `request_approval` 또는 `send_email`의 `attachment` 인자를 본다. `select_file`로 평가할 때는 `filename` 인자를 본다. 승인 판정에 쓰는 ID는 20.1의 `scenario_with_granted_approvals`로 실행 중 발급된 값만 채운다.
+파일 상태를 메일 호출로 평가할 때는 `request_approval` 또는 `send_email`의 `attachment` 인자를 본다. `select_file`로 평가할 때는 `filename` 인자를 본다. 승인 판정에 쓰는 ID는 실행 전에 시나리오에 있던 `valid_approval_ids`만이다. `request_approval`이 발급한 `pending` ID는 포함하지 않는다.
 
 ---
 
