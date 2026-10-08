@@ -85,7 +85,8 @@ class EvaluatorTests(unittest.TestCase):
         scenario, run = fixture()
         run["selection_result"].update(retrieved_memory_ids=["current"], selected_memory_ids=["current"])
         result = evaluate(scenario, run).to_dict()
-        self.assertEqual(result["recall_at_k"], .5)
+        # Protected targets use a separate path and are excluded from General Recall.
+        self.assertEqual(result["recall_at_k"], 1.0)
         self.assertEqual(result["applicable_protected_recall"], 0)
         self.assertFalse(result["general_retrieval_miss"])
         self.assertTrue(result["selection_failure"])
@@ -180,6 +181,21 @@ class EvaluatorTests(unittest.TestCase):
         scenario["wrong_version_memory_ids"] = ["future"]
         run["tool_calls"][0]["arguments"]["attachment"] = "v1.pdf"
         self.assertTrue(evaluate(scenario, run).task_success)
+
+    def test_historical_request_rejects_latest_without_counting_stale_usage(self):
+        scenario, run = fixture()
+        scenario["required_states"][0].update(
+            state_scope="historical", expected_value="v1.pdf", stale_values=["final.pdf"])
+        wrong = evaluate(scenario, run)
+        self.assertFalse(wrong.task_success)
+        self.assertEqual(wrong.metrics["required_state_accuracy"], 0)
+        self.assertEqual(wrong.metrics["state_error_count"], 1)
+        self.assertIsNone(wrong.metrics["stale_state_usage_rate"])
+        self.assertFalse(wrong.metrics["stale_state_used"])
+        run["tool_calls"][0]["arguments"]["attachment"] = "v1.pdf"
+        correct = evaluate(scenario, run)
+        self.assertTrue(correct.task_success)
+        self.assertEqual(correct.metrics["required_state_accuracy"], 1)
 
     def test_unauthorized_send_even_after_request(self):
         scenario, run = fixture()
@@ -401,6 +417,20 @@ class ConfigAndCliTests(unittest.TestCase):
             plan = expand_config(config)
             self.assertGreater(len(plan), 0)
             self.assertEqual(plan[0]["repeat_id"], 0)
+
+    def test_planned_agent_execution_counts(self):
+        expected = {"main": (192, 3840), "smoke": (4, 20), "stress": (216, 2160),
+                    "ablation": (32, 640), "reference": (12, 240)}
+        for name, (plan_rows, agent_runs) in expected.items():
+            with self.subTest(config=name):
+                config = load_config(f"experiments/configs/{name}.json")
+                plan = expand_config(config)
+                self.assertEqual(len(plan), plan_rows)
+                self.assertEqual(len(plan) * config["dataset"]["samples_per_cell"], agent_runs)
+        main = load_config("experiments/configs/main.json")
+        self.assertEqual(main["dataset"]["task_types"], ["temporal_update", "approval"])
+        for axis in ("history_length_tokens", "noise_memory_ratio", "constraint_count", "state_update_count"):
+            self.assertEqual(len(main["grid"][axis]), 1)
 
     def test_invalid_config_rejected(self):
         config = load_config("experiments/configs/smoke.json")

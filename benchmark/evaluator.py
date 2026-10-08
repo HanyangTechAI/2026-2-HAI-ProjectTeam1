@@ -1,5 +1,7 @@
 """Deterministic evaluation of supplied ground truth and execution snapshots.
 
+RQ1 uses action-level task_success; RQ2 uses budget/horizon cells and
+constraint/state metrics. Required states may be current or historical.
 No agent, store, tokenizer or API is called here. See docs/evaluation_usage.md
 for the input contract and the offline JSONL command.
 """
@@ -462,7 +464,10 @@ def aggregate_results(results: list[Any], *, group_by: tuple[str, ...] = ("strat
 def paired_success_deltas(results: list[Any], *, proposed: str = "proposed",
                           group_by: tuple[str, ...] = ("context_token_budget", "horizon_turns"),
                           bootstrap_iterations: int = 2000, seed: int = 42) -> list[dict]:
-    """RQ5: pair sample/repeat IDs, bootstrap entire samples, report unmatched runs."""
+    """RQ2 supporting ΔSuccess(B, H): pair sample/repeat IDs.
+
+    Bootstrap entire samples and report unmatched runs.
+    """
     if bootstrap_iterations < 100:
         raise ValueError("bootstrap_iterations must be >= 100")
     groups = defaultdict(lambda: defaultdict(dict))

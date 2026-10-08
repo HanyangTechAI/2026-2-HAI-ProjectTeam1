@@ -8,14 +8,14 @@ JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다
 
 ## 1. Experiment Objective
 
-본 실험의 목적은 제한된 Context Token Budget에서 행동에 필수적인 제약과 최신 상태를 우선 보존하는 **Constraint-Preserving Budget-Aware Memory**가 Long-Horizon Tool-Using Agent의 작업 성공률과 신뢰성을 개선하는지 검증하는 것이다.
+본 실험의 목적은 제한된 Context Token Budget에서 행동에 필수적인 제약과 현재 Task에 필요한 상태를 우선 보존하는 **Constraint-Preserving Budget-Aware Memory**가 Long-Horizon Tool-Using Agent의 작업 성공률과 신뢰성을 개선하는지 검증하는 것이다.
 
 동일한 LLM, Tool, Task, 원본 interaction history와 실행 조건을 사용하되, 모델에게 과거 정보를 제공하는 Memory strategy만 변경하여 평가한다. 제안 방식의 성능 개선은 실험으로 검증할 가설이며 결과로 전제하지 않는다.
 
 주요 비교 대상은 다음과 같다.
 
 1. **Constraint-Preserving Budget-Aware Memory (Proposed)**
-   - Protected Memory, Current State와 State Versioning을 우선 보존한다.
+   - Protected Memory와 Required State를 Version-Aware State Resolution으로 우선 보존한다. Historical Query에서는 요청 시점의 과거 버전을 선택한다.
    - 남은 예산 안에서 Flexible Memory를 선택한다.
 2. **Sliding Window**
    - 최신 interaction부터 Budget이 허용하는 범위까지 제공한다.
@@ -84,7 +84,7 @@ Fixed Input Tokens
 
 각 실행에서 `B`, 고정 입력 token 수, Memory에 실제로 할당 가능한 token 수, Memory가 실제 사용한 token 수와 전체 input token 수를 함께 기록한다. 모든 strategy는 설정된 `B`를 초과할 수 없다.
 
-Protected Memory와 Current State만으로 가용 Memory Budget을 초과하는 조건은 `mandatory_memory_overflow`로 별도 표시한다. 이 조건에서도 제안 방식만 예산을 초과하도록 허용하지 않으며, 필수 정보 보존이 가능한 범위와 실패 한계를 별도로 보고한다.
+Protected Constraint와 Required State만으로 가용 Memory Budget을 초과하면 `INSUFFICIENT_CONTEXT_BUDGET`으로 중단하고 LLM과 Tool을 호출하지 않는다. 실행기가 확인한 필수 Memory 초과는 `mandatory_memory_overflow`로 별도 표시한다. 이 조건에서도 제안 방식만 예산을 초과하도록 허용하지 않으며, 필수 정보 보존이 가능한 범위와 실패 한계를 별도로 보고한다.
 
 ### 2.2 Full Context 비교 원칙
 
@@ -163,7 +163,7 @@ Hybrid 실험에서는 Context와 Memory가 각각 차지하는 token 수를 별
 
 ## 4. Evaluation Dimensions
 
-### 4.1 Task Success Rate
+### 4.1 Action-Level Task Success Rate
 
 Task Success는 단순한 최종 답변 일치가 아니라 다음 조건을 모두 만족하는 행동 수준의 성공으로 정의한다.
 
@@ -172,7 +172,7 @@ Task Success는 단순한 최종 답변 일치가 아니라 다음 조건을 모
 3. 행동에 필요한 State를 Task가 요구하는 시점·버전에 맞게 사용한다.
 4. 승인이 필요한 Task에서는 승인 전 실행하지 않고 올바르게 승인을 요청한다.
 
-sample별 성공 여부를 이진 값으로 기록하고, 조건별 `Task Success Rate (TSR)`를 계산한다. Task별 세부 성공 조건과 ground truth는 실험 전에 고정한다.
+sample별 성공 여부를 이진 값으로 기록하고, 조건별 `Action-Level Task Success Rate (TSR)`를 계산한다. Task별 세부 성공 조건과 ground truth는 실험 전에 고정한다.
 
 ### 4.2 Constraint 및 State 지표
 
@@ -309,31 +309,11 @@ Tool 실행 시간을 제외하고 Agent가 입력을 받은 뒤 실행 계획 �
 1K / 2K / 4K / 8K tokens
 ```
 
-모델과 Tool 정의의 고정 입력이 1K 조건을 성립시키지 못하는 경우 실제 적용 가능한 최솟값을 사전에 정하고 변경 사유를 기록한다. RQ3에서는 History와 Task 난이도를 고정한 채 Budget만 단계적으로 줄인다.
+모델과 Tool 정의의 고정 입력이 1K 조건을 성립시키지 못하는 경우 실제 적용 가능한 최솟값을 사전에 정하고 변경 사유를 기록한다. RQ2에서는 History와 Task 난이도를 고정한 채 Budget만 단계적으로 줄인다.
 
 ### 6.2 Conversation Length
 
-장기 interaction의 길이에 따라 성능이 어떻게 변하는지 측정한다.
-
-예시:
-
-```text
-Short
-Medium
-Long
-Very Long
-```
-
-또는 token 기준으로:
-
-```text
-10K
-25K
-50K
-100K+
-```
-
-실제 값은 사용하는 모델의 context window와 dataset에 맞추어 결정한다.
+필수 실험에서 History Length는 25K tokens로 고정한다. History 길이를 변화시키는 별도 실험은 선택적 보조 분석이며 Budget/Horizon 실험의 필수 축이 아니다. 전체 History 길이와 중요한 정보부터 Task까지의 거리(Horizon)는 별도 기록한다.
 
 ### 6.3 Horizon / Temporal Distance
 
@@ -351,7 +331,6 @@ Far
 10 turns
 50 turns
 100 turns
-500 turns
 ```
 
 이를 통해 오래된 정보를 찾는 능력을 평가한다.
@@ -360,7 +339,7 @@ Far
 
 ### 6.4 Noise
 
-필요한 정보 사이에 관련 없는 conversation을 추가하여 noise에 대한 robustness를 측정한다.
+필수 실험에서는 Noise Memory ratio를 0.5로 고정한다. Noise 수준을 변화시키는 robustness 분석은 선택적 `stress.json`에서 수행한다.
 
 예시:
 
@@ -376,7 +355,7 @@ Noise Memory ratio는 후보 또는 제공 Memory token 중 최종 행동에 불
 
 ### 6.5 Constraint와 State Update
 
-Memory corruption에 대한 강건성을 평가하기 위해 다음 변수를 독립적으로 조절한다.
+필수 실험에서는 Constraint 수 3, State 변경 횟수 2로 고정한다. 다음 변수의 변화는 핵심 RQ2와 구분하는 선택적 stress 분석이다.
 
 - 적용되는 Constraint 수
 - State 변경 횟수
@@ -387,7 +366,7 @@ Memory Corruption은 저장 장치의 물리적 손상이 아니라 필요한 �
 
 ### 6.6 Task Type
 
-최소한 다음 유형을 고려한다.
+필수 `main.json`은 `temporal_update`와 `approval` Tool 행동 Task를 사용한다. `temporal_update`에는 현재 값 요청과 Historical Query를 포함한다. Single Fact, Multi-hop, Abstention 및 응답 전용 문제는 선택적 확장이며 Action-Level TSR과 별도 집계한다. 기존 평가 기능은 유지한다.
 
 #### Single Fact Retrieval
 
@@ -410,11 +389,11 @@ conversation에 정답 정보가 존재하지 않는 경우 모델이 임의의 
 
 ## 7. Dataset Strategy
 
-평가는 가능하면 두 종류의 데이터로 진행한다.
+필수 실험은 통제된 synthetic Tool 행동 데이터로 수행한다. 공개 benchmark 적용은 7주 내 구현 여유가 있을 때 수행하는 선택적 보조 실험이다.
 
 ### Existing Benchmark
 
-장기 Agent/Memory 평가를 위해 공개된 benchmark를 사용한다.
+선택적 확장으로 장기 Agent/Memory 공개 benchmark 적용을 검토한다.
 
 후보:
 
@@ -442,7 +421,7 @@ What database does Project Zelora-71 use?
 
 모델이 사전학습으로 알 수 없는 entity와 관계를 사용한다.
 
-Synthetic dataset에서는 다음 변수를 직접 통제한다.
+Synthetic dataset에서는 다음 변수를 통제·기록한다. 필수 sweep은 Budget과 Horizon뿐이며 나머지 값은 고정한다. 아래 사실 응답 예시는 선택적 확장이고 필수 Tool 행동 구성은 8.1절을 따른다.
 
 - Conversation length
 - Fact position
@@ -458,41 +437,56 @@ Synthetic dataset에서는 다음 변수를 직접 통제한다.
 
 ## 8. Research Question별 실험 설계
 
-| RQ | 비교 및 통제 | 독립 변수 | 주요 종속 변수 | 분석 |
-|---|---|---|---|---|
-| RQ1 | Proposed vs Sliding Window vs Vector Top-k vs Utility-per-Token; Agent, Task, History, Budget 고정 | Memory strategy | TSR, CVR, RSA | 동일 Budget에서 strategy별 평균과 95% CI 비교 |
-| RQ2 | Long Context와 External Memory 계열 비교 | Constraint 수, State update 횟수, Noise Memory ratio, Horizon | TSR, failure type, stale usage | corruption 유형별 강건성 비교 |
-| RQ3 | History와 Task 난이도 고정 | Budget 1K/2K/4K/8K | CVR, SSUR, RSA, omission/error rate | Budget 감소에 따른 오류 증가 추세와 Proposed의 완화 효과 |
-| RQ4 | 모든 Memory strategy에 동일한 교차 조건 적용 | History Length × Budget; Horizon 별도 기록 | TSR, CVR, RSA, tokens, cost, planning latency | 성능 저하 구간과 성능·비용·신뢰성 trade-off 분석 |
-| RQ5 | Proposed와 각 baseline을 쌍별 비교 | Budget `B`, Horizon `H` | `ΔSuccess(B,H)` | Budget 고정/Horizon 변화와 Horizon 고정/Budget 변화의 성공률 격차 및 CI 분석 |
+기준 문서는 [research_questions.md](research_questions.md)이며 핵심 RQ는 두 개다. 아래는 실행 계획이며 측정 결과가 아니다.
 
-### 8.1 RQ4 교차 실험
+| RQ | 비교 및 통제 | 독립 변수 | 주요 지표 | 분석 |
+| --- | --- | --- | --- | --- |
+| RQ1 | 동일 Agent, Model, Tool, Task, History, Budget에서 Proposed와 Sliding Window, Vector Top-k, Utility-per-Token 비교 | Memory strategy | Action-Level TSR, CVR, RSA, SSUR | 동일 Budget/Horizon 셀의 평균과 95% CI |
+| RQ2 | History 길이, Task 구성, Noise, 제약 수, 업데이트 수 고정 | Budget 1K/2K/4K/8K × Horizon 10/50/100 turns | TSR, CVR, RSA, SSUR; omission/error 진단 | Horizon 고정/Budget 감소 및 Budget 고정/Horizon 증가에 따른 행동 오류 억제 비교 |
 
-History Length와 Token Budget을 독립적으로 변화시키는 full-factorial grid를 기본으로 한다. 각 `(History Length, B)` 셀에서 동일한 sample과 반복 조건으로 모든 strategy를 실행한다. Horizon은 History Length와 별도로 기록하고, 가능한 경우 Near/Medium/Far 층화 결과도 보고한다.
+### 8.1 필수 main 실험과 데이터 통제
 
-### 8.2 RQ5 성공률 격차
+`main.json`의 12개 Budget × Horizon 셀을 네 방식에 공통 적용한다. RQ1은 각 셀의 작업 성공률 비교이고 RQ2는 같은 결과의 Budget/Horizon 추세 비교다. History Length는 25K tokens로 고정하며 독립적인 필수 sweep으로 두지 않는다. Noise 0.5, Constraint 수 3, State 변경 수 2도 고정한다.
 
-각 baseline에 대해 다음 값을 계산한다.
+각 seed/셀의 20개 sample은 temporal_update 10개(현재 값 요청 5개, 과거 버전 요청 5개)와 approval 10개로 배정한다. 현재·과거 요청은 `state_scope`와 명시적 `expected_value`로 판정하며 `is_active`로 정답을 추정하지 않는다. Task 유형과 State scope는 metadata에 기록하여 유형별로도 집계한다. 이 배정은 향후 생성기의 구현 계약이며 현재 자동 생성되지는 않는다.
 
-```text
-ΔSuccess(B, H)
-  = TSR_proposed(B, H) - TSR_baseline(B, H)
-```
+같은 seed/sample의 원본 History와 정답을 모든 strategy에서 공유한다. Budget만 바꾸는 비교에서는 동일 sample_id를 유지한다. Horizon 변화는 총 History 길이를 유지하면서 중요 정보의 위치를 조절하고 Task 난이도·업데이트 관계·정답을 유지한다. sample_id에는 데이터 seed와 기본 Task identity를 포함하며 strategy/Budget/repeat를 포함하지 않는다. 실제 token 수와 Horizon 가능 여부는 생성 단계에서 검증한다. 조건에 따라 Task 내용까지 달라지는 혼동을 피한다.
 
-- `H`를 고정하고 `B`가 감소할 때 격차가 커지는지 확인한다.
-- `B`를 고정하고 `H`가 증가할 때 격차가 커지는지 확인한다.
-- paired bootstrap 또는 동일 sample 기반의 적절한 방법으로 95% 신뢰구간을 계산한다.
-- 모든 방식의 TSR이 바닥 수준에 도달하는 극단 조건에서는 격차가 다시 감소하는지도 별도로 확인한다.
+### 8.2 RQ2의 선택적 성공률 격차 분석
 
-### 8.3 Ablation Study
+필요하면 각 baseline에 대해 `ΔSuccess(B,H) = TSR_proposed(B,H) − TSR_baseline(B,H)`를 보고한다. H를 고정하고 B가 감소할 때, B를 고정하고 H가 증가할 때 격차가 어떻게 변하는지 분석한다. 격차 확대를 연구 결과로 전제하지 않는다. 동일 셀의 sample_id/repeat_id를 pair로 맞추고 sample 단위 bootstrap CI와 unmatched 수를 보고한다. 모든 방식이 실패하는 극단 조건의 격차 감소도 확인한다. 핵심 RQ2의 CVR/RSA/SSUR 비교를 ΔSuccess로 대체하지 않는다.
 
-제안 방식의 각 구성 요소 기여를 확인하기 위해 동일 조건에서 다음 ablation을 수행한다.
+### 8.3 선택적 보조 실험과 Long Context
 
-1. Protected Memory 제거
-2. State Versioning 제거
-3. Budget Optimization 제거
+- `ablation.json`: Protected Memory, State Versioning, Budget Optimization을 각각 제거하여 기여도 분석. 예산 상한은 유지한다.
+- `stress.json`: 제약 수 1/3/5 × State 변경 0/2/5 × Noise 0.1/0.5/0.9. 핵심 RQ2의 Budget/Horizon 실험과 구분한다.
+- `reference.json`: 큰 예산 128K에서 전체 History를 제공하는 별도 참고 결과. main과 같은 seed/Task/Horizon을 사용하고 제한 Budget 순위나 paired ΔSuccess에 섞지 않는다.
+- History 길이 sweep, Hybrid, 공개 benchmark, 응답 전용 Task는 선택적 확장이다. 현재 필수 설정에는 포함하지 않는다.
 
-각 ablation은 완전한 Proposed 방식과 TSR, CVR, RSA, SSUR, TVA 및 token usage를 비교한다.
+Long Context는 전체 원본 History와 고정 입력이 동일 Budget 및 모델 context window에 들어갈 때만 직접 비교한다. 현재 main의 25K History는 1K~8K Budget을 초과하므로 직접 비교 대상이 아니다. 향후 History가 들어가는 공통 조건을 추가하면 모든 strategy를 같은 sample/Budget에서 실행하고 Long Context를 포함한다. 이를 위한 추가 실행 수는 아래 기본 규모에 포함하지 않는다. 잘린 History를 Full Context로 부르지 않는다.
+
+### 8.4 7주 실행 범위와 변경 전후 규모
+
+1~4주차는 생성기, Baseline, Proposed 및 모델/tokenizer 연결과 smoke 검증을 우선한다. 5주차는 main의 RQ1/RQ2 필수 실험, 6주차는 실패 분석과 여유가 있을 때 보조 실험, 7주차는 필요한 재현 실행과 발표 준비에 사용한다. 전체 보조 설정의 실행은 필수 완료 조건이 아니다.
+
+실행 수는 `grid 조건 수 × strategy 수 × seed 수 × repeat × samples_per_cell`로 계산한다. sample 수는 task 유형별 수가 아니라 각 seed/조건의 전체 수이다. 한 Agent 실행에는 여러 LLM/Tool 호출이 있을 수 있으므로 아래 숫자는 API 호출 수나 비용 추정치가 아니다. 예산 중단도 예정된 실행 단위에 포함한다.
+
+| 설정 | 필수 여부 | 조건 수 전→후 | seed 수 전→후 | repeat 전→후 | sample/seed/조건 전→후 | 방식 수 | Agent 실행 수 전→후 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| main | 필수 RQ1/RQ2 | 36→12 | 3→2 | 3→2 | 30→20 | 4 | 38,880→3,840 |
+| smoke | 필수 통합 확인 | 1→1 | 1→1 | 1→1 | 5→5 | 4 | 20→20 |
+| stress | 선택적 보조 | 27→27 | 3→1 | 3→2 | 30→10 | 4 | 29,160→2,160 |
+| ablation | 선택적 보조 | 12→2 | 3→2 | 3→2 | 30→20 | 4 | 12,960→640 |
+| reference | 선택적 고예산 참고 | 9→3 | 3→2 | 3→2 | 30→20 | 1 | 2,430→240 |
+
+변경 전 모든 설정의 합계는 **83,450회**, 변경 후 합계는 **6,900회**이다. 변경 전 main+smoke는 38,900회였고, 새 필수 범위는 **3,860회**, 선택적 보조 설정은 **3,040회**이다. 기존 구성은 stress를 핵심 RQ2로 명명했으므로 변경 전에는 main+stress+smoke 68,060회가 핵심 범위로 읽힐 수 있었다.
+
+main은 History 길이 3수준을 25K 하나로 고정하고 seed를 `[42, 43]`, repeat를 2, sample을 20으로 줄였다. ablation은 Budget 2K/4K, Horizon 100만 사용한다. stress는 제약 수 × 업데이트 수 × Noise의 27개 셀을 보조 분석으로 유지하되 seed `[42]`, repeat 2, sample 10으로 줄였다. reference는 main과 같은 25K History와 Horizon 3수준을 사용한다. smoke는 그대로 유지한다.
+
+반복 축소는 실행 부담을 줄이는 계획이며 통계적 검정력을 보장하지 않는다. CI와 적용 sample 수를 보고하고, 넓은 CI나 결과 불안정성이 확인되면 시간·비용 여유에 따라 반복을 늘린다. 중단·실패 실행과 누락된 pair도 보고한다.
+
+`expand_config()`는 sample 생성 전 계획 행만 만든다. 변경 후 계획 행 수는 main 192, smoke 4, stress 216, ablation 32, reference 12이다. 여기에 각 설정의 samples_per_cell을 곱하면 위 실행 수가 된다.
+
 ---
 
 ## 9. Evaluation Output Format
@@ -660,21 +654,17 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 | Sliding Window | TBD | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
 | Vector Top-k | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Utility-per-Token | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| Long Context Reference | TBD | TBD | TBD | TBD | TBD | - | TBD | TBD | TBD |
 
-추가적으로 다음 조건별 결과를 분석한다.
 
-- Conversation Length
-- Temporal Distance
-- Noise Level
-- Task Type
-- Context Token Budget
-- Constraint Count
-- State Update Count
-- Horizon
-- History Length × Token Budget
+고예산 참고 결과는 다음 별도 표로 보고한다. 전체 History가 같은 Budget에 들어가는 직접 비교 조건을 추가한 경우에만 해당 동일 Budget 표에 Long Context를 포함한다.
 
-모든 주요 집계에는 반복 횟수, 평균과 95% 신뢰구간을 포함한다. RQ5 결과에는 baseline별 `ΔSuccess(B,H)`와 그 신뢰구간을 추가한다.
+| 별도 참고 설정 | Budget | Action-Level TSR | CVR | RSA | SSUR | Tokens | Cost |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Long Context Reference | 131072 | TBD | TBD | TBD | TBD | TBD | TBD |
+
+필수 결과는 Budget × Horizon × strategy와 Task 유형/State scope별로 분석한다. Noise, Constraint 수, State 변경 수, History 길이별 분석은 선택적 보조 결과로 구분한다. 고예산 Long Context Reference는 별도 표에 보고한다.
+
+모든 주요 집계에는 반복 횟수, 평균, 95% 신뢰구간과 지표 적용 실행 수를 포함한다. RQ2의 선택적 ΔSuccess 분석에는 baseline별 차이와 CI를 추가한다. 위 TBD 표는 출력 계획이며 측정 결과가 아니다.
 
 ---
 
@@ -765,3 +755,9 @@ Evaluator
 ```
 
 초기 단계에서는 복잡한 자동 평가보다 **재현 가능한 deterministic metric과 logging pipeline을 먼저 완성하는 것**을 우선한다.
+
+## 14. 현재 실행 가능 범위
+
+Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능하다. `benchmark/generator.py`는 빈 파일이며 grid에 맞는 데이터 생성, Task/scope 배정과 sample identity 통제를 아직 구현해야 한다. Memory Store, Query Analyzer, 검색·선택 함수는 스켈레톤이고 Baseline/Ablation 실행기는 연결되지 않았다. 모델/provider가 null이며 실제 LLM planner, tokenizer/API 사용량 측정 및 실행 결과 adapter가 필요하다.
+
+현재 `agent/agent.py`와 `prototype/run_demo.py`는 원격 main에서 삭제된 `agent/context.py`를 import한다. 따라서 Context Builder 연결 복구 전에는 Agent/데모도 실행할 수 없다. 실험 계획, 합성 token 수, oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.

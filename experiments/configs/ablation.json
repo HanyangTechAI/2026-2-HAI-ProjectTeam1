@@ -1,8 +1,8 @@
 {
   "name": "ablation",
-  "description": "Component contribution; strategy implementations are provided by the memory/agent owner.",
+  "description": "Optional supporting ablation for RQ1/RQ2; strategy implementations must be connected by the runner.",
   "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
-  "dataset": {"source": "synthetic", "samples_per_cell": 30, "task_types": ["temporal_update", "approval"]},
+  "dataset": {"source": "synthetic", "samples_per_cell": 20, "task_types": ["temporal_update", "approval"]},
   "strategies": ["proposed", "without_protected_memory", "without_state_versioning", "without_budget_optimization"],
   "strategy_options": {
     "proposed": {"protect_constraints": true, "resolve_state_versions": true, "flexible_selection": "utility_per_token"},
@@ -10,12 +10,12 @@
     "without_state_versioning": {"protect_constraints": true, "resolve_state_versions": false, "flexible_selection": "utility_per_token"},
     "without_budget_optimization": {"protect_constraints": true, "resolve_state_versions": true, "flexible_selection": "retrieval_order"}
   },
-  "seeds": [42, 43, 44],
-  "repeats": 3,
+  "seeds": [42, 43],
+  "repeats": 2,
   "grid": {
-    "context_token_budget": [1024, 2048, 4096, 8192],
+    "context_token_budget": [2048, 4096],
     "history_length_tokens": [25000],
-    "horizon_turns": [10, 50, 100],
+    "horizon_turns": [100],
     "noise_memory_ratio": [0.5],
     "constraint_count": [3],
     "state_update_count": [2]

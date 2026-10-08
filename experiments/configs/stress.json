@@ -1,11 +1,11 @@
 {
   "name": "stress",
-  "description": "RQ2: constraint count x updates x noise; full-context reference evaluated separately.",
+  "description": "Optional supporting stress analysis: constraints x updates x noise; not the core RQ2 budget/horizon experiment.",
   "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
-  "dataset": {"source": "synthetic", "samples_per_cell": 30, "task_types": ["temporal_update", "approval"]},
+  "dataset": {"source": "synthetic", "samples_per_cell": 10, "task_types": ["temporal_update", "approval"]},
   "strategies": ["proposed", "sliding_window", "vector_top_k", "utility_per_token"],
-  "seeds": [42, 43, 44],
-  "repeats": 3,
+  "seeds": [42],
+  "repeats": 2,
   "grid": {
     "context_token_budget": [2048],
     "history_length_tokens": [25000],
