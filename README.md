@@ -4,9 +4,9 @@
 
 2026-2 HAI Project · Team 1
 
-장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 최신 작업 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
+장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. Agent 실행 흐름, mock Tool, Context Builder, Evaluator와 시나리오 데모가 구현되어 있으며, Memory Store와 검색·선택 핵심 알고리즘 및 실제 LLM 연동은 아직 스켈레톤이다.
+> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. Agent 실행 흐름, mock Tool, Evaluator와 시나리오 데모가 구현되어 있으며, Memory Store와 검색·선택 핵심 알고리즘 및 실제 LLM 연동은 아직 스켈레톤이다.
 
 ## 배경과 목표
 
@@ -15,7 +15,7 @@
 본 프로젝트의 핵심 질문은 **“모든 과거 정보를 기억할 수 없는 Agent는 무엇을 반드시 기억해야 올바른 행동을 유지할 수 있는가?”**이다.
 
 - 동일한 Context Token Budget에서 높은 Task Success Rate 유지
-- 중요한 제약과 최신 상태를 보존하여 Constraint Violation 및 오래된 State 사용 감소
+- 중요한 제약과 Task가 요구한 시점의 상태를 보존하여 Constraint Violation 및 오래된 State 사용 감소
 - Full Context 대비 Token 사용량과 비용의 관계 분석
 - 실제 Tool 호출 결과를 통한 행동 수준의 메모리 평가
 
@@ -26,7 +26,7 @@
 | 구성 요소 | 보존할 정보 | 관리 방식 |
 | --- | --- | --- |
 | **Protected Memory** | 외부 발송 전 승인, 수행 금지 작업, 예산·권한 등 행동 제약 | 일반 Memory Ranking보다 우선하여 보존 |
-| **Current State** | 현재 유효한 파일, 일정, 작업 상태 등 | State Versioning으로 최신 상태와 대체된 상태 구분 |
+| **Required State** | Task가 요구하는 시점에 유효한 파일, 일정, 작업 상태 등 | Version-Aware State Resolution으로 현재·과거 버전 선택 |
 | **Flexible Memory** | 과거 경험, 선호, 참고 정보 등 | 남은 예산에서 관련성·중요도·최신성·Token Cost를 고려하여 선택 |
 
 예를 들어 보고서가 `report_v1.pdf`에서 `report_final.pdf`로 변경되면, 이전 파일은 `SUPERSEDED`, 최신 파일은 `ACTIVE`로 관리한다.
@@ -35,7 +35,7 @@
 flowchart TD
     A[User / Tool Interaction] --> B[Memory Analyzer]
     B --> C[Protected Memory]
-    B --> D[Current State]
+    B --> D[Required State]
     B --> E[Flexible Memory]
     C --> F[Budget-Aware Selector]
     D --> F
@@ -48,7 +48,7 @@ flowchart TD
 
 ### Budget-Aware Selection
 
-전체 입력 Context Budget을 `B`, 공통 지시문·현재 요청·Tool 정의 등의 고정 비용을 `C_fixed`, Protected Memory와 최신 State의 비용을 `C_P`라고 하면 Flexible Memory에 사용할 수 있는 예산은 다음과 같다.
+전체 입력 Context Budget을 `B`, 공통 지시문·현재 요청·Tool 정의 등의 고정 비용을 `C_fixed`, Protected Memory와 Required State의 비용을 `C_P`라고 하면 Flexible Memory에 사용할 수 있는 예산은 다음과 같다.
 
 ```text
 B_flex = B - C_fixed - C_P
@@ -57,17 +57,16 @@ maximize  Σ U_i × x_i
 subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 ```
 
+필수 정보가 예산을 넘으면 `INSUFFICIENT_CONTEXT_BUDGET`으로 중단하고 LLM과 Tool을 호출하지 않는다.
+
 `U_i`는 Memory 항목의 효용, `C_i`는 Token 비용, `x_i`는 선택 여부이다. 필수 정보를 먼저 배치하고 남은 예산에서 Flexible Memory의 효용을 최적화한다. 필수 정보 자체가 예산을 초과하는 조건은 별도로 기록하여 보존 가능 범위와 한계를 평가한다.
 
 ## 연구 질문
 
-1. 동일한 Context Token Budget에서 제안 방식은 기존 Memory 방식보다 Agent의 Task Success Rate를 높이는가?
-2. Long Context와 External Memory는 제약 누락, 오래된 상태 사용, 관련 없는 정보의 간섭에 대해 서로 다른 Robustness를 보이는가?
-3. Token Budget이 작아질수록 기존 방식에서 Constraint Violation과 오래된 State 사용이 증가하는가?
-4. Interaction History가 길어지고 가용 Context Budget이 감소할수록 제안 구조의 성능은 기존 방식과 비교하여 어떻게 변화하는가?
-5. Budget이 작아지거나 Horizon이 길어질수록 제안 방식과 기존 방식의 성공률 차이가 커지는가?
+1. **RQ1:** 동일한 Context Token Budget에서 Proposed가 기존 기억 방식보다 실제 Tool 행동을 포함한 작업 성공률(Action-Level TSR)을 높이는가?
+2. **RQ2:** Budget이 감소하거나 중요한 정보와 Task 사이의 거리(Horizon)가 증가할 때 Proposed가 제약 위반과 잘못된 State 사용을 더 잘 억제하는가?
 
-질문별 비교 조건과 평가 지표는 [Research Questions](docs/research_questions.md)에 정리되어 있다.
+기준 문서는 [Research Questions](docs/research_questions.md)이다. 현재 Task에 필요한 State는 항상 최신 버전을 뜻하지 않는다. Historical Query에서는 요청 시점에 유효했던 과거 버전이 정답이다.
 
 ## 실험 계획
 
@@ -79,7 +78,7 @@ subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 | Sliding Window | 최근 History 중심으로 제공 |
 | Vector Top-k Memory | 벡터 유사도에 따라 검색한 Memory 제공 |
 | Utility-per-Token Memory | Token 비용 대비 효용을 기준으로 Memory 선택 |
-| Proposed | 제약과 최신 State를 우선 보존하고 남은 예산을 효용 기반으로 할당 |
+| Proposed | 제약과 Required State를 우선 보존하고 남은 예산을 효용 기반으로 할당 |
 
 동일 예산 비교는 각 방식의 입력이 예산 내에 들어가도록 수행한다. 전체 History가 예산을 초과하는 Full Context 실행은 별도의 비용·성능 참고 기준으로 보고한다.
 
@@ -100,12 +99,12 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 
 ### 평가 지표
 
-- **작업 성과:** Task Success Rate
-- **행동 신뢰성:** Constraint Violation Rate, Current-State Accuracy, 오래된 State 사용률
+- **작업 성과:** Action-Level Task Success Rate
+- **행동 신뢰성:** Constraint Violation Rate, Required-State Accuracy, 오래된 State 사용률
 - **메모리 선택 품질:** Memory Retrieval Accuracy
 - **효율:** Input Token Usage, Total LLM Cost, Planning Latency
 
-작업 성공은 적용되는 제약 준수와 필요한 최신 State 사용을 포함하여 평가한다. 반복 실행으로 결과의 불확실성을 확인하고 성능·비용·신뢰성의 관계를 분석한다.
+작업 성공은 적용되는 제약 준수와 Task가 요구하는 시점·버전의 State 사용을 포함하여 평가한다. 반복 실행으로 결과의 불확실성을 확인하고 성능·비용·신뢰성의 관계를 분석한다.
 
 ## 데모 시나리오
 
@@ -166,8 +165,8 @@ python prototype/run_demo.py
 | 2주차 | Tool-Using Agent Testbed 및 Baseline 구현 |
 | 3주차 | Constraint Extraction 및 State Versioning |
 | 4주차 | Budget-Aware Memory Manager 통합 |
-| 5주차 | Token·State·Constraint·Noise 실험 및 Ablation |
-| 6주차 | 추가 실험, 실패 분석, Dashboard Demo |
+| 5주차 | 필수 RQ1/RQ2 Budget × Horizon 실험 |
+| 6주차 | 실패 분석, 여유가 있으면 Ablation·stress, Dashboard Demo |
 | 7주차 | 최종 재현 실험, 발표 자료 및 Demo 준비 |
 
 ## 관련 문서
