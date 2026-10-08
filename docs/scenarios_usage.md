@@ -33,9 +33,9 @@
 
 ## 정책과 평가 범위
 
-EC-01/EC-06에 남아 있는 과거 부분 선택 설명과 최신 설계가 다르다.
-이 데이터는 최신 `architecture.md`, `interfaces.md` 및 EC-12에 따라 필수 Memory가 예산에 들어가지 않으면
-`insufficient_context_budget`을 반환하고 Agent를 중단하는 정책을 따른다.
+이 데이터는 `architecture.md`, `algorithm.md`, `interfaces.md` 및 `edge_cases.md`의 EC-01/EC-06/EC-12와 동일하게,
+필수 Memory 전체가 예산에 들어가지 않으면 `insufficient_context_budget`을 반환하고 Agent와 Tool을 호출하지 않는 정책을 따른다.
+단일 Flexible Memory만 예산을 초과하는 경우에는 해당 항목을 제외하고 선택을 계속한다.
 상태 문자열은 `PipelineStatus`의 JSON 값인 소문자를 사용한다.
 
 S15(EC-09)는 후순위로 `benchmark_enabled=false`이다. S21은 Store 오류 단위 테스트로,

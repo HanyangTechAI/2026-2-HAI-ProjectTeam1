@@ -9,7 +9,7 @@
     "integration_token_policy": "선정한 동일 Tokenizer로 고정 입력, Memory와 최종 Context를 다시 측정한다."
   },
   "policy_notes": [
-    "필수 Memory 초과는 최신 architecture/interfaces의 중단 정책을 따른다. edge_cases EC-01/EC-06의 과거 부분 선택 설명보다 EC-12를 우선한다.",
+    "필수 Memory 전체가 예산을 초과하면 architecture/algorithm/interfaces 및 edge_cases EC-01/EC-06/EC-12에 따라 insufficient_context_budget을 반환하고 Agent와 Tool을 호출하지 않는다. 단일 Flexible Memory 초과는 해당 항목을 제외하고 선택을 계속한다.",
     "EC-09는 후순위이며 benchmark_enabled=false이다.",
     "Store consistency 오류는 PipelineStatus에 정의되어 있지 않아 expected_pipeline_status=null이며 별도 assertion으로 검증한다.",
     "선택/포맷/Store assertion은 기존 evaluator가 검사하지 않으므로 실행기에서 별도로 검사해야 한다.",
@@ -3557,7 +3557,7 @@
       "session_id": "session_main",
       "current_turn": 120,
       "current_time": "2026-10-05T12:00:00+09:00",
-      "query": "최신 보고서 이메일 보내줘.",
+      "query": "최신 보고서를 partner@example.test에게 이메일로 보내줘.",
       "context_budget": 512,
       "fixed_input_tokens": 100,
       "token_count_mode": "synthetic_fixture",
@@ -3736,11 +3736,17 @@
           "tool_name": "email",
           "action": "send_email",
           "arguments": {
-            "attachment": "report_final.pdf"
+            "attachment": "report_final.pdf",
+            "recipient": "partner@example.test"
           }
         }
       ],
-      "forbidden_tool_calls": [],
+      "forbidden_tool_calls": [
+        {
+          "tool_name": "email",
+          "action": "request_approval"
+        }
+      ],
       "expected_pipeline_status": "ok",
       "assertions": {
         "selected_memory_ids": [

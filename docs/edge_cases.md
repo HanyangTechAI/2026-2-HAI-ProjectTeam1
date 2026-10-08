@@ -4,8 +4,8 @@
 
 본 문서는 Constraint-Preserving Budget-Aware Memory 시스템에서 발생할 수 있는 예외 상황과 검증 기준을 정의한다. Memory 저장·검색·시간 해석·예산 할당 과정의 오류가 Agent 행동에 미치는 영향을 확인하는 데 사용한다.
 
-- 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md)
-- 작성 기준: 2026-09-28에 확인한 설계 문서
+- 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md), [interfaces.md](./interfaces.md)
+- 작성 기준: 2026-09-28에 확인한 설계 문서. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
 - EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. 구현 완료나 테스트 통과를 의미하지 않는다.
 - EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. 구현 완료나 테스트 통과를 의미하지 않는다. EC-09의 구현 및 Benchmark 포함 여부는 별도로 결정한다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.
@@ -15,7 +15,7 @@
 1. 동일 Session과 `memory_key`에서 현재 ACTIVE State는 최대 하나이다.
 2. 현재 상태 요청에는 현재 유효한 State를, 과거 상태 요청에는 요청 시점에 유효한 State를 사용한다.
 3. SUPERSEDED Memory도 과거 시점 요청에서는 정답일 수 있다. 과거 버전 사용 자체를 오류로 판정하지 않는다.
-4. 현재 Task와 해당 시점에 적용되는 Protected Constraint 및 필수 State를 Flexible Memory보다 먼저 선택한다.
+4. 현재 Task와 해당 시점에 적용되는 Protected Constraint 및 필수 State 전체를 Flexible Memory보다 먼저 확보한다. 필수 Memory 전체가 예산에 들어가지 않으면 EC-12에 따라 오류를 반환하고 Agent와 Tool을 호출하지 않는다.
 5. 전체 Context는 설정한 Token Budget을 초과하지 않는다. Overflow 발생은 일반 조건과 구분하여 기록한다.
 6. 선택 결과와 Agent 행동을 각각 확인한다. 올바른 Memory가 선택되었어도 Agent가 잘못된 파일이나 Tool을 사용하면 행동 평가에서는 실패이다.
 
@@ -27,27 +27,27 @@
 
 **입력 예시:**
 
-| Memory | 역할 | 토큰 수 | 정렬 우선순위 |
-|---|---|---:|---:|
-| M1 | 발송 전 승인이 필요한 직접 행동 제약 | 60 | 1 |
-| M2 | 발송할 보고서의 필수 State | 50 | 2 |
-| M3 | 기타 적용 가능한 Protected Memory | 30 | 3 |
+| Memory | 역할 | 토큰 수 |
+|---|---|---:|
+| M1 | 발송 전 승인이 필요한 직접 행동 제약 | 60 |
+| M2 | 발송할 보고서의 필수 State | 50 |
+| M3 | 기타 적용 가능한 Protected Memory | 30 |
 
 - `B_memory = 100`, 필수 Memory 합계는 140이다.
-- 테스트 입력의 criticality, relevance, importance는 M1 → M2 → M3 순서가 되도록 설정한다.
+- 세 항목 모두 필수 Memory이며, criticality, relevance, importance와 무관하게 전체 비용으로 예산 충족 여부를 판단한다.
 
 **기대 동작:**
 
-- `algorithm.md` 13절에 따라 우선순위 순서로 검사하고, 예산에 들어가는 Memory를 선택한다.
-- M1을 선택하고 M2는 남은 40토큰에 들어가지 않아 제외하며, M3를 선택한다.
+- `algorithm.md` 12~13절 및 EC-12에 따라 필수 Memory 전체 비용 140이 `B_memory = 100`을 초과하므로 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다.
+- `{M1, M3}`처럼 예산에 들어가는 일부만 선택한 결과를 반환하지 않는다.
 - `mandatory_overflow = true`를 기록한다.
-- 현재 의사코드는 Overflow 발생 시 Flexible 선택용 잔여 예산을 0으로 반환한다. 물리적으로 남은 10토큰과 구분한다.
+- Flexible 선택 단계로 진행하지 않으며, Agent와 Tool을 호출하지 않는다.
 
-**통과 기준:** 선택 집합이 `{M1, M3}`이고 비용은 90이다. Overflow가 기록되며 Flexible Memory가 추가되지 않는다. 완성된 Context도 전체 예산을 준수한다.
+**통과 기준:** 반환 상태가 `INSUFFICIENT_CONTEXT_BUDGET`이고 최종 선택 집합은 비어 있다. Overflow가 기록되며 Flexible 선택, Agent 실행 및 Tool 호출이 발생하지 않는다. 오류 반환은 Task 성공으로 집계하지 않는다.
 
 **관련 모듈:** `memory/selector.py`, Context Builder, Execution Logger
 
-**누락 후 행동 정책:** 행동에 필요한 제약 또는 State가 누락되면 EC-12에 따라 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다.
+**정책 관계:** EC-12의 공통 실패 정책을 필수 Memory 합계 초과 입력으로 검증한다.
 
 ### EC-02. 동일 Key에 ACTIVE State가 여러 개 존재하는 경우
 
@@ -125,11 +125,11 @@
 
 **기대 동작 A:** F1을 제외하고 예산 내에서 F2를 선택한다. F1의 Utility가 높아도 예산을 넘겨 삽입하지 않는다.
 
-**입력 예시 B — Protected Memory:** `B_memory = 100`인데 필수 Protected Memory P1 하나가 120토큰이다.
+**입력 예시 B — 필수 Memory:** `B_memory = 100`인데 필수 Protected Memory P1 하나가 120토큰이다. 필수 State 하나가 같은 예산을 초과하는 경우에도 동일한 정책을 적용한다.
 
-**기대 동작 B:** Mandatory Overflow 정책을 적용한다. 현재 알고리즘은 항목 단위로 선택하므로 P1은 들어가지 않으며 Overflow가 기록된다. Memory를 임의로 자르는 정책은 정의되어 있지 않다.
+**기대 동작 B:** EC-12에 따라 `mandatory_overflow = true`를 기록하고 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다. P1을 제외하거나 임의로 잘라 선택을 계속하지 않는다. Flexible 선택 단계로 진행하지 않으며, Agent와 Tool을 호출하지 않는다.
 
-**통과 기준:** A의 선택 비용은 40 이하이고 F1은 제외된다. B에서는 P1이 예산을 초과하여 삽입되지 않고 `mandatory_overflow = true`가 기록된다.
+**통과 기준:** A의 선택 집합은 `{F2}`이고 비용은 20이다. B에서는 반환 상태가 `INSUFFICIENT_CONTEXT_BUDGET`이고 최종 선택 집합은 비어 있다. Overflow가 기록되며 Flexible 선택, Agent 실행 및 Tool 호출이 발생하지 않는다. 오류 반환은 Task 성공으로 집계하지 않는다.
 
 **관련 모듈:** `memory/selector.py`, Context Builder
 
@@ -199,11 +199,14 @@
 
 ### EC-12. 행동에 필요한 필수 Memory를 예산에 담을 수 없는 경우
 
-**상황:** Mandatory Overflow 때문에 행동에 필요한 제약 또는 State가 제외된다.
+**상황:** 고정 비용은 전체 예산 이내이지만, 행동에 필요한 Protected Constraint와 필수 State 전체를 예산에 담을 수 없다. 다음 두 경로에 공통으로 적용한다.
 
-**기대 동작:** `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다.
+- 필수 Memory 전체 비용이 `B_memory`를 초과한다. EC-01의 합계 초과와 EC-06 B의 단일 필수 Memory 초과가 여기에 해당한다.
+- 필수 Memory 내용은 `B_memory`에 들어가지만, EC-10에서 Flexible Memory를 모두 제거한 후에도 포맷을 포함한 최종 Context가 전체 예산 `B`를 초과한다.
 
-**통과 기준:** Mandatory Overflow를 기록하고, 필수 제약 또는 State가 누락된 Context로 요청한 행동을 실행하지 않는다. 오류 반환을 Task 성공으로 집계하지 않는다.
+**기대 동작:** 필수 Memory를 일부 제외하거나 임의로 잘라 실행 가능한 Context를 만들지 않고 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다. Agent와 Tool을 호출하지 않는다. 필수 Memory 비용 검사에서 실패하면 Flexible 선택 단계로 진행하지 않는다. 고정 비용만으로 전체 예산을 초과한 경우에는 EC-11의 `INVALID_BUDGET_CONFIGURATION`을 적용한다.
+
+**통과 기준:** 해당 실패 상태와 발생 단계가 기록되며, Agent 실행 및 Tool 호출이 발생하지 않는다. 필수 Memory 비용 초과 경로에서는 `mandatory_overflow = true`를 기록하고, 최종 포맷 초과 경로는 원인을 구분해서 기록한다. 오류 반환은 정책 검사에서는 통과이지만 Task 성공으로 집계하지 않는다.
 
 **관련 모듈:** `memory/selector.py`, Context Builder, `agent/agent.py`, `benchmark/evaluator.py`
 
