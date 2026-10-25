@@ -30,8 +30,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import agent.agent as agent_module
-from agent.agent import Agent, AgentAction, usage_dict
-from agent.context import provisional_token_count
+from agent.agent import Agent, AgentAction
+from context.tokenizer import provisional_token_count
 from agent.evaluation import scenario_with_granted_approvals
 from agent.tools import CalendarTool, EmailTool, FileTool, TaskTool, ToolCall, ToolExecutor
 from benchmark.evaluator import evaluate

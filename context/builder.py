@@ -246,4 +246,4 @@ def _section_token_count(
     if section is None:
         return 0
     
-    return token_counter(section)
+    return count_tokens(section, token_counter)
