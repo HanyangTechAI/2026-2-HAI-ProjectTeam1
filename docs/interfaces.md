@@ -41,7 +41,6 @@ memory/store.py
 memory/selector.py
 
 agent/agent.py
-agent/context.py
 agent/interaction.py
 agent/evaluation.py
 agent/tools/email.py
