@@ -1111,7 +1111,17 @@ Optional implementation:
 0/1 Knapsack
 ```
 
-어떤 방식을 사용할지는 Experiment Config에서 선택 가능하게 한다. 단, 선택된 후보들을 선택 우선순위가 높은 순서대로 반환해야 합니다.
+어떤 방식을 사용할지는 Experiment Config에서 선택 가능하게 한다. 단, 반환 순서는 다음 V1 계약으로 고정한다.
+
+```text
+selected_flexible[0]
+→ 선택 우선순위가 가장 높은 Memory
+
+selected_flexible[-1]
+→ 선택 우선순위가 가장 낮은 Memory
+```
+
+즉 `select_flexible`은 선택된 후보를 **선택 우선순위 내림차순**으로 반환해야 한다. Utility-per-Token, 0/1 Knapsack 등 내부 알고리즘이 달라도 이 반환 순서는 바뀌지 않는다. 동일 우선순위의 tie-break 규칙은 구현에서 결정할 수 있지만 반드시 결정적이어야 한다.
 
 ---
 
@@ -1137,6 +1147,15 @@ class SelectionResult:
     memory_tokens: int
     remaining_budget: int
 ```
+
+`SelectionResult.flexible`은 `select_flexible`의 순서를 그대로 보존한다. 따라서 다음 불변식을 만족한다.
+
+```text
+flexible[0]  = 유지 우선순위가 가장 높은 Memory
+flexible[-1] = 예산 초과 시 가장 먼저 제거할 Memory
+```
+
+Selector와 Context Builder 사이에서 `flexible`을 다시 정렬하거나 역순으로 바꾸지 않는다.
 
 ## Interface
 
@@ -1274,7 +1293,17 @@ def count_tokens(
 [CURRENT TASK]
 ```
 
-상태 섹션 제목은 `[STATE]`다. 과거 버전을 현재 상태라고 표시하지 않기 위해서다. 빈 Protected, State, Flexible 섹션은 프롬프트에 넣지 않는다. Flexible Memory는 선택 순서의 뒤를 낮은 우선순위로 보고, 예산 초과 시 뒤에서부터 제거한다.
+상태 섹션 제목은 `[STATE]`다. 과거 버전을 현재 상태라고 표시하지 않기 위해서다. 빈 Protected, State, Flexible 섹션은 프롬프트에 넣지 않는다.
+
+Flexible Memory 제거 계약은 다음과 같이 고정한다.
+
+```python
+while total_input_tokens > total_budget and flexible:
+    removed = flexible.pop()
+    dropped_flexible_ids.append(removed.memory_id)
+```
+
+즉 Context Builder는 `SelectionResult.flexible`의 **마지막 Memory부터 한 개씩 제거**한다. 제거 후 Context 전체를 다시 조립하고 다시 tokenize한다. `dropped_flexible_ids`는 실제 제거 순서와 동일하며, 첫 번째 ID가 최초로 제거된 가장 낮은 우선순위 Memory다. Context Builder는 자체 점수 계산이나 재정렬을 수행하지 않는다.
 
 ---
 
@@ -1290,8 +1319,8 @@ Final Context <= B_total
 초과하면:
 
 ```text
-가장 낮은 priority의
-Flexible Memory 제거
+SelectionResult.flexible의
+마지막 Memory 제거
 ↓
 재format
 ↓
@@ -2238,6 +2267,7 @@ Budget Check
 
 Context Builder
 → `context/`에서 최종 Prompt를 조립하고 같은 TokenCounter로 검증한다.
+→ 예산 초과 시 `SelectionResult.flexible`의 마지막 Memory부터 제거한다.
 
 Agent
 → 완성된 Context만 보고 행동한다.
