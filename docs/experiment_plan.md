@@ -758,6 +758,6 @@ Evaluator
 
 ## 14. 현재 실행 가능 범위
 
-Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능하다. `benchmark/generator.py`는 빈 파일이며 grid에 맞는 데이터 생성, Task/scope 배정과 sample identity 통제를 아직 구현해야 한다. Memory Store, Query Analyzer, 검색·선택 함수는 스켈레톤이고 Baseline/Ablation 실행기는 연결되지 않았다. 모델/provider가 null이며 실제 LLM planner, tokenizer/API 사용량 측정 및 실행 결과 adapter가 필요하다.
+Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능하다. `context/tokenizer.py`와 `context/builder.py`에는 공용 Token Counter 검증, 고정 입력 측정, Prompt 조립, Flexible Memory 제거를 포함한 최종 Budget Validation이 구현되어 있다. `benchmark/generator.py`는 빈 파일이며 grid에 맞는 데이터 생성, Task/scope 배정과 sample identity 통제를 아직 구현해야 한다. Memory Store, Query Analyzer, 검색·선택 함수는 스켈레톤이고 Baseline/Ablation 실행기는 연결되지 않았다. 모델/provider가 null이며 실제 LLM planner, 모델별 tokenizer/API 사용량 측정 및 실행 결과 adapter가 필요하다.
 
-현재 `agent/agent.py`와 `prototype/run_demo.py`는 원격 main에서 삭제된 `agent/context.py`를 import한다. 따라서 Context Builder 연결 복구 전에는 Agent/데모도 실행할 수 없다. 실험 계획, 합성 token 수, oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.
+현재 `prototype/run_demo.py`는 삭제된 `agent/context.py`를 import하므로 새 `context/` 모듈로 연결을 갱신해야 한다. `agent/agent.py`의 `run_task`와 `act`도 아직 스켈레톤이므로 구현된 Budget Validation이 실제 Agent 실행 경로에는 연결되지 않았다. 실험 계획, 합성 token 수, oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.

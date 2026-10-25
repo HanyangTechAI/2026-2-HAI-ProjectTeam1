@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. Agent 실행 흐름, mock Tool, Evaluator와 시나리오 데모가 구현되어 있으며, Memory Store와 검색·선택 핵심 알고리즘 및 실제 LLM 연동은 아직 스켈레톤이다.
+> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. Context 조립·Token Counter 검증·최종 Budget Validation, mock Tool, Evaluator와 시나리오 기반 데모가 구현되어 있다. Memory Store와 검색·선택 핵심 알고리즘, Agent 실행기 및 실제 LLM 연동은 아직 스켈레톤 또는 미연결 상태이다.
 
 ## 배경과 목표
 
@@ -60,6 +60,8 @@ subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 필수 정보가 예산을 넘으면 `INSUFFICIENT_CONTEXT_BUDGET`으로 중단하고 LLM과 Tool을 호출하지 않는다.
 
 `U_i`는 Memory 항목의 효용, `C_i`는 Token 비용, `x_i`는 선택 여부이다. 필수 정보를 먼저 배치하고 남은 예산에서 Flexible Memory의 효용을 최적화한다. 필수 정보 자체가 예산을 초과하는 조건은 별도로 기록하여 보존 가능 범위와 한계를 평가한다.
+
+`context/builder.py`는 선택 결과를 실제 Prompt로 조립한 뒤 전체 입력을 다시 측정한다. Formatting overhead로 예산을 넘으면 우선순위가 가장 낮은 Flexible Memory부터 제거하고 재조립·재측정을 반복한다. 모든 Flexible Memory를 제거해도 초과하면 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다. `context/tokenizer.py`는 공용 `TokenCounter`와 반환값 검증을 담당한다.
 
 ## 연구 질문
 
@@ -126,6 +128,7 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 ```text
 .
 ├── memory/              # Memory 스키마, 저장소, 선택 알고리즘
+├── context/             # Token Counter, Prompt 조립, 최종 Budget Validation
 ├── agent/               # Agent 실행 및 가상 Tool
 ├── benchmark/           # 시나리오 생성과 행동 평가
 ├── experiments/
@@ -144,7 +147,7 @@ Agent 스켈레톤과 mock Tool 데모는 저장소 루트에서 다음으로 �
 python prototype/run_demo.py
 ```
 
-데모는 스크립트 planner로 파일 선택, 승인 요청, 발송 순서를 확인하고, 예산이 고정 입력보다 작으면 툴을 호출하지 않는지 확인한다. 이어서 `benchmark/scenarios.json`을 읽는다. 기억 선택은 아직 미구현인 선택기 함수를 데모 내부의 결정적 구현으로 대체하여 시나리오 `memory_snapshot`과 합성 토큰 수로 실행한다. 에이전트는 예산 중단, 기억 문장 답변, 기대 툴 호출을 수행한 뒤 evaluator에 넘긴다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다. 실제 LLM은 아직 연결되지 않았다.
+데모는 스크립트 planner와 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 기억 선택은 아직 미구현인 선택기 대신 시나리오 `memory_snapshot`과 합성 토큰 수를 사용한다. 새 `context/` Budget Validation은 구현되었지만 현재 데모와 Agent 실행기에는 아직 연결되지 않았다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있으며, 실제 LLM은 아직 연결되지 않았다.
 
 ## 기술 스택 후보
 

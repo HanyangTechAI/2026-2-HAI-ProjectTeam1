@@ -39,10 +39,16 @@ Evaluator
 memory/schema.py
 memory/store.py
 memory/selector.py
+memory/query_analyzer.py
+
+context/tokenizer.py
+context/builder.py
 
 agent/agent.py
 agent/interaction.py
 agent/evaluation.py
+agent/planner.py
+agent/tools/types.py
 agent/tools/email.py
 agent/tools/file.py
 agent/tools/calendar.py
@@ -51,6 +57,21 @@ agent/tools/executor.py
 
 benchmark/generator.py
 benchmark/evaluator.py
+```
+
+현재 구현 상태는 다음과 같다. 이 문서의 Interface 선언은 계약을 뜻하며 구현 완료를 뜻하지 않는다.
+
+```text
+구현됨
+- context/tokenizer.py의 공용 TokenCounter와 count 검증
+- context/builder.py의 Prompt 조립과 최종 Budget Validation
+- mock Tool과 ToolExecutor
+- benchmark/evaluator.py의 snapshot 평가와 집계
+
+스켈레톤 또는 미구현
+- MemoryStore, Query Analyzer, General Retrieval
+- Version/Temporal Resolution, Utility 및 Flexible Selection
+- Agent planner/run_task/act, benchmark generator
 ```
 
 ---
@@ -104,18 +125,32 @@ State 변경 및 Version 관계 갱신은 반드시 `MemoryStore` Interface를 �
 
 ---
 
-### 2.4 동일 Tokenizer 사용
+### 2.4 Context 계층과 동일 Tokenizer 사용
 
-다음 모듈은 동일한 Tokenizer를 사용한다.
+Context 조립과 토큰 계산의 소유자는 `context/`이다.
+
+```text
+context/tokenizer.py
+→ TokenCounter, provisional_token_count, count_tokens
+
+context/builder.py
+→ 고정 입력 계산, Prompt 조립, 최종 예산 검증
+```
+
+다음 모듈은 `context.tokenizer`가 제공하는 동일한 `TokenCounter`를 주입받아 사용한다.
 
 ```text
 Memory Analyzer
 Memory Selector
 Context Builder
-Evaluator
+실험 실행기와 usage 기록 계층
 ```
 
-이를 통해 `token_count`와 실제 Context Token 사용량의 불일치를 최소화한다.
+`Agent`와 `Evaluator`는 직접 tokenize하지 않는다. Agent는 완성된 Context만 받고, Evaluator는 실행 결과에 기록된 토큰 수만 읽는다. 이를 통해 `MemoryItem.token_count`, 고정 입력, 최종 Context, usage 사이의 측정 기준을 일치시킨다.
+
+공용 모델 Tokenizer가 연결되기 전에는 임시 counter를 사용할 수 있지만, 임시 측정값은 모델의 실제 Token Usage로 보고하지 않는다. `provisional_token_count`를 여러 모듈에 중복 정의하지 않고 `context/tokenizer.py`를 단일 진입점으로 사용한다.
+
+`count_tokens`는 입력이 문자열인지, counter 반환값이 음수가 아닌 정수인지 검증한다. 잘못된 counter 결과는 Token Usage로 기록하지 않고 `TypeError` 또는 `ValueError`로 거부한다.
 
 ---
 
@@ -253,7 +288,7 @@ is_protected = true
 User, Tool, Environment에서 발생하는 입력을 통일한다.
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class Interaction:
     session_id: str
     turn_id: int
@@ -292,14 +327,14 @@ class TemporalIntent(str, Enum):
 현재 Task 분석 결과이다.
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class QueryContext:
     query: str
 
     temporal_intent: TemporalIntent
 
-    target_time: datetime | None
-    target_range: tuple[datetime, datetime] | None
+    target_time: datetime | None = None
+    target_range: tuple[datetime, datetime] | None = None
 
     entities: tuple[str, ...] = ()
     required_tools: tuple[str, ...] = ()
@@ -651,12 +686,36 @@ Required Tool Detection
 memory/selector.py
 ```
 
+Selector는 구체 Store 구현 대신 다음 최소 Protocol에 의존한다.
+
+```python
+class MemoryStoreProtocol(Protocol):
+    def find_all_by_key(
+        self,
+        session_id: str,
+        memory_key: str,
+    ) -> list[MemoryItem]:
+        ...
+
+    def find_active_protected_constraints(
+        self,
+        session_id: str,
+    ) -> list[MemoryItem]:
+        ...
+
+    def list_session_memories(
+        self,
+        session_id: str,
+    ) -> list[MemoryItem]:
+        ...
+```
+
 ## Interface
 
 ```python
 def retrieve_candidates(
     query_context: QueryContext,
-    memory_store: MemoryStore,
+    memory_store: MemoryStoreProtocol,
     session_id: str,
     top_k: int
 ) -> list[MemoryCandidate]:
@@ -688,8 +747,8 @@ General Retrieval에서 Versioned Memory를 발견하면 동일 Key의 전체 Ve
 
 ```python
 def expand_version_chains(
-    candidates: list[MemoryCandidate],
-    memory_store: MemoryStore
+    candidates: Sequence[MemoryCandidate],
+    memory_store: MemoryStoreProtocol
 ) -> list[MemoryCandidate]:
     ...
 ```
@@ -742,7 +801,7 @@ Protected Retrieval 경로에는 적용하지 않는다.
 
 ```python
 def resolve_temporal_versions(
-    candidates: list[MemoryCandidate],
+    candidates: Sequence[MemoryCandidate],
     query_context: QueryContext
 ) -> list[MemoryCandidate]:
     ...
@@ -805,7 +864,7 @@ D-03 확정 사항이다.
 ```python
 def retrieve_protected(
     query_context: QueryContext,
-    memory_store: MemoryStore,
+    memory_store: MemoryStoreProtocol,
     session_id: str
 ) -> list[MemoryItem]:
     ...
@@ -873,7 +932,7 @@ Temporal Resolution 결과에서 현재 Task에 필요한 State를 결정한다.
 
 ```python
 def resolve_required_states(
-    candidates: list[MemoryCandidate],
+    candidates: Sequence[MemoryCandidate],
     query_context: QueryContext
 ) -> list[MemoryItem]:
     ...
@@ -917,16 +976,9 @@ candidate.utility_score
 
 # 13. Budget Interface
 
-## 13.1 BudgetConfig
+## 13.1 Budget 값 전달
 
-```python
-@dataclass
-class BudgetConfig:
-    total_budget: int
-
-    fixed_tokens: int
-    memory_budget: int
-```
+현재 코드에는 `BudgetConfig` dataclass가 없다. Budget은 `select_memory`와 `calculate_memory_budget`의 `total_budget`, `fixed_tokens` 인자로 전달하고, `memory_budget`은 계산 결과로만 사용한다.
 
 기본 관계:
 
@@ -995,8 +1047,8 @@ class MandatorySelectionResult:
 
 ```python
 def select_mandatory(
-    protected: list[MemoryItem],
-    states: list[MemoryItem],
+    protected: Sequence[MemoryItem],
+    states: Sequence[MemoryItem],
     memory_budget: int
 ) -> MandatorySelectionResult:
     ...
@@ -1033,7 +1085,7 @@ Agent는 실행하지 않는다.
 
 ```python
 def select_flexible(
-    candidates: list[MemoryCandidate],
+    candidates: Sequence[MemoryCandidate],
     budget: int
 ) -> list[MemoryCandidate]:
     ...
@@ -1092,7 +1144,7 @@ class SelectionResult:
 def select_memory(
     query: str,
     session_id: str,
-    memory_store: MemoryStore,
+    memory_store: MemoryStoreProtocol,
     total_budget: int,
     fixed_tokens: int,
     current_turn: int,
@@ -1139,6 +1191,13 @@ SelectionResult
 
 # 17. Context Builder Interface
 
+담당 파일:
+
+```text
+context/tokenizer.py
+context/builder.py
+```
+
 담당 영역:
 
 ```text
@@ -1168,6 +1227,8 @@ class ContextBuildResult:
 
 `protected_tokens`, `state_tokens`, `flexible_tokens`는 `MemoryItem.token_count`가 아니다. 각 섹션을 포맷한 문자열을 `total_input_tokens`와 같은 `token_counter`로 센 값이다. Selector의 기억 예산은 계속 `MemoryItem.token_count`를 쓴다.
 
+`ContextBuildResult`와 아래 함수는 `context.builder`의 공개 Interface다. Agent 또는 Memory 모듈 안에 Context 조립 로직을 복제하지 않는다.
+
 ## Interface
 
 ```python
@@ -1177,7 +1238,7 @@ def build_context(
     query: str,
     selection: SelectionResult,
     total_budget: int,
-    token_counter: Callable[[str], int] | None = None
+    token_counter: TokenCounter | None = None
 ) -> ContextBuildResult:
     ...
 
@@ -1185,14 +1246,22 @@ def fixed_context_tokens(
     system_prompt: str,
     tool_definitions: str,
     query: str,
-    token_counter: Callable[[str], int] | None = None
+    token_counter: TokenCounter | None = None
+) -> int:
+    ...
+
+def count_tokens(
+    text: str,
+    token_counter: TokenCounter | None = None,
 ) -> int:
     ...
 ```
 
 `fixed_context_tokens`는 기억이 없는 프롬프트의 토큰 수다. `[SYSTEM]`, `[TOOL DEFINITIONS]`, `[CURRENT TASK]` 제목을 포함한다. `run_task`는 이 값을 `select_memory`의 `fixed_tokens`로 넘긴다.
 
-`token_counter`는 Memory Analyzer, Selector, Evaluator와 같은 토크나이저를 넣는 자리다. 공용 토크나이저가 정해지기 전에는 공백 기준 단어 수를 세는 `provisional_token_count`를 쓴다. 고정 프롬프트, 섹션, 최종 입력, `usage`는 그 실행에 넣은 같은 함수로 센다. 기본 단어 수는 모델 토크나이저 측정값이 아니므로, 공용 토크나이저를 넣기 전에는 실험 지표로 보고하지 않는다.
+`token_counter`는 `context.tokenizer.TokenCounter`를 받는 자리다. 공용 토크나이저가 정해지기 전에는 `context.tokenizer`의 임시 counter를 쓴다. 고정 프롬프트, 섹션, 최종 입력, `usage`는 한 실행에서 같은 함수를 사용한다. 기본 단어 수는 모델 토크나이저 측정값이 아니므로 공용 토크나이저를 넣기 전에는 실험 지표로 보고하지 않는다.
+
+현재 `context/builder.py`는 `context.tokenizer`의 `TokenCounter`, `provisional_token_count`, `count_tokens`를 사용한다. Context 조립과 최종 Budget Validation은 구현되어 있으며, 실제 모델별 Tokenizer 연결은 실행기 통합 단계에서 진행한다.
 
 프롬프트 섹션 순서는 다음과 같다.
 
@@ -1714,12 +1783,12 @@ metadata
 
 `required_state_ids`와 `required_states[*].memory_id`, `applicable_constraint_ids`와 `constraint_rules[*].constraint_id`는 각각 정확히 일치해야 한다.
 
-필요한 경우 추가 실험 변수:
+추가 실험 변수의 코드상 이름:
 
 ```text
-history_length
-horizon
-noise_ratio
+history_length_tokens
+horizon_turns
+noise_memory_ratio
 constraint_count
 state_update_count
 ```
@@ -1779,18 +1848,21 @@ def evaluate(
 
 `scenario`와 `run_result`는 mapping 또는 dataclass snapshot을 받을 수 있으며 Evaluator는 Memory Store, tokenizer, Agent를 호출하지 않는다.
 
-Evaluator는 다음 세 단계를 구분한다.
+Evaluator는 다음 진단을 구분한다.
 
 ```text
-1. Retrieval Failure
+1. General Retrieval Miss
 
 Target Memory가 retrieved_memory_ids에 없음
+단, Version Expansion 또는 Protected Retrieval이 복구할 수 있으므로
+그 자체는 최종 Task Failure가 아니다.
 
 
 2. Selection Failure
 
-Target Memory가 retrieval에는 있었지만
-selected_memory_ids에 없음
+최종 selected_memory_ids에 Target Memory가 없음
+Retrieval 누락, Temporal Resolution, Budget Selection 등
+원인은 별도 진단값으로 구분한다.
 
 
 3. Reasoning / Action Failure
@@ -1870,7 +1942,7 @@ temporal_version_correct
 
 # 26. Logger Interface
 
-모든 실행은 재현 가능한 분석을 위해 다음 정보를 기록한다.
+모든 실행은 재현 가능한 분석을 위해 다음 정보를 기록한다. 현재 코드에는 `ExecutionLog` dataclass가 없으므로 아래는 구현 타입이 아니라 JSONL 실행 레코드의 논리적 스키마다.
 
 ```python
 @dataclass
@@ -1923,6 +1995,23 @@ extract_memories()
 Memory Store
 insert()
     │
+    │     System Prompt + Tool Definitions + Current Task
+    │                       │
+    │                       ▼
+    │          context.fixed_context_tokens()
+    │                       │
+    │              fixed_tokens 계산
+    │                       │
+    ├───────────────────────┘
+    │
+    ▼
+select_memory(..., fixed_tokens=...)
+    │
+    ▼
+calculate_memory_budget()
+    │
+    ├── INVALID_BUDGET_CONFIGURATION → Agent / Tool 미호출
+    │
     ├──────────────────────────────┐
     │                              │
     ▼                              ▼
@@ -1942,9 +2031,6 @@ Required State               Applicable Constraint
 resolve_required_states()          │
     │                              │
     └──────────────┬───────────────┘
-                   ▼
-             Budget Check
-                   │
                    ▼
         select_mandatory()
                    │
@@ -2051,6 +2137,11 @@ Memory Store 담당
 Selector 담당
 → 어떤 Memory를 Context에 넣을지 결정
 
+Context 담당
+→ 공용 TokenCounter 제공
+→ 고정 입력 Token 계산
+→ Prompt 조립과 최종 Budget 검증
+
 Agent 담당
 → 전달된 Context로 행동 결정
 
@@ -2102,6 +2193,8 @@ SelectionResult
 
 ContextBuildResult
 
+TokenCounter
+
 AgentAction / AgentRunResult
 
 ToolCall / ToolResult
@@ -2144,7 +2237,7 @@ Budget Check
 → Mandatory가 들어가지 않으면 실행하지 않는다.
 
 Context Builder
-→ 최종 Prompt를 실제 Tokenizer로 검증한다.
+→ `context/`에서 최종 Prompt를 조립하고 같은 TokenCounter로 검증한다.
 
 Agent
 → 완성된 Context만 보고 행동한다.

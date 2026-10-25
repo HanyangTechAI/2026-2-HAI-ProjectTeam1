@@ -24,10 +24,10 @@
 - `retrieval_fixture`: 단위 테스트에서 검색 결과와 점수를 고정하는 입력. 통합 Benchmark에서는 실제 Retrieval을 실행한다. 점수는 MemoryItem 밖에서 관리한다.
 - `required_states`, `constraint_rules`, `expected_tool_calls`, `expected_answers`: 기존 Evaluator의 행동/응답 정답이다. `.test` 주소는 가상 수신자이며 실제 발송하지 않는다.
 - `assertions`: 최종 선택 ID, 제외 ID, 버전 확장, 중단, 재tokenize 등을 검증하는 실행기용 정답. 기존 Evaluator는 이 필드를 검사하지 않는다.
-- `context_fixture`: Context Builder 단위 테스트용 토큰 측정 반환값과 제거 순서. 실제 Tokenizer 구현을 대신하는 성능 데이터가 아니다.
+- `context_fixture`: 구현된 `context/builder.py`의 Budget Validation을 결정적으로 검증하기 위한 토큰 측정 반환값과 Flexible Memory 제거 순서. 실제 모델 Tokenizer의 성능 데이터가 아니다.
 
 `token_count_mode=synthetic_fixture`의 토큰 비용은 예산 경계 검증용 고정 숫자이다.
-실제 LLM 실험에서는 모든 전략에 동일한 Tokenizer를 사용하여 Memory·고정 입력·최종 Context를 다시 측정한다.
+실제 LLM 실험에서는 `context.tokenizer.TokenCounter`에 모든 전략이 동일한 모델별 Tokenizer를 주입하여 Memory·고정 입력·최종 Context를 다시 측정한다. 기본 `provisional_token_count` 결과는 실제 모델 Token Usage로 보고하지 않는다.
 `experiment_axes`는 확장 실험 조건이다. 긴 History 생성, Noise 비율 계산, seed별 sample 생성은 별도 구현이 필요하다.
 메타데이터에는 측정하지 않은 History token 수나 Noise token 비율을 넣지 않았다.
 

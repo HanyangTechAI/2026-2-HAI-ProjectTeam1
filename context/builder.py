@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import Sequence
 
 from memory.schema import MemoryItem
 from memory.selector import PipelineStatus, SelectionResult
 
-
-TokenCounter = Callable[[str], int]
+from .tokenizer import provisional_token_count, TokenCounter, count_tokens
 
 
 @dataclass(frozen=True)
@@ -24,13 +23,6 @@ class ContextBuildResult:
     
     total_input_tokens: int = 0
     unused_budget: int = 0
-    
-    
-def provisional_token_count(text: str) -> int:
-    if not text:
-        return 0
-    
-    return len(text.split())
 
 
 def fixed_context_tokens(
@@ -50,7 +42,7 @@ def fixed_context_tokens(
         flexible=(),
     )
     
-    return counter(context)
+    return count_tokens(context, counter)
 
 
 def build_context(
@@ -89,7 +81,7 @@ def build_context(
             flexible=flexible,
         )
         
-        total_tokens = counter(context)
+        total_tokens = count_tokens(context, counter)
         
         if total_tokens <= total_budget:
             protected_tokens = _section_token_count(

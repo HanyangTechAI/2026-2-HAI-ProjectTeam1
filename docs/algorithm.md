@@ -1130,28 +1130,30 @@ FUNCTION SELECT_MEMORY(
 
 Memory 선택 시 계산한 Token Cost와 실제 Formatting된 Prompt의 Token Count에는 차이가 발생할 수 있으므로, 최종 Context를 다시 Tokenize한다.
 
+현재 구현은 `context/tokenizer.py`의 동일한 `TokenCounter`를 `fixed_context_tokens`와 `build_context`에 주입한다. `count_tokens`는 counter 반환값이 음수가 아닌 정수인지 검증한다. 모델별 Tokenizer가 없을 때 사용하는 `provisional_token_count`는 임시 공백 기준 측정이며 실제 모델 Token Usage로 보고하지 않는다.
+
 ## Pseudocode
 
 ```text
 FUNCTION BUILD_CONTEXT(
     system_prompt,
-    tools,
-    selected_memories,
+    tool_definitions,
     query,
-    B_total
+    selection,
+    B_total,
+    token_counter
 ):
 
-    protected ← selected where
-        memory_type == CONSTRAINT
-        AND is_active == TRUE
-        AND is_protected == TRUE
+    IF selection.status != OK:
+        RETURN ContextBuildResult(
+            status = selection.status,
+            context = NULL
+        )
 
-    states ← selected where
-        memory_type == STATE
-
-    flexible ← remaining selected
-
-    SORT flexible BY selection_priority DESC
+    protected ← selection.protected
+    states ← selection.states
+    flexible ← selection.flexible
+    dropped_flexible_ids ← empty list
 
     LOOP:
 
@@ -1164,19 +1166,36 @@ FUNCTION BUILD_CONTEXT(
             query
         )
 
-        actual_tokens ← COUNT_TOKENS(context)
+        actual_tokens ← COUNT_TOKENS(
+            context,
+            token_counter
+        )
 
         IF actual_tokens <= B_total:
-            RETURN context
+            RETURN ContextBuildResult(
+                status = OK,
+                context = context,
+                selected_memory_ids = IDs of protected + states + flexible,
+                dropped_flexible_ids = dropped_flexible_ids,
+                total_input_tokens = actual_tokens,
+                unused_budget = B_total - actual_tokens
+            )
 
         IF flexible is empty:
-            RETURN INSUFFICIENT_CONTEXT_BUDGET
+            RETURN ContextBuildResult(
+                status = INSUFFICIENT_CONTEXT_BUDGET,
+                context = NULL,
+                selected_memory_ids = IDs of protected + states,
+                dropped_flexible_ids = dropped_flexible_ids,
+                total_input_tokens = actual_tokens,
+                unused_budget = 0
+            )
 
-        REMOVE lowest-priority item
-        FROM flexible
+        removed ← REMOVE last item FROM flexible
+        APPEND removed.memory_id TO dropped_flexible_ids
 ```
 
-Protected Memory와 Required State는 최종 Context 보정 과정에서 제거하지 않는다.
+`selection.flexible`은 선택 우선순위가 높은 순서로 전달된다는 계약을 사용하므로 마지막 항목을 가장 낮은 우선순위로 간주한다. Protected Memory와 Required State는 최종 Context 보정 과정에서 제거하지 않는다.
 
 ---
 

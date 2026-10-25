@@ -185,7 +185,7 @@
 
 **실패 경로:** Flexible Memory를 모두 제거해도 예산을 충족하지 못하면, 고정 비용 초과는 EC-11, 행동에 필요한 제약 또는 State를 담을 수 없는 경우는 EC-12를 적용한다.
 
-**관련 모듈:** Context Builder, `memory/selector.py`
+**관련 모듈:** `context/builder.py`, `context/tokenizer.py`, `memory/selector.py`
 
 ### EC-11. 고정 비용만으로 전체 예산을 초과하는 경우
 
@@ -195,7 +195,7 @@
 
 **통과 기준:** 고정 비용 초과를 설정 오류로 반환하고, 예산을 초과한 Context로 Agent를 실행하지 않는다.
 
-**관련 모듈:** Budget 계산, Context Builder
+**관련 모듈:** `memory/selector.py`의 Budget 계산, `context/builder.py`, `context/tokenizer.py`
 
 ### EC-12. 행동에 필요한 필수 Memory를 예산에 담을 수 없는 경우
 
@@ -208,13 +208,14 @@
 
 **통과 기준:** 해당 실패 상태와 발생 단계가 기록되며, Agent 실행 및 Tool 호출이 발생하지 않는다. 필수 Memory 비용 초과 경로에서는 `mandatory_overflow = true`를 기록하고, 최종 포맷 초과 경로는 원인을 구분해서 기록한다. 오류 반환은 정책 검사에서는 통과이지만 Task 성공으로 집계하지 않는다.
 
-**관련 모듈:** `memory/selector.py`, Context Builder, `agent/agent.py`, `benchmark/evaluator.py`
+**관련 모듈:** `memory/selector.py`, `context/builder.py`, `context/tokenizer.py`, `agent/agent.py`, `benchmark/evaluator.py`
 
 ### 모듈 단위 검증
 
 - `memory/store.py`: ACTIVE 중복 감지와 버전 유효 구간을 확인한다.
 - `memory/selector.py`: 후보 누락 보완, 규칙 우선순위, 올바른 버전 선택, 예산 준수를 확인한다.
-- Context Builder: 포맷을 적용한 최종 Context의 토큰 수를 확인한다.
+- `context/tokenizer.py`: 문자열 입력과 counter의 음수가 아닌 정수 반환을 확인한다.
+- `context/builder.py`: 포맷을 적용한 최종 Context를 재측정하고, 낮은 우선순위의 Flexible Memory 제거 순서와 최종 상태를 확인한다.
 
 ### Agent 통합 검증
 

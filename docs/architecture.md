@@ -873,7 +873,7 @@ Selector 결과를 실제 LLM Prompt 형태로 변환한다.
 
 - 외부 이메일은 승인 후 발송해야 한다.
 
-[CURRENT STATE]
+[STATE]
 
 - Current report: report_final.pdf
 
@@ -888,7 +888,7 @@ Selector 결과를 실제 LLM Prompt 형태로 변환한다.
 
 Memory Selection 단계에서 계산한 Token Cost와 실제 Formatting 이후의 Token Cost에는 차이가 발생할 수 있다.
 
-따라서 Context Builder는 완성된 Prompt를 실제 Tokenizer로 다시 측정한다.
+따라서 Context Builder는 완성된 Prompt를 주입된 공용 `TokenCounter`로 다시 측정한다. 현재 `context/tokenizer.py`는 counter 입력과 반환값을 검증하며, 모델별 Tokenizer가 없을 때는 임시 공백 기준 counter를 제공한다. 임시 측정값은 실제 모델 Token Usage로 간주하지 않는다.
 
 ```text
 Final Context Token Count > B_total
@@ -916,14 +916,25 @@ Context Builder는 다음을 기록한다.
 
 ```text
 selected_memory_ids
-total_memory_tokens
+dropped_flexible_ids
 protected_tokens
 state_tokens
 flexible_tokens
+total_input_tokens
 unused_budget
 ```
 
 이 정보는 이후 실험에 사용된다.
+
+현재 구현 위치는 다음과 같다.
+
+```text
+context/tokenizer.py
+→ TokenCounter, provisional_token_count, count_tokens
+
+context/builder.py
+→ fixed_context_tokens, build_context, ContextBuildResult
+```
 
 ---
 
