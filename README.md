@@ -151,6 +151,14 @@ python prototype/run_demo.py
 
 `memory/store.py`는 프로세스 내부 인메모리 저장소를 제공한다. 동일 세션·`memory_key`의 새 ACTIVE 항목을 삽입하면 기존 ACTIVE 항목을 비활성화하고 유효 종료 시각과 양방향 대체 참조를 연결한다. ID·버전 참조·시간 순서·ACTIVE 유일성도 검증하지만, 파일이나 DB로 영속화하지는 않는다.
 
+단위 테스트는 다음 명령으로 실행한다.
+
+```text
+python -m pytest -q
+```
+
+`tests/test_memory.py`는 Store의 저장·조회, 세션/Key 격리, 정렬, 보호된 Constraint 조회와 잘못된 버전 참조 거부를 검증한다. `tests/test_state.py`는 다단계 State Version Chain, ACTIVE 유일성, 과거 비활성 State 보존, 입력 객체 불변성과 시간 순서를 검증한다.
+
 ## 기술 스택 후보
 
 프로젝트 문서에서 제시한 후보이며, 구체적인 도구는 구현 과정에서 확정한다.

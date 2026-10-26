@@ -64,6 +64,7 @@ benchmark/evaluator.py
 ```text
 구현됨
 - memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
+- tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
 - context/tokenizer.py의 공용 TokenCounter와 count 검증
 - context/builder.py의 Prompt 조립과 최종 Budget Validation
 - mock Tool과 ToolExecutor
@@ -680,6 +681,29 @@ def list_session_memories(
 ```
 
 비활성 버전을 포함한 Session의 모든 Memory를 `turn_id ASC, memory_id ASC`로 반환한다. 기록이 없으면 빈 리스트다.
+
+## 5.7 구현 검증 범위
+
+현재 단위 테스트는 다음 계약을 실행 가능한 형태로 검증한다.
+
+```text
+tests/test_memory.py
+- insert/get 및 중복 ID·잘못된 입력 거부
+- Session별 전체 목록과 Session + memory_key 격리
+- ACTIVE 조회와 Version Chain 정렬
+- 활성·보호된 Constraint만 별도 조회
+- 알 수 없는 선행 버전, 다른 Session/Key 참조, 역행하는 valid_from 거부
+
+tests/test_state.py
+- 최초 State의 ACTIVE 등록과 새 State의 자동 대체
+- 3단계 Version Chain의 양방향 참조와 valid_to 갱신
+- Key/Session별 ACTIVE 유일성 및 독립성
+- 비활성 과거 State 삽입 시 현재 ACTIVE 유지
+- Store 갱신 과정에서 호출자가 전달한 불변 MemoryItem을 수정하지 않음
+- 명시적 supersedes가 현재 ACTIVE와 다를 때 일관성 오류 발생
+```
+
+영속화, 동시성, 프로세스 간 공유와 검색 인덱스는 이 테스트 범위에 포함되지 않는다.
 
 ---
 

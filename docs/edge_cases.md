@@ -6,8 +6,8 @@
 
 - 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md), [interfaces.md](./interfaces.md)
 - 작성 기준: 2026-09-28에 확인한 설계 문서. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
-- EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. 구현 완료나 테스트 통과를 의미하지 않는다.
-- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. 구현 완료나 테스트 통과를 의미하지 않는다. EC-09의 구현 및 Benchmark 포함 여부는 별도로 결정한다.
+- EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. 이 중 EC-02의 정상 삽입 경로와 관련 Store 불변식은 `tests/test_memory.py`, `tests/test_state.py`에서 검증한다. 나머지 항목은 명세만으로 구현 완료나 테스트 통과를 의미하지 않는다.
+- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. EC-08에 필요한 Store의 전체 Version Chain 조회는 단위 테스트로 검증하지만 Retrieval과 Temporal Resolver 통합은 아직 미구현이다. 그 밖의 항목도 문서만으로 구현 완료나 테스트 통과를 의미하지 않는다. EC-09의 구현 및 Benchmark 포함 여부는 별도로 결정한다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.
 
 ## 2. 공통 검증 원칙
@@ -216,6 +216,8 @@
 - `memory/selector.py`: 후보 누락 보완, 규칙 우선순위, 올바른 버전 선택, 예산 준수를 확인한다.
 - `context/tokenizer.py`: 문자열 입력과 counter의 음수가 아닌 정수 반환을 확인한다.
 - `context/builder.py`: 포맷을 적용한 최종 Context를 재측정하고, 낮은 우선순위의 Flexible Memory 제거 순서와 최종 상태를 확인한다.
+
+현재 `tests/test_memory.py`와 `tests/test_state.py`는 위 Store 항목 중 정상 삽입을 통한 ACTIVE 유일성, Version Chain·유효 종료 시각, 세션/Key 격리, 잘못된 참조와 역행 시각 거부, 대체된 Constraint의 비활성·보호 해제를 검증한다. 손상된 내부 저장소를 직접 구성해 복수 ACTIVE 감지 경로를 실행하는 테스트는 아직 없다.
 
 ### Agent 통합 검증
 
