@@ -157,7 +157,7 @@ python prototype/run_demo.py
 python -m pytest -q
 ```
 
-`tests/test_memory.py`는 Store의 저장·조회, 세션/Key 격리, 정렬, 보호된 Constraint 조회와 잘못된 버전 참조 거부를 검증한다. `tests/test_state.py`는 다단계 State Version Chain, ACTIVE 유일성, 과거 비활성 State 보존, 입력 객체 불변성과 시간 순서를 검증한다.
+`tests/test_memory.py`는 Store의 저장·조회, 세션/Key 격리, 정렬, 보호된 Constraint 조회와 잘못된 버전 참조 거부를 검증한다. `tests/test_state.py`는 다단계 State Version Chain, ACTIVE 유일성, 과거 비활성 State 보존, 입력 객체 불변성과 시간 순서를 검증한다. `tests/test_memory_context_integration.py`는 Store에서 조회한 최신 State와 Protected Constraint가 Context에 포함되고 대체된 항목은 제외되며, 필수 Memory가 최종 예산을 넘으면 Context 생성이 중단되는지를 검증한다. 이 통합 테스트는 아직 미구현인 Selector 대신 결정적 helper로 `SelectionResult`를 구성한다.
 
 ## 기술 스택 후보
 

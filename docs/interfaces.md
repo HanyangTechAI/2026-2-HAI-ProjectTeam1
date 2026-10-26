@@ -65,6 +65,7 @@ benchmark/evaluator.py
 구현됨
 - memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
 - tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
+- tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
 - context/tokenizer.py의 공용 TokenCounter와 count 검증
 - context/builder.py의 Prompt 조립과 최종 Budget Validation
 - mock Tool과 ToolExecutor
@@ -704,6 +705,17 @@ tests/test_state.py
 ```
 
 영속화, 동시성, 프로세스 간 공유와 검색 인덱스는 이 테스트 범위에 포함되지 않는다.
+
+`tests/test_memory_context_integration.py`는 현재 Store와 Context Builder 사이의 다음 계약을 추가로 검증한다.
+
+```text
+- 현재 ACTIVE State와 활성·보호된 Constraint가 각 Context 섹션에 포함됨
+- 대체된 State와 Constraint는 Store 이력에는 남지만 현재 Context에서 제외됨
+- Store에서 조회한 필수 Memory를 포맷한 최종 Context가 예산을 넘으면
+  INSUFFICIENT_CONTEXT_BUDGET과 context=None을 반환함
+```
+
+이 테스트의 `selection_from_store`는 미구현 Selector를 대신하는 테스트 전용 helper다. 따라서 General Retrieval, Version Chain Expansion, Temporal Resolution 또는 Budget-Aware Selection의 통합 완료를 의미하지 않는다.
 
 ---
 
