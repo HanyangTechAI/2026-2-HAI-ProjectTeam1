@@ -63,13 +63,14 @@ benchmark/evaluator.py
 
 ```text
 구현됨
+- memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
 - context/tokenizer.py의 공용 TokenCounter와 count 검증
 - context/builder.py의 Prompt 조립과 최종 Budget Validation
 - mock Tool과 ToolExecutor
 - benchmark/evaluator.py의 snapshot 평가와 집계
 
 스켈레톤 또는 미구현
-- MemoryStore, Query Analyzer, General Retrieval
+- Query Analyzer, General Retrieval
 - Version/Temporal Resolution, Utility 및 Flexible Selection
 - Agent planner/run_task/act, benchmark generator
 ```
@@ -515,6 +516,23 @@ Reference consistency 검증
 
 Retrieval ranking이나 Utility 계산은 Store의 책임이 아니다.
 
+현재 V1 구현은 `dict[str, MemoryItem]` 기반의 프로세스 내부 인메모리 저장소다. 재시작 후 복원과 파일·DB 영속화는 제공하지 않는다. `MemoryItem`은 불변 객체이므로 버전 갱신 시 `dataclasses.replace`로 새 스냅샷을 만들고 동일 ID의 저장 값을 교체한다.
+
+Store가 사용하는 오류 계약은 다음과 같다.
+
+```text
+TypeError
+→ insert에 MemoryItem이 아닌 값 전달
+
+ValueError
+→ 빈 조회 키, memory_id 중복, 알 수 없는 supersedes 참조,
+  서로 다른 Session/Key의 버전 연결, 역행하거나 호환되지 않는 시각
+
+MemoryStoreConsistencyError
+→ ACTIVE 중복 또는 이미 다른 후속 버전에 연결된 항목 등
+  저장소 불변식 위반
+```
+
 ---
 
 ## 5.1 Insert
@@ -527,6 +545,10 @@ def insert(
 ```
 
 새 Memory를 저장한다.
+
+`memory_key`가 없는 Memory는 버전 체인을 만들지 않고 ID로 저장한다. 단, `supersedes` 또는 `superseded_by`를 가진 항목에는 `memory_key`가 반드시 있어야 한다.
+
+`memory_key`가 있고 새 Memory가 ACTIVE라면 동일 Session + Key의 기존 ACTIVE Memory를 자동으로 직전 버전으로 간주한다. 호출자가 `supersedes`를 명시했다면 그 참조는 현재 ACTIVE 항목과 일치해야 한다.
 
 동일 `memory_key`의 기존 ACTIVE Memory를 대체하는 경우 Store가:
 
@@ -548,6 +570,8 @@ old.is_protected = false
 
 도 함께 적용한다.
 
+새 버전의 `valid_from`은 직전 버전보다 빠를 수 없다. 비활성 Memory는 명시적인 `supersedes`가 있을 때만 해당 선행 버전과 연결한다. 저장 성공 시 Store가 보정한 `MemoryItem`을 반환한다.
+
 ---
 
 ## 5.2 Get by ID
@@ -558,6 +582,8 @@ def get(
 ) -> MemoryItem | None:
     ...
 ```
+
+빈 문자열은 `ValueError`, 존재하지 않는 ID는 `None`을 반환한다.
 
 ---
 
@@ -579,6 +605,8 @@ Invariant:
 active_count <= 1
 ```
 
+0개이면 `None`, 2개 이상이면 임의의 항목을 고르지 않고 `MemoryStoreConsistencyError`를 발생시킨다. `session_id`와 `memory_key`는 비어 있지 않은 문자열이어야 한다.
+
 ---
 
 ## 5.4 Find Version Chain
@@ -595,11 +623,13 @@ def find_all_by_key(
 
 반환 결과는 해당 `memory_key`의 모든 Version이다.
 
-권장 정렬:
+정렬:
 
 ```text
-valid_from ASC
+valid_from ASC, turn_id ASC, memory_id ASC
 ```
+
+비교할 수 없는 시각이 한 체인에 섞여 있으면 `MemoryStoreConsistencyError`를 발생시킨다.
 
 예:
 
@@ -634,6 +664,8 @@ Temporal Filter를 적용하지 않는다.
 
 Task applicability는 Selector가 판단한다.
 
+반환 순서는 `turn_id ASC, memory_id ASC`이다.
+
 ---
 
 ## 5.6 Session Memories
@@ -646,6 +678,8 @@ def list_session_memories(
 ) -> list[MemoryItem]:
     ...
 ```
+
+비활성 버전을 포함한 Session의 모든 Memory를 `turn_id ASC, memory_id ASC`로 반환한다. 기록이 없으면 빈 리스트다.
 
 ---
 

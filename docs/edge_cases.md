@@ -61,7 +61,7 @@
 
 **관련 모듈:** `memory/store.py`
 
-**미정 사항:** 자동 복구, 신규 삽입 거부, 실행 중단 중 어느 방식을 사용할지는 추가 결정이 필요하다. 단순히 최신 항목 하나를 고르는 것을 확정 정책으로 두지 않는다.
+**현재 구현:** 정상적인 `insert` 경로에서는 새 ACTIVE 버전이 기존 ACTIVE 버전을 자동으로 대체하므로 중복이 생기지 않는다. 이미 손상된 내부 상태에서 조회 결과가 2개 이상이면 임의의 최신 항목을 고르지 않고 `MemoryStoreConsistencyError`를 발생시킨다. 자동 복구는 수행하지 않는다.
 
 ### EC-03. 과거 요청 시점에 유효한 State가 없는 경우
 
@@ -212,7 +212,7 @@
 
 ### 모듈 단위 검증
 
-- `memory/store.py`: ACTIVE 중복 감지와 버전 유효 구간을 확인한다.
+- `memory/store.py`: ID 중복, 버전 참조의 Session/Key 일치, 시간 순서, ACTIVE 중복, 버전 유효 구간과 대체된 Constraint의 보호 해제를 확인한다.
 - `memory/selector.py`: 후보 누락 보완, 규칙 우선순위, 올바른 버전 선택, 예산 준수를 확인한다.
 - `context/tokenizer.py`: 문자열 입력과 counter의 음수가 아닌 정수 반환을 확인한다.
 - `context/builder.py`: 포맷을 적용한 최종 Context를 재측정하고, 낮은 우선순위의 Flexible Memory 제거 순서와 최종 상태를 확인한다.

@@ -344,6 +344,8 @@ is_protected = true
 
 따라서 과거 Constraint는 Historical Retrieval에 사용할 수 있지만 현재 행동의 Protected Memory로는 사용하지 않는다.
 
+현재 `memory/store.py`는 `memory_id`를 키로 사용하는 인메모리 구현이다. 동일 Session과 `memory_key`에 새 ACTIVE Memory가 들어오면 기존 ACTIVE Memory를 자동으로 종료하고 `supersedes`/`superseded_by`를 양방향으로 연결한다. 명시된 선행 버전은 같은 Session과 Key여야 하며, 새 `valid_from`이 선행 버전보다 빠르면 삽입을 거부한다. 저장소는 이력과 참조 일관성만 담당하며 영속화, 의미 검색, 효용 계산은 담당하지 않는다.
+
 ---
 
 ## Memory Types

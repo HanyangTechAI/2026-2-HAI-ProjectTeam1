@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. Context 조립·Token Counter 검증·최종 Budget Validation, mock Tool, Evaluator와 시나리오 기반 데모가 구현되어 있다. Memory Store와 검색·선택 핵심 알고리즘, Agent 실행기 및 실제 LLM 연동은 아직 스켈레톤 또는 미연결 상태이다.
+> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. 인메모리 Memory Store와 State Versioning, Context 조립·Token Counter 검증·최종 Budget Validation, mock Tool, Evaluator와 시나리오 기반 데모가 구현되어 있다. Query Analyzer와 검색·선택 핵심 알고리즘, Agent 실행기 및 실제 LLM 연동은 아직 스켈레톤 또는 미연결 상태이다.
 
 ## 배경과 목표
 
@@ -148,6 +148,8 @@ python prototype/run_demo.py
 ```
 
 데모는 스크립트 planner와 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 기억 선택은 아직 미구현인 선택기 대신 시나리오 `memory_snapshot`과 합성 토큰 수를 사용한다. 새 `context/` Budget Validation은 구현되었지만 현재 데모와 Agent 실행기에는 아직 연결되지 않았다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있으며, 실제 LLM은 아직 연결되지 않았다.
+
+`memory/store.py`는 프로세스 내부 인메모리 저장소를 제공한다. 동일 세션·`memory_key`의 새 ACTIVE 항목을 삽입하면 기존 ACTIVE 항목을 비활성화하고 유효 종료 시각과 양방향 대체 참조를 연결한다. ID·버전 참조·시간 순서·ACTIVE 유일성도 검증하지만, 파일이나 DB로 영속화하지는 않는다.
 
 ## 기술 스택 후보
 

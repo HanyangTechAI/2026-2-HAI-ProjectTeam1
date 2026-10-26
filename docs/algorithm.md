@@ -264,10 +264,6 @@ FUNCTION INSERT_MEMORY(new_memory):
         STORE new_memory
         RETURN
 
-    IF new_memory does not replace previous:
-        STORE new_memory
-        RETURN
-
     updated_previous ← previous WITH:
         is_active = FALSE
         valid_to = new_memory.valid_from
@@ -283,6 +279,8 @@ FUNCTION INSERT_MEMORY(new_memory):
     REPLACE previous WITH updated_previous
     STORE updated_new
 ```
+
+현재 V1 Store에서는 동일 Session + `memory_key`의 ACTIVE Memory를 새 ACTIVE Memory가 자동으로 대체한다. `new_memory.supersedes`가 명시된 경우에는 그 대상이 실제 현재 ACTIVE 버전과 같은지, 같은 Session과 Key인지, 아직 다른 후속 버전에 연결되지 않았는지를 먼저 검증한다. 새 Memory가 비활성이면 명시적인 `supersedes`가 있을 때만 Version Chain을 갱신한다. `memory_key`가 없는 Memory는 버전 처리 없이 독립 항목으로 저장한다.
 
 현재 행동에 적용되는 새로운 Hard Constraint는 Memory Extraction 단계에서 `is_protected = TRUE`로 생성한다.
 
