@@ -1,17 +1,19 @@
-"""Agent 실행 스켈레톤.
+"""완성된 입력으로 행동 하나를 고르고 툴을 실행한다.
 
 프롬프트를 조립하지 않는다. 토큰을 세지 않고, 예산 초과를 검사하지 않는다.
-기억을 만들거나 저장소에 넣지 않는다. 완성된 입력을 받아 다음 행동을 고르고
-툴을 실행하는 자리는 여기 두되, 그 동작은 아직 구현하지 않는다.
+기억을 만들거나 저장소에 넣지 않는다. 한 번 호출에 행동은 하나다.
+툴을 실행했으면 그 결과를 Interaction으로 돌려주고 멈춘다. 메모리 쪽이
+그 Interaction을 정리하고 Context Builder가 다시 조립한 context로 다시 부른다.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from .interaction import Interaction
+from .interaction import Interaction, interactions_from_tool_results
 from .tools.executor import ToolExecutor
 from .tools.types import ToolCall, ToolResult
 
@@ -33,7 +35,11 @@ class AgentAction:
 
 @dataclass(frozen=True)
 class ActResult:
-    """계획과 툴 실행이 남길 결과. 토큰 수는 포함하지 않는다."""
+    """행동 하나의 결과. 토큰 수는 포함하지 않는다.
+
+    stopped_reason은 completed, tool_called, tool_failure 중 하나다.
+    tool_called이면 다시 조립한 context로 다시 불러야 한다.
+    """
 
     response: str | None
     tool_calls: tuple[ToolCall, ...]
@@ -44,7 +50,7 @@ class ActResult:
 
 @dataclass(frozen=True)
 class AgentRunResult:
-    """run_task가 남길 결과. 기억 선택과 프롬프트 조립 결과는 포함하지 않는다."""
+    """run_task의 결과. 기억 선택과 프롬프트 조립 결과는 포함하지 않는다."""
 
     response: str | None
     tool_calls: tuple[ToolCall, ...]
@@ -55,9 +61,10 @@ class AgentRunResult:
 
 
 class Agent:
-    """완성된 입력을 받아 행동을 고르고 툴을 실행할 실행기.
+    """완성된 입력을 받아 행동 하나를 고르고 툴을 실행하는 실행기.
 
     기억 선택, 프롬프트 조립, 토큰 계산, 예산 검사는 이 클래스 밖에 둔다.
+    goal_checker가 없으면 goal_completed는 False다.
     """
 
     def __init__(
@@ -67,10 +74,8 @@ class Agent:
         planner: Planner | None = None,
         goal_checker: GoalChecker | None = None,
         current_turn: int = 0,
-        max_steps: int = 8,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
-        if max_steps < 1:
-            raise ValueError("max_steps must be a positive integer")
         if planner is None:
             from .planner import Planner as PlannerImpl
 
@@ -79,16 +84,54 @@ class Agent:
         self.planner = planner
         self.goal_checker = goal_checker
         self.current_turn = current_turn
-        self.max_steps = max_steps
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     def plan(self, context: str) -> AgentAction:
         """완성된 입력을 planner에 넘긴다."""
         return self.planner.plan(context)
 
-    def run_task(self, task: str, session_id: str) -> AgentRunResult:
-        """과제 한 번을 실행한다. 예산과 프롬프트는 받지 않는다."""
-        raise NotImplementedError
+    def run_task(self, context: str, session_id: str) -> AgentRunResult:
+        """Context Builder가 만든 입력으로 행동 하나를 실행한다."""
+        acted = self.act(context, session_id=session_id)
+        goal_completed = (
+            acted.stopped_reason == "completed"
+            and self.goal_checker is not None
+            and self.goal_checker(acted.response, acted.tool_calls, acted.tool_results)
+        )
+        return AgentRunResult(
+            response=acted.response,
+            tool_calls=acted.tool_calls,
+            tool_results=acted.tool_results,
+            goal_completed=goal_completed,
+            stopped_reason=acted.stopped_reason,
+            interactions=acted.interactions,
+        )
 
     def act(self, context: str, *, session_id: str) -> ActResult:
-        """이미 만들어진 입력으로 계획과 툴 실행만 한다."""
-        raise NotImplementedError
+        """plan 한 번과 툴 실행 한 번을 한다.
+
+        툴을 실행하면 current_turn을 Interaction 수만큼 올린다.
+        다음 호출의 Interaction은 그 다음 차례부터 번호를 받는다.
+        """
+        action = self.plan(context)
+        if action.tool_name is None and action.action is None:
+            return ActResult(action.text_response, (), (), "completed", ())
+        if action.tool_name is None or action.action is None:
+            return ActResult(None, (), (), "tool_failure", ())
+
+        call = ToolCall(action.tool_name, action.action, dict(action.arguments))
+        result = self.executor.execute(call)
+        interactions = interactions_from_tool_results(
+            session_id,
+            self.current_turn,
+            (result,),
+            self.clock(),
+        )
+        self.current_turn += len(interactions)
+        return ActResult(
+            response=None,
+            tool_calls=(call,),
+            tool_results=(result,),
+            stopped_reason="tool_called" if result.success else "tool_failure",
+            interactions=interactions,
+        )
