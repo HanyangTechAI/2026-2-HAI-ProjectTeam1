@@ -264,7 +264,7 @@ def _import_callable(spec: str) -> Callable:
     return value
 
 
-def main() -> None:
+def ㅣmain() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenarios", default="benchmark/scenarios.json")
     parser.add_argument("--scenario-ids", nargs="+")

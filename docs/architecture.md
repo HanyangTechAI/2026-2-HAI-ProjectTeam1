@@ -994,7 +994,7 @@ TaskTool
 
 `ToolExecutor`가 `ToolCall`을 받아 실행한다. Mock은 승인 같은 행동 제약을 거부하지 않고 호출과 결과를 기록한다. 승인 없는 발송이 툴에서 막히면 Constraint Violation을 측정할 수 없기 때문이다. 없는 승인 ID처럼 잘못된 인자만 실패한다.
 
-Tool 실행 결과는 `Interaction(source="tool")`로 바꾼다. V1 스켈레톤은 그 객체를 만들지만 Memory Store에는 넣지 않는다.
+Tool 실행 결과는 `Interaction(source="tool")`로 바꾼다. `Agent.act`가 Interaction을 만들고, Orchestrator는 이를 다음 단계의 Tool feedback으로 Context에 반영한다. 현재 Orchestrator는 Interaction을 Memory Store에 영속화하거나 Memory Analyzer로 새 Memory를 생성하지 않으며, 실행 시작 시 받은 Memory snapshot으로 선택을 반복한다.
 
 ---
 
@@ -1262,6 +1262,10 @@ Budget-Aware Memory Selection
 │   │   └── Storage / State Versioning
 │   │       / Version Chain Lookup
 │   │
+│   ├── baselines.py
+│   │   └── Sliding Window / Vector Top-k
+│   │       / Utility-per-Token
+│   │
 │   └── selector.py
 │       └── Retrieval / Protected Resolution
 │           / Temporal Resolution
@@ -1269,10 +1273,10 @@ Budget-Aware Memory Selection
 │
 ├── agent/
 │   ├── agent.py
-│   │   └── LLM Agent / run_task
+│   │   └── 단일 행동 실행 / run_task / act
 │   │
-│   ├── context.py
-│   │   └── Context Builder
+│   ├── planner.py
+│   │   └── 결정적 규칙 Planner / LLM 교체 지점
 │   │
 │   └── tools/
 │       ├── email.py
@@ -1281,12 +1285,26 @@ Budget-Aware Memory Selection
 │       ├── task.py
 │       └── executor.py
 │
+├── context/
+│   ├── tokenizer.py
+│   │   └── 공용 TokenCounter
+│   └── builder.py
+│       └── Prompt 조립 / 최종 Budget Validation
+│
+├── pipeline/
+│   ├── orchestrator.py
+│   │   └── 선택 / Context / Agent 다단계 실행
+│   └── pipeline_adapter.py
+│       └── 실행별 Agent 생성과 Pipeline 호출 adapter
+│
 ├── benchmark/
 │   ├── generator.py
 │   │   └── Long-Horizon Scenario Generation
 │   │
 │   ├── evaluator.py
 │   │   └── Task / Constraint Evaluation
+│   ├── runner.py
+│   │   └── Baseline 실행 / JSONL / 집계 출력
 │   │
 │   └── scenarios.json
 │

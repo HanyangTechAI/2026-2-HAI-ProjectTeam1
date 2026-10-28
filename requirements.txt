@@ -1,0 +1,6 @@
+# 현재 핵심 실행 경로와 unittest 테스트에는 필수 서드파티 패키지가 없다.
+# 지원 기준: Python 3.10 이상 (개발 환경 검증: Python 3.12).
+#
+# Vector Top-k / Utility-per-Token은 특정 embedding SDK에 의존하지 않는다.
+# 실험에서 사용할 provider 또는 로컬 모델 패키지는 embedder 구현과 함께
+# 별도로 고정한 뒤 이 파일에 추가한다.

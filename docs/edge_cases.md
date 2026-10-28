@@ -221,6 +221,8 @@
 
 `tests/test_memory_context_integration.py`는 Store에서 가져온 현재 State와 Protected Constraint가 최종 Context에 포함되고 대체된 버전은 제외되는지 확인한다. 또한 Flexible Memory가 없는 상태에서 필수 섹션을 포함한 최종 Context가 예산을 초과하면 EC-12에 따라 생성을 중단하는 경로를 검증한다. 실제 Selector 대신 테스트 helper를 사용하므로 Retrieval·Temporal Resolution까지 포함한 통합 검증은 아니다.
 
+`tests/test_pipeline.py`는 선택 또는 Context 단계의 예산 실패가 Agent·Tool 호출 전에 중단되는지, Tool feedback 이후 고정 비용이 증가해 예산을 넘는 경우 다음 Agent 실행을 막는지 검증한다. Tool 실패와 `max_steps` 종료도 별도 경로로 확인한다. `tests/test_baseline_context_agent_integration.py`는 세 Baseline과 Context Builder, 결정적 Agent, mock Tool의 연결을 검증하지만 Proposed Selector의 정책 검증은 아니다.
+
 ### Agent 통합 검증
 
 - 같은 시나리오를 가상 Tool 환경에서 실행한다.

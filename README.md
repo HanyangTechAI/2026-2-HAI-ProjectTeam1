@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 인터페이스 검증 단계이다. 인메모리 Memory Store와 State Versioning, Context 조립·Token Counter 검증·최종 Budget Validation, mock Tool, Evaluator와 시나리오 기반 데모가 구현되어 있다. Query Analyzer와 검색·선택 핵심 알고리즘, Agent 실행기 및 실제 LLM 연동은 아직 스켈레톤 또는 미연결 상태이다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, mock Tool, Benchmark Runner와 Evaluator가 구현되어 있다. Proposed Query Analyzer·검색·시간 해석·선택 알고리즘, 시나리오 생성기와 실제 LLM/모델별 Tokenizer 연동은 아직 미구현 또는 미연결 상태이다.
 
 ## 배경과 목표
 
@@ -130,7 +130,8 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 ├── memory/              # Memory 스키마, 저장소, 선택 알고리즘
 ├── context/             # Token Counter, Prompt 조립, 최종 Budget Validation
 ├── agent/               # Agent 실행 및 가상 Tool
-├── benchmark/           # 시나리오 생성과 행동 평가
+├── pipeline/            # 선택·Context·Agent 반복 실행과 adapter
+├── benchmark/           # Baseline 실행, 시나리오 생성 자리와 행동 평가
 ├── experiments/
 │   ├── configs/         # 실험 설정
 │   └── results/         # 실험 결과
@@ -141,27 +142,57 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 └── README.md
 ```
 
-Agent 스켈레톤과 mock Tool 데모는 저장소 루트에서 다음으로 실행한다.
+결정적 Planner와 mock Tool 데모는 저장소 루트에서 다음으로 실행한다.
 
 ```text
 python prototype/run_demo.py
 ```
 
-데모는 스크립트 planner와 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 기억 선택은 아직 미구현인 선택기 대신 시나리오 `memory_snapshot`과 합성 토큰 수를 사용한다. 새 `context/` Budget Validation은 구현되었지만 현재 데모와 Agent 실행기에는 아직 연결되지 않았다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있으며, 실제 LLM은 아직 연결되지 않았다.
+데모는 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 시나리오 `memory_snapshot`과 합성 토큰 수를 사용하는 별도 데모 경로이며 실제 LLM 성능 측정은 아니다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다.
+
+실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token을 공통 `SelectionResult`로 변환한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 활성 integration 시나리오를 전략·반복별로 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector 기반 전략에는 embedding 함수가 필요하며 기본 공백 기준 Token Counter는 실제 모델 사용량이 아니다.
 
 `memory/store.py`는 프로세스 내부 인메모리 저장소를 제공한다. 동일 세션·`memory_key`의 새 ACTIVE 항목을 삽입하면 기존 ACTIVE 항목을 비활성화하고 유효 종료 시각과 양방향 대체 참조를 연결한다. ID·버전 참조·시간 순서·ACTIVE 유일성도 검증하지만, 파일이나 DB로 영속화하지는 않는다.
 
-단위 테스트는 다음 명령으로 실행한다.
+## 설치와 의존성
+
+현재 핵심 실행 경로는 Python 표준 라이브러리만 사용한다. Python 3.10 이상이 필요하며 현재 개발 환경에서는 Python 3.12로 검증한다. 가상 환경 사용을 권장한다.
 
 ```text
-python -m pytest -q
+python -m venv .venv
+
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install -r requirements.txt
 ```
 
-`tests/test_memory.py`는 Store의 저장·조회, 세션/Key 격리, 정렬, 보호된 Constraint 조회와 잘못된 버전 참조 거부를 검증한다. `tests/test_state.py`는 다단계 State Version Chain, ACTIVE 유일성, 과거 비활성 State 보존, 입력 객체 불변성과 시간 순서를 검증한다. `tests/test_memory_context_integration.py`는 Store에서 조회한 최신 State와 Protected Constraint가 Context에 포함되고 대체된 항목은 제외되며, 필수 Memory가 최종 예산을 넘으면 Context 생성이 중단되는지를 검증한다. 이 통합 테스트는 아직 미구현인 Selector 대신 결정적 helper로 `SelectionResult`를 구성한다.
+현재 `requirements.txt`에는 설치할 필수 서드파티 패키지가 없으므로 마지막 명령은 추가 설치 없이 정상 종료한다. `unittest`도 표준 라이브러리이므로 별도 테스트 패키지가 필요하지 않다.
+
+선택 기능의 의존성은 구현을 주입하는 쪽에서 결정한다.
+
+| 기능 | 현재 계약 | 추가 의존성 |
+| --- | --- | --- |
+| Sliding Window | 내장 구현을 바로 사용 | 없음 |
+| Vector Top-k | `embedder(text) -> Sequence[float]` 주입 | 선택한 embedding SDK 또는 로컬 모델 |
+| Utility-per-Token | Vector Top-k와 같은 embedder 사용 | 선택한 embedding SDK 또는 로컬 모델 |
+| Token 측정 | 기본 `provisional_token_count` 또는 `TokenCounter` 주입 | 실제 모델 tokenizer를 쓸 때 해당 패키지 |
+| Agent | 기본 결정적 규칙 `Planner` | 실제 LLM 연결 시 provider SDK |
+| 저장소 | 프로세스 내부 `MemoryStore` | DB 영속화를 구현할 때 DB driver |
+
+Embedding·LLM·Tokenizer provider는 아직 확정되지 않았다. 연구 실행 전에는 선택한 provider와 정확한 버전을 `requirements.txt`에 고정하고, 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 개발 PC에 우연히 설치된 패키지를 프로젝트 의존성으로 간주하지 않는다.
+
+현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
+
+```text
+python -m unittest discover -s tests -v
+```
+
+`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`는 세 Baseline에서 Context Builder, Agent와 mock Tool까지의 경로를 검증하고, `tests/test_pipeline.py`는 다단계 재선택·Context 재조립·Tool feedback, 목표 판정, 예산 중단, Tool 실패와 최대 단계 종료를 검증한다.
 
 ## 기술 스택 후보
 
-프로젝트 문서에서 제시한 후보이며, 구체적인 도구는 구현 과정에서 확정한다.
+아래 항목은 설치된 의존성이 아니라 향후 실험·서비스 구현 후보이다. 실제 채택 전까지 `requirements.txt`의 필수 패키지로 간주하지 않는다.
 
 | 영역 | 후보 |
 | --- | --- |

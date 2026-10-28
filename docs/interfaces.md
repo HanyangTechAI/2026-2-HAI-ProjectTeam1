@@ -38,6 +38,7 @@ Evaluator
 ```text
 memory/schema.py
 memory/store.py
+memory/baselines.py
 memory/selector.py
 memory/query_analyzer.py
 
@@ -55,8 +56,12 @@ agent/tools/calendar.py
 agent/tools/task.py
 agent/tools/executor.py
 
+pipeline/orchestrator.py
+pipeline/pipeline_adapter.py
+
 benchmark/generator.py
 benchmark/evaluator.py
+benchmark/runner.py
 ```
 
 현재 구현 상태는 다음과 같다. 이 문서의 Interface 선언은 계약을 뜻하며 구현 완료를 뜻하지 않는다.
@@ -68,13 +73,18 @@ benchmark/evaluator.py
 - tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
 - context/tokenizer.py의 공용 TokenCounter와 count 검증
 - context/builder.py의 Prompt 조립과 최종 Budget Validation
-- mock Tool과 ToolExecutor
+- memory/baselines.py의 Sliding Window, Vector Top-k, Utility-per-Token
+- 결정적 규칙 Planner, Agent, mock Tool과 ToolExecutor
+- pipeline/orchestrator.py의 다단계 선택·Context·Agent 실행 제어
+- pipeline/pipeline_adapter.py의 Agent factory 기반 PipelineAdapter
+- benchmark/runner.py의 Baseline 시나리오 실행과 JSONL/summary 출력
 - benchmark/evaluator.py의 snapshot 평가와 집계
+- tests/test_baseline_context_agent_integration.py와 tests/test_pipeline.py의 경계·파이프라인 테스트
 
 스켈레톤 또는 미구현
-- Query Analyzer, General Retrieval
-- Version/Temporal Resolution, Utility 및 Flexible Selection
-- Agent planner/run_task/act, benchmark generator
+- Proposed Query Analyzer와 General Retrieval
+- Proposed Version/Temporal Resolution 및 Mandatory/Flexible Selection
+- benchmark generator, 실제 LLM planner와 모델별 tokenizer/provider adapter
 ```
 
 ---
@@ -2375,6 +2385,17 @@ Context Builder
 
 Agent
 → 완성된 Context만 보고 행동한다.
+
+Orchestrator
+→ 매 단계 선택과 Context 조립을 다시 실행한다.
+→ Tool Interaction을 다음 Context의 feedback으로 제공한다.
+→ 예산 실패, Tool 실패, 목표 완료 또는 max_steps에서 중단한다.
+
+PipelineAdapter
+→ 실행마다 새 Agent와 Orchestrator를 만들어 전략·반복 간 상태를 격리한다.
+
+Benchmark Runner
+→ Baseline 전략별 실행 결과를 Evaluator에 넘기고 runs.jsonl과 summary.json을 기록한다.
 
 Evaluator
 → Retrieval, Selection, Action Failure를 분리해 평가한다.
