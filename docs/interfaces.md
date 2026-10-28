@@ -1423,14 +1423,15 @@ INSUFFICIENT_CONTEXT_BUDGET
 담당 영역:
 
 ```text
-Context Builder의 context
-        ↓
-Planner / Agent
-        ↓
-Tool Executor
-        ↓
-Interaction        AgentRunResult
-(Memory Analyzer)  (Evaluator)
+Context Builder의 context ◄──────────────┐
+        ↓                                │
+Planner / Agent                          │
+        ↓                                │
+Tool Executor                            │
+        ↓                                │
+Interaction ─► Memory Analyzer / Store ──┘  (stopped_reason = tool_called)
+        │
+AgentRunResult ─► Evaluator
 ```
 
 역할:
@@ -1438,9 +1439,12 @@ Interaction        AgentRunResult
 ```text
 완성된 Context로 다음 행동 하나를 결정한다.
 Tool Executor에 ToolCall을 넘기고 ToolResult를 받는다.
+툴을 실행하면 Interaction을 돌려주고 멈춘다.
 Memory Analyzer에는 Interaction만 넘긴다.
 Evaluator에는 AgentRunResult를 넘긴다.
 ```
+
+한 번 호출에 행동은 하나다. 툴을 실행했으면 Memory 쪽이 그 `Interaction`을 정리하고, Context Builder가 예산 안에서 다시 조립한 context로 Agent를 다시 부른다. Agent는 툴 결과를 context 뒤에 붙이지 않는다. 다시 부르는 반복과 최대 반복 횟수는 Agent 밖에서 정한다.
 
 Agent가 다른 모듈과 주고받는 값은 아래 입력과 출력뿐이다. 기억 선택, 프롬프트 조립, 토큰 계산, 예산 검사는 Selector와 Context Builder의 Interface에 남긴다.
 
@@ -1482,6 +1486,12 @@ class AgentAction:
 
 ```python
 class Planner:
+    def __init__(
+        self,
+        recipient_aliases: Mapping[str, str] | None = None,
+    ) -> None:
+        ...
+
     def plan(self, context: str) -> AgentAction:
         ...
 ```
@@ -1499,6 +1509,18 @@ AgentAction
 ```
 
 툴 실행은 Planner의 출력이 아니다. `Agent`가 이 `AgentAction`을 `ToolCall`로 바꾸어 Tool Executor에 넘긴다.
+
+LLM이 정해지기 전의 `Planner`는 결정적 규칙으로 행동을 고른다. 같은 `context`에는 같은 `AgentAction`을 돌려준다. 읽는 섹션은 `[PROTECTED CONSTRAINTS]`, `[STATE]`, `[RELEVANT MEMORY]`, `[CURRENT TASK]`다.
+
+이전 툴 결과는 `Interaction.content`와 같은 형식의 줄이면 어느 섹션에 있든 읽는다. 다시 조립한 context에 이 줄이 없으면 Planner는 같은 툴을 다시 고를 수 있다.
+
+```text
+email.request_approval success=true output={"approval_id": "approval_001", ...}
+```
+
+`recipient_aliases`는 과제의 호칭을 메일 주소로 바꾸는 표다. 예: `{"교수님": "professor@example.test"}`. 과제와 State에 주소가 없고 표에도 없으면 메일 툴을 호출하지 않고 텍스트로 끝낸다.
+
+승인 제약이 적용되면 `request_approval`을 고른다. 이전 결과가 `pending`이면 `send_email`을 고르지 않고 텍스트로 끝낸다. Context에 승인된 번호가 있을 때만 그 번호로 `send_email`을 고른다.
 
 ---
 
@@ -1520,7 +1542,7 @@ class Agent:
         planner: Planner | None = None,
         goal_checker: GoalChecker | None = None,
         current_turn: int = 0,
-        max_steps: int = 8,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         ...
 
@@ -1529,7 +1551,7 @@ class Agent:
 
     def run_task(
         self,
-        task: str,
+        context: str,
         session_id: str,
     ) -> AgentRunResult:
         ...
@@ -1545,7 +1567,9 @@ class Agent:
 
 `plan`의 입력은 `Planner.plan`의 입력과 같다. `Agent.plan`은 그 문자열을 Planner에 그대로 넘긴다.
 
-`max_steps`는 1 이상이다.
+`act`는 `plan` 한 번과 툴 실행 한 번을 한다. `run_task`는 `act`를 한 번 부르고 `goal_completed`를 채운다.
+
+`current_turn`은 다음 `Interaction`의 기준 차례다. 툴을 실행하면 만든 `Interaction` 수만큼 올라간다. `clock`은 `Interaction.timestamp`를 정한다. 넘기지 않으면 현재 UTC 시각이다.
 
 ## Input
 
@@ -1558,11 +1582,11 @@ act
   session_id: str
 
 run_task
-  task: str
+  context: str
   session_id: str
 ```
 
-`context`는 Context Builder가 확정한 최종 문자열이다. `task`는 이번 실행의 과제다.
+`context`는 Context Builder가 확정한 최종 문자열이다. 두 번째 호출부터는 이전 `Interaction`을 반영해 다시 조립한 문자열이다.
 
 ## Output
 
@@ -1572,7 +1596,15 @@ act      → ActResult
 run_task → AgentRunResult
 ```
 
-`goal_completed`는 `run_task` 출력의 한 칸이다. `goal_checker`가 있으면 응답, `ToolCall`, `ToolResult`를 받아 그 칸을 채운다. 툴을 호출했다는 사실 자체가 이 값의 참은 아니다. Evaluator는 이 값을 과제 성공의 한 조건으로 읽고, 선택 결과와 행동 평가는 Evaluator Interface에서 따로 한다.
+`stopped_reason`은 다음 중 하나다.
+
+```text
+completed     텍스트 응답으로 끝남. 다시 부르지 않는다.
+tool_called   툴을 실행함. Interaction을 반영해 다시 조립한 context로 다시 부른다.
+tool_failure  툴이 실패했거나, tool_name과 action 중 하나만 있음.
+```
+
+`goal_completed`는 `run_task` 출력의 한 칸이다. `stopped_reason`이 `completed`이고 `goal_checker`가 응답, `ToolCall`, `ToolResult`를 보고 참을 돌려줄 때만 True다. checker가 없으면 False다. 툴을 호출했다는 사실 자체가 이 값의 참은 아니다. Evaluator는 이 값을 과제 성공의 한 조건으로 읽고, 선택 결과와 행동 평가는 Evaluator Interface에서 따로 한다.
 
 ---
 
@@ -1590,7 +1622,7 @@ class ActResult:
     interactions: tuple[Interaction, ...]
 ```
 
-`tool_calls`는 Tool Executor에 넘긴 호출이다. `tool_results`는 Tool Executor가 돌려준 결과다. `interactions`는 같은 결과를 Memory Analyzer 입력으로 바꾼 값이다.
+`tool_calls`는 Tool Executor에 넘긴 호출이다. `tool_results`는 Tool Executor가 돌려준 결과다. `interactions`는 같은 결과를 Memory Analyzer 입력으로 바꾼 값이다. 한 번 호출에 툴은 많아야 하나이므로 세 칸은 비어 있거나 원소가 하나다.
 
 ---
 
@@ -1642,7 +1674,9 @@ timestamp
 tuple[Interaction, ...]
 ```
 
-저장은 Memory Store Interface의 `insert`가 담당한다. 이 함수의 출력은 `Interaction`까지다.
+n번째 결과의 `turn_id`는 `turn_id + n`이다. Agent는 `current_turn`과 `clock()`을 넘긴다. `content`는 Planner 절의 툴 결과 줄과 같은 형식이다.
+
+저장은 Memory Store Interface의 `insert`가 담당한다. 이 함수의 출력은 `Interaction`까지다. `Interaction`에서 기억을 추출하고 정리하는 일은 Memory Analyzer가 맡는다.
 
 ---
 
