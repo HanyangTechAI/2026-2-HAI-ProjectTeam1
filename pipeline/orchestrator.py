@@ -20,7 +20,7 @@ GoalChecker = Callable[
     [
         str | None,
         tuple[ToolCall, ...],
-        tuple[ToolCall, ...],
+        tuple[ToolResult, ...],
     ],
     bool,
 ]
