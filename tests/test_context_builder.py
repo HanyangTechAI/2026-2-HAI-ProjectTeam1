@@ -560,6 +560,108 @@ class ContextBuilderTests(unittest.TestCase):
                 selection(),
                 total_budget=-1,
             )
+    
+    def test_same_memories_produce_same_context_across_policies(self):
+        """
+        Baseline과 Proposed가 동일한 Memory를 선택했으면
+        Context 형식도 같아야 한다.
+        """
+
+        proposed = selection(
+            protected=(self.protected,),
+            states=(self.state,),
+        )
+
+        baseline = selection(
+            flexible=(
+                self.protected,
+                self.state,
+            ),
+        )
+
+        proposed_result = build_context(
+            SYSTEM_PROMPT,
+            TOOL_DEFINITIONS,
+            QUERY,
+            proposed,
+            total_budget=1000,
+        )
+
+        baseline_result = build_context(
+            SYSTEM_PROMPT,
+            TOOL_DEFINITIONS,
+            QUERY,
+            baseline,
+            total_budget=1000,
+        )
+
+        self.assertEqual(
+            proposed_result.status,
+            PipelineStatus.OK,
+        )
+
+        self.assertEqual(
+            baseline_result.status,
+            PipelineStatus.OK,
+        )
+
+        self.assertEqual(
+            proposed_result.context,
+            baseline_result.context,
+        )
+
+        self.assertEqual(
+            proposed_result.total_input_tokens,
+            baseline_result.total_input_tokens,
+        )
+
+        self.assertEqual(
+            proposed_result.selected_memory_ids,
+            baseline_result.selected_memory_ids,
+        )
+
+
+    def test_baseline_protected_memory_remains_droppable(self):
+        """
+        Baseline에서 선택된 Protected Constraint가
+        표시상 PROTECTED 섹션에 들어갔다고 해서
+        Mandatory가 되어서는 안 된다.
+        """
+
+        baseline = selection(
+            flexible=(self.protected,),
+        )
+
+        fixed_only = build_context(
+            SYSTEM_PROMPT,
+            TOOL_DEFINITIONS,
+            QUERY,
+            selection(),
+            total_budget=1000,
+        )
+
+        result = build_context(
+            SYSTEM_PROMPT,
+            TOOL_DEFINITIONS,
+            QUERY,
+            baseline,
+            total_budget=fixed_only.total_input_tokens,
+        )
+
+        self.assertEqual(result.status, PipelineStatus.OK)
+
+        self.assertEqual(
+            result.dropped_flexible_ids,
+            (self.protected.memory_id,),
+        )
+
+        self.assertEqual(
+            result.selected_memory_ids,
+            (),
+        )
+
+        self.assertEqual(result.context, fixed_only.context)
+
 
 
 if __name__ == "__main__":

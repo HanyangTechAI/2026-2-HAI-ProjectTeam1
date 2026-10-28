@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from memory.schema import MemoryItem
+from memory.schema import MemoryItem, MemoryType
 from memory.selector import PipelineStatus, SelectionResult
 
 from .tokenizer import provisional_token_count, TokenCounter, count_tokens
@@ -45,6 +45,34 @@ def fixed_context_tokens(
     return count_tokens(context, counter)
 
 
+def _group_for_display(
+    protected: Sequence[MemoryItem],
+    states: Sequence[MemoryItem],
+    flexible: Sequence[MemoryItem],
+) -> tuple[
+    list[MemoryItem],
+    list[MemoryItem],
+    list[MemoryItem],
+]:
+    display_protected = list(protected)
+    display_states = list(states)
+    display_flexible = []
+    
+    for memory in flexible:
+        if memory.memory_type == MemoryType.CONSTRAINT and memory.is_protected and memory.is_active:
+            display_protected.append(memory)
+        elif memory.memory_type == MemoryType.STATE:
+            display_states.append(memory)
+        else:
+            display_flexible.append(memory)
+            
+    return (
+        display_protected,
+        display_states,
+        display_flexible,
+    )
+
+
 def build_context(
     system_prompt: str,
     tool_definitions: str,
@@ -72,13 +100,15 @@ def build_context(
     dropped_flexible_ids: list[str] = []
     
     while True:
+        (display_protected, display_states, display_flexible) = _group_for_display(protected, states, flexible)
+        
         context = _assemble_context(
             system_prompt=system_prompt,
             tool_definitions=tool_definitions,
             query=query,
-            protected=protected,
-            states=states,
-            flexible=flexible,
+            protected=display_protected,
+            states=display_states,
+            flexible=display_flexible,
         )
         
         total_tokens = count_tokens(context, counter)
@@ -86,23 +116,25 @@ def build_context(
         if total_tokens <= total_budget:
             protected_tokens = _section_token_count(
                 "PROTECTED CONSTRAINTS", 
-                protected, 
+                display_protected, 
                 counter,
             )
             state_tokens = _section_token_count(
                 "STATE", 
-                states, 
+                display_states, 
                 counter,
             )
             flexible_tokens = _section_token_count(
                 "RELEVANT MEMORY", 
-                flexible,
+                display_flexible,
                 counter,
             )
             
+            displayed_memories = display_protected + display_states + display_flexible
+            
             selected_memory_ids = tuple(
                 memory.memory_id
-                for memory in protected + states + flexible
+                for memory in displayed_memories
             )
             
             return ContextBuildResult(
@@ -124,12 +156,12 @@ def build_context(
         
         protected_tokens = _section_token_count(
             "PROTECTED CONSTRAINTS", 
-            protected, 
+            display_protected, 
             counter,
         )
         state_tokens = _section_token_count(
             "STATE", 
-            states, 
+            display_states, 
             counter,
         )
         
