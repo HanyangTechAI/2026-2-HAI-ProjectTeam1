@@ -16,7 +16,7 @@ from pipeline.orchestrator import GoalChecker, Orchestrator, PipelineRunResult, 
 AgentFactory = Callable[[], Agent]
 
 
-class PipelineAdaterProtocal(Protocol):
+class PipelineAdapterProtocol(Protocol):
     def __call__(
         self,
         *,
@@ -30,6 +30,7 @@ class PipelineAdaterProtocal(Protocol):
         
 
 class PipelineAdapter:
+    """실행마다 새 Agent를 만들어 입력 스냅샷을 Orchestrator에 전달한다."""
     def __init__(
         self,
         *,
@@ -41,7 +42,7 @@ class PipelineAdapter:
         max_steps: int = 8,
         goal_checker: GoalChecker | None = None,
     ) -> None:
-        if not Callable(policy):
+        if not callable(policy):
             raise TypeError("policy must be callable")
         
         if not callable(agent_factory):
@@ -80,7 +81,7 @@ class PipelineAdapter:
         memories: Sequence[MemoryItem],
         total_budget: int,
         current_turn: int,  
-    ):
+    ) -> PipelineRunResult:
         agent = self.agent_factory()
         
         if not isinstance(agent, Agent):
@@ -109,7 +110,7 @@ def make_baseline_pipeline_adapter(
     strategy: str,
     *,
     system_prompt: str,
-    tool_defnitions: str,
+    tool_definitions: str,
     agent_factory: AgentFactory = Agent,
     embedder: Embedder | None = None,
     top_k: int = 20,
@@ -118,6 +119,7 @@ def make_baseline_pipeline_adapter(
     max_steps: int = 8,
     goal_checker: GoalChecker | None = None,
 ) -> PipelineAdapter:
+    """전략 이름을 공통 선택 정책으로 바꾸어 실행 adapter를 구성한다."""
     policy = make_baseline_policy(
         strategy,
         embedder=embedder,
@@ -128,7 +130,7 @@ def make_baseline_pipeline_adapter(
     return PipelineAdapter(
         policy=policy,
         system_prompt=system_prompt,
-        tool_definitions=tool_defnitions,
+        tool_definitions=tool_definitions,
         agent_factory=agent_factory,
         token_counter=token_counter,
         max_steps=max_steps,

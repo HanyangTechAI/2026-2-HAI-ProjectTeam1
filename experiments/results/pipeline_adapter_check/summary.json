@@ -1,0 +1,407 @@
+[
+  {
+    "strategy": "sliding_window",
+    "context_token_budget": 1000,
+    "n_runs": 1,
+    "n_samples": 1,
+    "metrics": {
+      "task_success": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "constraint_violation_rate": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "required_state_accuracy": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "general_retrieval_miss": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "selection_failure": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "temporal_version_correct": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "recall_at_k": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "state_omission_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "precision_at_k": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "mrr": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "input_tokens": {
+        "mean": 29.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "output_tokens": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "planning_latency_ms": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "total_latency_ms": {
+        "mean": 0.31925004441291094,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "total_llm_cost": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      }
+    },
+    "failure_counts": {}
+  },
+  {
+    "strategy": "vector_top_k",
+    "context_token_budget": 1000,
+    "n_runs": 1,
+    "n_samples": 1,
+    "metrics": {
+      "task_success": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "constraint_violation_rate": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "required_state_accuracy": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "general_retrieval_miss": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "selection_failure": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "temporal_version_correct": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "recall_at_k": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "state_omission_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "precision_at_k": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "mrr": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "input_tokens": {
+        "mean": 29.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "output_tokens": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "planning_latency_ms": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "total_latency_ms": {
+        "mean": 0.23633299861103296,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "total_llm_cost": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      }
+    },
+    "failure_counts": {}
+  },
+  {
+    "strategy": "utility_per_token",
+    "context_token_budget": 1000,
+    "n_runs": 1,
+    "n_samples": 1,
+    "metrics": {
+      "task_success": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "constraint_violation_rate": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "required_state_accuracy": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "general_retrieval_miss": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "selection_failure": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "temporal_version_correct": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "recall_at_k": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "state_omission_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "precision_at_k": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "mrr": {
+        "mean": 1.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "input_tokens": {
+        "mean": 29.0,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "output_tokens": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "planning_latency_ms": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "total_latency_ms": {
+        "mean": 0.21079200087115169,
+        "ci95": null,
+        "n": 1,
+        "n_samples": 1
+      },
+      "total_llm_cost": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      }
+    },
+    "failure_counts": {}
+  }
+]

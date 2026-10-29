@@ -1,4 +1,4 @@
-"""스냅샷 시나리오를 baseline, Context Builder, 평가기로 연결해 실행한다.
+"""스냅샷 시나리오를 PipelineAdapter로 실행한 뒤 평가하고 저장한다.
 
 사용법: python -m benchmark.runner --help
 시나리오 정답과 고정된 검색·토큰 fixture는 전략이나 Agent에 전달하지 않는다.
@@ -16,29 +16,20 @@ import importlib
 import json
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Protocol
+from typing import Any
 
-from agent.agent import AgentRunResult
 from agent.evaluation import scenario_with_granted_approvals
-from agent.tools.types import ToolResult
-from context.builder import build_context, fixed_context_tokens
 from context.tokenizer import TokenCounter, count_tokens, provisional_token_count
-from memory.baselines import Embedder, sliding_window, utility_per_token, vector_top_k
+from memory.baselines import Embedder
 from memory.schema import MemoryItem
-from memory.selector import PipelineStatus, SelectionResult
+from memory.selector import PipelineStatus
+from pipeline.orchestrator import GoalChecker, PipelineRunResult
+from pipeline.pipeline_adapter import AgentFactory, make_baseline_pipeline_adapter
 
 from .evaluator import aggregate_results, evaluate
 
 
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token")
-
-
-class AgentAdapter(Protocol):
-    def __call__(
-        self, context: str, *, session_id: str,
-    ) -> AgentRunResult | Mapping[str, Any]:
-        """조립된 Context로 실행하고 실제 행동과 결과를 반환한다."""
-        ...
 
 
 def _json_record(value: Any) -> Any:
@@ -55,124 +46,92 @@ def _json_record(value: Any) -> Any:
     return value
 
 
-def _select(
-    strategy: str, scenario: Mapping[str, Any], memories: Sequence[MemoryItem],
-    fixed_tokens: int, embedder: Embedder | None, top_k: int,
-    utility_weights: tuple[float, float, float],
-) -> SelectionResult:
-    options = dict(
-        session_id=scenario["session_id"],
-        total_budget=scenario["context_budget"],
-        fixed_tokens=fixed_tokens,
-        current_turn=scenario["current_turn"],
-    )
-    if strategy == "sliding_window":
-        return sliding_window(memories, **options)
-    if embedder is None:
-        raise ValueError(f"{strategy} requires an embedding function")
-    if strategy == "vector_top_k":
-        return vector_top_k(
-            scenario["query"], memories, embedder=embedder, top_k=top_k, **options,
-        )
-    return utility_per_token(
-        scenario["query"], memories, embedder=embedder, top_k=top_k,
-        weights=utility_weights, **options,
-    )
-
-
 def _run_one(
     scenario: Mapping[str, Any], strategy: str, repeat_id: int, *,
-    agent_factory: Callable[[], AgentAdapter], embedder: Embedder | None,
+    agent_factory: AgentFactory, embedder: Embedder | None,
     system_prompt: str, tool_definitions: str, token_counter: TokenCounter,
     token_count_mode: str, top_k: int,
     utility_weights: tuple[float, float, float],
+    max_steps: int, goal_checker: GoalChecker | None,
 ) -> dict[str, Any]:
     start = perf_counter()
-    # Store에 삽입하면 버전 관계가 다시 생성되므로 스냅샷을 직접 복원한다.
-    # fixture의 비용은 이번 실행에 사용하는 TokenCounter의 측정값으로 대체한다.
-    memories = [MemoryItem.from_dict(item) for item in scenario["memory_snapshot"]]
-    memories = [replace(memory, token_count=count_tokens(memory.content, token_counter))
-                for memory in memories
-                if memory.session_id == scenario["session_id"]
-                and memory.turn_id <= scenario["current_turn"]]
-    fixed_tokens = fixed_context_tokens(
-        system_prompt, tool_definitions, scenario["query"], token_counter,
+    # Store에 재삽입하지 않고 기존 버전 관계를 유지한 채 스냅샷을 복원한다.
+    memories = tuple(MemoryItem.from_dict(item) for item in scenario["memory_snapshot"])
+    memories = tuple(memory for memory in memories
+                     if memory.session_id == scenario["session_id"]
+                     and memory.turn_id <= scenario["current_turn"])
+    adapter = make_baseline_pipeline_adapter(
+        strategy,
+        system_prompt=system_prompt,
+        tool_definitions=tool_definitions,
+        agent_factory=agent_factory,
+        embedder=embedder,
+        top_k=top_k,
+        utility_weights=utility_weights,
+        token_counter=token_counter,
+        max_steps=max_steps,
+        goal_checker=goal_checker,
     )
-    selection = _select(
-        strategy, scenario, memories, fixed_tokens, embedder, top_k, utility_weights,
+    # policy는 adapter 생성 시 지정하고, 나머지 실행 입력은 Orchestrator.run으로 전달한다.
+    outcome = adapter(
+        query=scenario["query"],
+        session_id=scenario["session_id"],
+        memories=memories,
+        total_budget=scenario["context_budget"],
+        current_turn=scenario["current_turn"],
     )
-    if not isinstance(selection, SelectionResult):
-        raise TypeError("strategy must return memory.selector.SelectionResult")
-    context = build_context(
-        system_prompt, tool_definitions, scenario["query"], selection,
-        scenario["context_budget"], token_counter,
-    )
-    run: dict[str, Any] = dict(
-        status=context.status.value,
+    if not isinstance(outcome, PipelineRunResult):
+        raise TypeError("pipeline adapter must return PipelineRunResult")
+    if not outcome.steps:
+        raise ValueError("pipeline result must contain at least one step")
+    final_step = outcome.steps[-1]
+    selection = final_step.selection_result
+    context = final_step.context_result
+    # 누적 입력량은 단일 Context 예산과 비교하지 않는다. 정상 실행의 input_tokens에는
+    # 실제 Agent에 전달된 단계별 입력량의 최댓값을 기록하고 누적량은 별도로 보존한다.
+    delivered = [step.context_result.total_input_tokens for step in outcome.steps
+                 if step.action_result is not None]
+    if outcome.status == PipelineStatus.OK:
+        input_tokens = max(delivered, default=0)
+    elif outcome.status == PipelineStatus.INVALID_BUDGET_CONFIGURATION:
+        input_tokens = None
+    else:
+        input_tokens = context.total_input_tokens
+    run = _json_record(outcome)
+    run.update(
         selection_result=_json_record(selection),
         context_result=_json_record(context),
         token_count_mode=token_count_mode,
-        strategy_options=dict(top_k=top_k, utility_weights=list(utility_weights)),
-        retrieved_memories=[memory.to_dict() for mid in selection.retrieved_memory_ids
-                            for memory in memories if memory.memory_id == mid],
-        response=None, goal_completed=False, tool_calls=[], tool_results=[],
-        usage=dict(fixed_input_tokens=fixed_tokens, input_tokens=None, output_tokens=None),
+        strategy_options=dict(top_k=top_k, utility_weights=list(utility_weights), max_steps=max_steps),
+        retrieved_memories=[
+            replace(memory, token_count=count_tokens(memory.content, token_counter)).to_dict()
+            for mid in selection.retrieved_memory_ids
+            for memory in memories if memory.memory_id == mid
+        ],
+        usage=dict(
+            fixed_input_tokens=final_step.fixed_tokens,
+            input_tokens=input_tokens,
+            total_input_tokens=outcome.total_input_tokens,
+            output_tokens=None,
+        ),
         planning_latency_ms=None, total_llm_cost=None,
-        agent_executed=False, stopped_reason=context.status.value,
+        agent_executed=outcome.agent_executed,
     )
-    final_ids = set(context.selected_memory_ids) if context.status == PipelineStatus.OK else set()
+    final_ids = set(context.selected_memory_ids) if outcome.status == PipelineStatus.OK else set()
     run["context_result"]["memory_tokens"] = sum(
-        memory.token_count for memory in selection.flexible if memory.memory_id in final_ids
+        memory.token_count
+        for memory in selection.protected + selection.states + selection.flexible
+        if memory.memory_id in final_ids
     )
-    # 이 baseline들은 버전·적용 여부에 따른 후보 확장을 하지 않으므로
-    # 예산 적용 전의 전체 후보를 알 수 있다. Sliding의 제외 목록에는
-    # 연속 구간을 유지하는 예산 정책에 따라 제외한 나머지 항목도 포함된다.
+    # 평가기에는 최종 선택을 전달하고, 중간 선택·Context·행동은 steps에 모두 보존한다.
     if selection.status == PipelineStatus.OK:
         run["selection_trace"] = dict(
             candidate_memory_ids=list(selection.selected_memory_ids + selection.rejected_memory_ids),
             budget_rejected_memory_ids=list(selection.rejected_memory_ids),
         )
-    if context.status == PipelineStatus.OK:
-        # 실행마다 새 adapter를 만들어 전략·반복 사이에 planner와 Tool 상태가 섞이지 않게 한다.
-        adapter = agent_factory()
-        if not callable(adapter):
-            raise TypeError("agent_factory must return a callable agent adapter")
-        agent_start = perf_counter()
-        outcome = _json_record(adapter(context.context, session_id=scenario["session_id"]))
-        agent_ms = (perf_counter() - agent_start) * 1000
-        if not isinstance(outcome, dict):
-            raise TypeError("agent adapter must return AgentRunResult or a mapping")
-        if "goal_completed" not in outcome and scenario.get("expected_answers") is None:
-            raise ValueError("action-task adapter must explicitly report goal_completed")
-        if "goal_completed" in outcome and type(outcome["goal_completed"]) is not bool:
-            raise TypeError("goal_completed must be a boolean")
-        run.update(
-            response=outcome.get("response"), goal_completed=outcome.get("goal_completed"),
-            tool_calls=outcome.get("tool_calls", []),
-            tool_results=outcome.get("tool_results", []),
-            stopped_reason=outcome.get("stopped_reason", "completed"),
-            planning_latency_ms=outcome.get("planning_latency_ms"),
-            agent_latency_ms=agent_ms,
-            total_llm_cost=outcome.get("total_llm_cost"), agent_executed=True,
-        )
-        usage = outcome.get("usage") or {}
-        # API 토큰 수에는 조립된 문자열에 없는 모델별 형식 비용이 포함될 수 있다.
-        # 누락된 출력 토큰 수나 비용을 추정값으로 채우지 않는다.
-        run["usage"].update(
-            input_tokens=usage.get("input_tokens", context.total_input_tokens),
-            output_tokens=usage.get("output_tokens"),
-        )
-        if "total_input_tokens" in usage:
-            run["usage"]["total_input_tokens"] = usage["total_input_tokens"]
-    elif selection.status == PipelineStatus.OK:
-        # Agent를 호출하지 않았더라도 예산을 초과한 측정값을 기록한다.
-        run["usage"]["input_tokens"] = context.total_input_tokens
     run["total_latency_ms"] = (perf_counter() - start) * 1000
-
-    # 대기 중인 승인 요청은 발송 권한을 부여하지 않는다. 기존 adapter 보조 함수를
-    # 재사용하고, 실제 평가에 사용한 스냅샷을 JSONL에 보존한다.
-    tool_results = [ToolResult(**item) for item in run["tool_results"]]
-    evaluation_scenario = scenario_with_granted_approvals(scenario, tool_results)
+    # 대기 중인 승인 요청을 유효한 승인으로 평가하지 않도록 기존 보조 함수를 사용한다.
+    evaluation_scenario = scenario_with_granted_approvals(scenario, outcome.tool_results)
     evaluation = evaluate(
         evaluation_scenario, run, strategy=strategy, repeat_id=repeat_id, k=top_k,
     )
@@ -184,7 +143,7 @@ def _run_one(
 
 def run_scenarios(
     scenarios: Sequence[Mapping[str, Any]], *,
-    agent_factory: Callable[[], AgentAdapter],
+    agent_factory: AgentFactory,
     system_prompt: str,
     tool_definitions: str,
     output_directory: str | Path,
@@ -196,6 +155,8 @@ def run_scenarios(
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
     bootstrap_iterations: int = 2000,
     seed: int = 42,
+    max_steps: int = 8,
+    goal_checker: GoalChecker | None = None,
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
@@ -204,7 +165,13 @@ def run_scenarios(
     출력 파일을 덮어쓴다. 오류를 성공 결과로 바꾸지 않고 예외로 전달한다.
     미지원 시나리오와 모듈 전용 시나리오는 TSR 표본에 포함하지 않는다.
     기본 공백 기준 TokenCounter는 임시 측정이며 실제 모델 토큰 사용량이 아니다.
+    agent_factory는 실행마다 새 Agent를 반환해야 한다. 다단계 선택·Context 조립·
+    행동 실행은 Orchestrator에 맡기고 단계별 기록과 누적 입력량을 결과에 보존한다.
     """
+    if type(max_steps) is not int or max_steps < 1:
+        raise ValueError("max_steps must be a positive integer")
+    if goal_checker is not None and not callable(goal_checker):
+        raise TypeError("goal_checker must be callable")
     strategies = tuple(strategies)
     if not strategies or len(set(strategies)) != len(strategies) or any(
         strategy not in STRATEGIES for strategy in strategies
@@ -234,7 +201,7 @@ def run_scenarios(
             scenario, strategy, repeat_id, agent_factory=agent_factory,
             embedder=embedder, system_prompt=system_prompt, tool_definitions=tool_definitions,
             token_counter=token_counter, token_count_mode=mode, top_k=top_k,
-            utility_weights=utility_weights,
+            utility_weights=utility_weights, max_steps=max_steps, goal_checker=goal_checker,
         )
         for scenario in enabled for strategy in strategies for repeat_id in range(repeats)
     ]
@@ -264,12 +231,12 @@ def _import_callable(spec: str) -> Callable:
     return value
 
 
-def ㅣmain() -> None:
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenarios", default="benchmark/scenarios.json")
     parser.add_argument("--scenario-ids", nargs="+")
     parser.add_argument("--strategies", nargs="+", choices=STRATEGIES, default=STRATEGIES)
-    parser.add_argument("--agent-factory", required=True, help="module:function returning a fresh callable adapter")
+    parser.add_argument("--agent-factory", required=True, help="module:function returning a fresh Agent instance")
     parser.add_argument("--embedder", help="module:function taking text and returning a numeric vector")
     parser.add_argument("--token-counter", help="module:function taking text and returning token count")
     parser.add_argument("--system-prompt-file", required=True)
@@ -277,6 +244,7 @@ def ㅣmain() -> None:
     parser.add_argument("--output", default="experiments/results/baselines")
     parser.add_argument("--top-k", type=int, default=20)
     parser.add_argument("--repeats", type=int, default=1)
+    parser.add_argument("--max-steps", type=int, default=8)
     parser.add_argument("--utility-weights", type=float, nargs=3, default=(0.6, 0.3, 0.1))
     parser.add_argument("--bootstrap-iterations", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
@@ -302,7 +270,7 @@ def ㅣmain() -> None:
         embedder=_import_callable(args.embedder) if args.embedder else None,
         token_counter=_import_callable(args.token_counter) if args.token_counter else provisional_token_count,
         top_k=args.top_k, repeats=args.repeats, utility_weights=tuple(args.utility_weights),
-        bootstrap_iterations=args.bootstrap_iterations, seed=args.seed,
+        bootstrap_iterations=args.bootstrap_iterations, seed=args.seed, max_steps=args.max_steps,
     )
     print(json.dumps(result, ensure_ascii=False))
 
