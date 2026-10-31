@@ -12,7 +12,7 @@ fixture로 대체하지 않으며, 두 전략에 동일한 embedding 모델 함�
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import replace
 import math
 
@@ -20,9 +20,7 @@ from context.tokenizer import TokenCounter, count_tokens
 
 from .schema import MemoryItem
 from .selector import PipelineStatus, SelectionResult
-
-
-Embedder = Callable[[str], Sequence[float]]
+from .retrieval import Embedder, RetrievalHit, semantic_retrieve
 
 
 def _nonnegative_int(name: str, value: int) -> None:
@@ -47,6 +45,8 @@ def _prepare(
     available: list[MemoryItem] = []
     seen: set[str] = set()
     for memory in memories:
+        if not isinstance(memory, MemoryItem):
+            raise TypeError("memories must contain MemoryItem objects")
         if memory.session_id != session_id:
             continue
         if current_turn is not None and memory.turn_id > current_turn:
@@ -57,7 +57,8 @@ def _prepare(
         if token_counter is not None:
             memory = replace(memory, token_count=count_tokens(memory.content, token_counter))
         available.append(memory)
-    return available, total_budget - fixed_tokens
+    memory_budget = total_budget - fixed_tokens
+    return available, memory_budget
 
 
 def _pack(
@@ -76,7 +77,8 @@ def _pack(
     for memory in ranked:
         if stopped or memory.token_count > remaining:
             rejected.append(memory.memory_id)
-            stopped = contiguous
+            if contiguous:
+                stopped = True
             continue
         selected.append(memory)
         remaining -= memory.token_count
@@ -118,47 +120,6 @@ def sliding_window(
     return _pack(available, budget, contiguous=True)
 
 
-def _vector(text: str, embedder: Embedder) -> tuple[float, ...]:
-    values = tuple(embedder(text))
-    if not values or any(
-        isinstance(value, bool) or not isinstance(value, (int, float))
-        or not math.isfinite(value) for value in values
-    ):
-        raise ValueError("embeddings must be non-empty finite numeric vectors")
-    norm = math.hypot(*values)
-    if not math.isfinite(norm):
-        raise ValueError("embedding norm must be finite")
-    # 영벡터는 모든 벡터와의 유사도를 0으로 처리한다.
-    return tuple(value / norm for value in values) if norm else values
-
-
-def _retrieve(
-    query: str,
-    memories: Sequence[MemoryItem],
-    embedder: Embedder,
-    top_k: int,
-) -> list[tuple[MemoryItem, float]]:
-    if not memories:
-        return []
-    query_vector = _vector(query, embedder)
-    scored: list[tuple[MemoryItem, float]] = []
-    for memory in memories:
-        vector = _vector(memory.content, embedder)
-        if len(vector) != len(query_vector):
-            raise ValueError("query and memory embedding dimensions must match")
-        score = sum(left * right for left, right in zip(query_vector, vector))
-        scored.append((memory, max(-1.0, min(1.0, score))))
-    scored.sort(key=lambda item: (-item[1], item[0].memory_id))
-    return scored[:top_k]
-
-
-def _validate_retrieval(query: str, top_k: int) -> None:
-    if not isinstance(query, str):
-        raise TypeError("query must be a string")
-    if type(top_k) is not int or top_k <= 0:
-        raise ValueError("top_k must be a positive integer")
-
-
 def vector_top_k(
     query: str,
     memories: Sequence[MemoryItem],
@@ -176,16 +137,15 @@ def vector_top_k(
     예산보다 큰 항목은 건너뛴다. 검색 ID에는 예산 때문에 제외한 항목도 포함하며,
     최초 Top-K 순서를 유지한다. 유사도가 같으면 memory_id 오름차순으로 정렬한다.
     """
-    _validate_retrieval(query, top_k)
     available, budget = _prepare(
         memories, session_id, total_budget, fixed_tokens, current_turn, token_counter,
     )
     if budget < 0:
         return _pack((), budget)
-    retrieved = _retrieve(query, available, embedder, top_k)
+    hits = semantic_retrieve(query=query, memories=available, embedder=embedder, top_k=top_k)
     return _pack(
-        [memory for memory, _ in retrieved], budget,
-        retrieved=tuple(memory.memory_id for memory, _ in retrieved),
+        [hit.memory for hit in hits], budget,
+        retrieved=tuple(hit.memory.memory_id for hit in hits),
     )
 
 
@@ -211,32 +171,39 @@ def utility_per_token(
     최초 검색 순서를 따른다. 토큰 수가 0인 기억은 예산을 소비하지 않지만
     순위 계산에서는 분모를 1로 처리한다. 버전 확장이나 보호 검색은 수행하지 않는다.
     """
-    _validate_retrieval(query, top_k)
     _nonnegative_int("current_turn", current_turn)
     if len(weights) != 3 or any(
         isinstance(weight, bool) or not isinstance(weight, (int, float))
         or not math.isfinite(weight) or weight < 0 for weight in weights
-    ) or not math.isfinite(sum(weights)) or sum(weights) <= 0:
+    ) or sum(weights) <= 0:
         raise ValueError("weights must contain three finite non-negative values with positive sum")
     available, budget = _prepare(
         memories, session_id, total_budget, fixed_tokens, current_turn, token_counter,
     )
     if budget < 0:
         return _pack((), budget)
-    retrieved = _retrieve(query, available, embedder, top_k)
-    relevance_weight, importance_weight, recency_weight = weights
+    hits = semantic_retrieve(
+        query=query,
+        memories=available,
+        embedder=embedder,
+        top_k=top_k,
+    )
+    (relevance_weight, importance_weight, recency_weight) = weights
+    
+    def utility(hit: RetrievalHit) -> float:
+        memory = hit.memory
+        
+        turn_distance = max(current_turn - memory.turn_id, 0)
+        
+        recency = 1.0 / (1.0 + turn_distance)
+        
+        return relevance_weight * max(hit.score, 0.0) + importance_weight * memory.importance + recency_weight * recency
 
-    def priority(item: tuple[MemoryItem, float]) -> float:
-        memory, similarity = item
-        utility = (
-            relevance_weight * max(similarity, 0.0)
-            + importance_weight * memory.importance
-            + recency_weight / (1 + current_turn - memory.turn_id)
-        )
-        return utility / max(memory.token_count, 1)
+    def priority(hit: RetrievalHit) -> float:
+        return utility(hit) / max(hit.memory.token_count, 1)
 
-    ranked = sorted(retrieved, key=priority, reverse=True)
+    ranked = sorted(hits, key=priority, reverse=True)
     return _pack(
-        [memory for memory, _ in ranked], budget,
-        retrieved=tuple(memory.memory_id for memory, _ in retrieved),
+        [hit.memory for hit in ranked], budget,
+        retrieved=tuple(hit.memory.memory_id for hit in hits),
     )

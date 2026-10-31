@@ -5,8 +5,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol, Sequence
 
+from context.tokenizer import TokenCounter, count_tokens
+
 from .query_analyzer import QueryContext, analyze_query
 from .schema import MemoryItem, MemoryType
+from .retrieval import Embedder, semantic_retrieve
 
 
 class PipelineStatus(str, Enum):
@@ -80,10 +83,48 @@ def retrieve_candidates(
     query_context: QueryContext,
     memory_store: MemoryStoreProtocol,
     session_id: str,
+    *,
+    embedder: Embedder,
     top_k: int,
 ) -> list[MemoryCandidate]:
     """Retrieve memories relevant to the query."""
-    raise NotImplementedError
+    if not isinstance(query_context, QueryContext):
+        raise TypeError("query_context must be QueryContext")
+    
+    if not isinstance(session_id, str) or not session_id.strip():
+        raise ValueError("session_id must be a non-empty string")
+    
+    if type(top_k) is not int or top_k <= 0:
+        raise ValueError("top_k must be a positive integer")
+    
+    memories = memory_store.list_session_memories(session_id)
+    
+    available = []
+    
+    for memory in memories:
+        if memory.turn_id > query_context.current_turn:
+            continue
+        
+        if memory.memory_type == MemoryType.CONSTRAINT and memory.is_protected and memory.is_active:
+            continue
+        
+        available.append(memory)
+        
+    hits = semantic_retrieve(
+        query=query_context.query,
+        memories=available,
+        embedder=embedder,
+        top_k=top_k,
+    )
+    
+    return [
+        MemoryCandidate(
+            memory=hit.memory,
+            semantic_score=hit.score,
+            relevance_score=max(hit.score, 0.0)
+        )
+        for hit in hits
+    ]
 
 
 def expand_version_chains(
@@ -199,6 +240,8 @@ def select_memory(
     current_turn: int,
     current_time: datetime,
     *,
+    embedder: Embedder,
+    token_counter: TokenCounter | None = None,
     top_k: int = 20,
 ) -> SelectionResult:
     """Run the memory-selection pipeline."""
@@ -221,6 +264,7 @@ def select_memory(
         query_context=query_context,
         memory_store=memory_store,
         session_id=session_id,
+        embedder=embedder,
         top_k=top_k,
     )
 

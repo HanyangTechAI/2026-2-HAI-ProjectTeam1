@@ -38,6 +38,7 @@ Evaluator
 ```text
 memory/schema.py
 memory/store.py
+memory/retrieval.py
 memory/baselines.py
 memory/selector.py
 memory/query_analyzer.py
@@ -69,6 +70,8 @@ benchmark/runner.py
 ```text
 구현됨
 - memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
+- memory/retrieval.py의 임베딩 검증, 코사인 유사도와 Semantic Top-K
+- memory/selector.py의 Session/turn 필터 및 Protected 분리 General Retrieval
 - tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
 - tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
 - context/tokenizer.py의 공용 TokenCounter, GeminiTokenCounter, count 검증과 token_count_mode
@@ -81,10 +84,12 @@ benchmark/runner.py
 - benchmark/evaluator.py의 snapshot 평가와 집계
 - tests/test_baseline_context_agent_integration.py, tests/test_pipeline.py, tests/test_pipeline_adapter.py의 경계·파이프라인 테스트
 - tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
+- tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
 
 스켈레톤 또는 미구현
-- Proposed Query Analyzer와 General Retrieval
-- Proposed Version/Temporal Resolution 및 Mandatory/Flexible Selection
+- Proposed Query Analyzer
+- Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution
+- Proposed Utility 및 Flexible Selection
 - benchmark generator, 실제 LLM planner와 embedding/provider adapter
 ```
 
@@ -800,6 +805,8 @@ def retrieve_candidates(
     query_context: QueryContext,
     memory_store: MemoryStoreProtocol,
     session_id: str,
+    *,
+    embedder: Embedder,
     top_k: int
 ) -> list[MemoryCandidate]:
     ...
@@ -819,6 +826,8 @@ Entity Match
 ```
 
 반환 결과는 최종 Context가 아니라 **Candidate Pool**이다.
+
+현재 구현은 `memory_store.list_session_memories(session_id)`에서 `current_turn` 이후 항목과 활성·보호 Constraint를 제외한 뒤 `memory.retrieval.semantic_retrieve`를 호출한다. 활성·보호 Constraint는 별도 Protected Retrieval 경로에서 처리한다. 반환 후보의 `semantic_score`에는 코사인 점수, `relevance_score`에는 `max(score, 0)`을 기록한다. 동률은 `memory_id` 오름차순이며 embedding 차원 불일치, 빈 벡터와 비유한 값은 오류로 거부한다.
 
 ---
 

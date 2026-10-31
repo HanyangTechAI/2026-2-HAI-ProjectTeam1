@@ -1267,6 +1267,10 @@ Budget-Aware Memory Selection
 │   │   └── Sliding Window / Vector Top-k
 │   │       / Utility-per-Token
 │   │
+│   ├── retrieval.py
+│   │   └── Embedding 검증 / Cosine Similarity
+│   │       / Semantic Top-K
+│   │
 │   └── selector.py
 │       └── Retrieval / Protected Resolution
 │           / Temporal Resolution

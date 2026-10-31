@@ -758,10 +758,10 @@ Evaluator
 
 ## 14. 현재 실행 가능 범위
 
-Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능하다. 인메모리 Store와 State Versioning, 공용 Token Counter, Context 조립 및 최종 Budget Validation이 구현되어 있다. `memory/baselines.py`에는 항목 단위 Sliding Window, embedding 기반 Vector Top-k와 Utility-per-Token이 구현되어 모두 공통 `SelectionResult`를 반환한다. Vector 계열에는 외부 embedder를 명시적으로 주입해야 하며, baseline은 Version Expansion·Protected 우선 보존·Temporal Resolution을 수행하지 않는다.
+Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능하다. 인메모리 Store와 State Versioning, 공용 Token Counter, Context 조립 및 최종 Budget Validation이 구현되어 있다. `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도와 결정적 Semantic Top-K를 제공하며 Baseline과 General Retrieval이 공유한다. `memory/baselines.py`에는 항목 단위 Sliding Window, embedding 기반 Vector Top-k와 Utility-per-Token이 구현되어 모두 공통 `SelectionResult`를 반환한다. Vector 계열에는 외부 embedder를 명시적으로 주입해야 하며, baseline은 Version Expansion·Protected 우선 보존·Temporal Resolution을 수행하지 않는다.
 
 결정적 규칙 `Planner`, 단일 행동 `Agent`, mock Tool과 `pipeline/orchestrator.py`의 다단계 실행이 연결되어 있다. Orchestrator는 매 단계 선택과 Context 조립을 다시 수행하고 Tool Interaction을 다음 입력에 feedback으로 제공하며, 목표 완료·Tool 실패·예산 실패·`max_steps`에서 중단한다. `benchmark/runner.py`는 활성 integration 시나리오를 Baseline 전략과 반복별로 실행하여 `runs.jsonl`과 `summary.json`을 기록한다. `pipeline/pipeline_adapter.py`는 실행마다 새 Agent를 생성하는 호출형 adapter를 제공한다.
 
-아직 `benchmark/generator.py`는 빈 파일이고, Proposed Query Analyzer·General Retrieval·Version Expansion·Temporal Resolution·Mandatory/Flexible Selection 및 Ablation 실행은 구현되지 않았다. 실제 LLM planner, embedding provider, 모델 API 사용량과 비용 adapter도 필요하다. 기본 공백 기준 Token Counter, 결정적 test embedder, 합성 token fixture와 oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.
+아직 `benchmark/generator.py`는 빈 파일이고, Proposed Query Analyzer·Version Expansion·Temporal Resolution·Protected applicability·Required-State Resolution·Utility/Flexible Selection 및 Ablation 실행은 구현되지 않았다. General Retrieval은 Session/turn 필터, 활성 Protected Constraint 분리와 Semantic Top-K까지 구현되어 있다. 실제 LLM planner, embedding provider, 모델 API 사용량과 비용 adapter도 필요하다. 기본 공백 기준 Token Counter, 결정적 test embedder, 합성 token fixture와 oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.
 
 Python 3.10 이상을 지원하며 `requirements.txt`에는 Gemini CountTokens 연동용 `google-genai>=2.0.0`이 포함되어 있다. `GeminiTokenCounter`는 모델명과 `GEMINI_API_KEY`를 사용하고 동일 문자열 결과를 캐시한다. Runner는 `--gemini-token-model`, `--gemini-token-cache-size` 또는 사용자 `--token-counter module:function`을 받아 실행별 `token_count_mode`를 기록한다. 비교하는 모든 전략에는 같은 embedder와 TokenCounter를 사용한다. Gemini 연동의 단위 테스트는 실제 네트워크 대신 fake client를 사용하므로 API 성능·비용 검증은 아니다.

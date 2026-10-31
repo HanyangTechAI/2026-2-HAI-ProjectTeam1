@@ -11,9 +11,10 @@ from agent.tools.types import ToolCall, ToolResult
 from context.builder import ContextBuildResult, build_context, fixed_context_tokens
 from context.tokenizer import TokenCounter, provisional_token_count
 
-from memory.baselines import Embedder, sliding_window, utility_per_token, vector_top_k
+from memory.baselines import sliding_window, utility_per_token, vector_top_k
 from memory.schema import MemoryItem
 from memory.selector import PipelineStatus, SelectionResult
+from memory.retrieval import Embedder
 
 
 GoalChecker = Callable[

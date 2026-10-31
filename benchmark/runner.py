@@ -20,7 +20,7 @@ from typing import Any
 
 from agent.evaluation import scenario_with_granted_approvals
 from context.tokenizer import TokenCounter, count_tokens, provisional_token_count, GeminiTokenCounter, token_count_mode
-from memory.baselines import Embedder
+from memory.retrieval import Embedder
 from memory.schema import MemoryItem
 from memory.selector import PipelineStatus
 from pipeline.orchestrator import GoalChecker, PipelineRunResult

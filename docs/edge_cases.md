@@ -7,7 +7,7 @@
 - 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md), [interfaces.md](./interfaces.md)
 - 작성 기준: 2026-09-28에 확인한 설계 문서. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
 - EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. 이 중 EC-02의 정상 삽입 경로와 관련 Store 불변식은 `tests/test_memory.py`, `tests/test_state.py`에서 검증한다. 나머지 항목은 명세만으로 구현 완료나 테스트 통과를 의미하지 않는다.
-- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. EC-08에 필요한 Store의 전체 Version Chain 조회는 단위 테스트로 검증하지만 Retrieval과 Temporal Resolver 통합은 아직 미구현이다. EC-12의 최종 Context 포맷 초과 경로는 `tests/test_memory_context_integration.py`에서 Store 조회 결과를 테스트 helper로 연결해 검증한다. Selector 단계의 필수 Memory 합계 초과 경로는 별도 범위다. 그 밖의 항목도 문서만으로 구현 완료나 테스트 통과를 의미하지 않는다. EC-09의 구현 및 Benchmark 포함 여부는 별도로 결정한다.
+- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. Semantic General Retrieval과 Store의 전체 Version Chain 조회는 각각 단위 테스트로 검증하지만, EC-08의 Version Chain Expansion과 Temporal Resolver 연결은 아직 미구현이다. EC-12의 최종 Context 포맷 초과 경로는 `tests/test_memory_context_integration.py`에서 Store 조회 결과를 테스트 helper로 연결해 검증한다. Selector 단계의 필수 Memory 합계 초과 경로는 별도 범위다. 그 밖의 항목도 문서만으로 구현 완료나 테스트 통과를 의미하지 않는다. EC-09의 구현 및 Benchmark 포함 여부는 별도로 결정한다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.
 
 ## 2. 공통 검증 원칙

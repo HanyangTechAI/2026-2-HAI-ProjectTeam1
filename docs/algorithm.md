@@ -399,6 +399,8 @@ FUNCTION DETECT_TEMPORAL_INTENT(query, current_time):
 
 초기 구현은 Semantic Retrieval을 필수로 사용하고, BM25 / Entity Match를 선택적으로 결합한다.
 
+현재 V1 코드는 Semantic Signal만 구현한다. `memory/retrieval.py`의 `semantic_retrieve`가 Query와 각 Memory content를 같은 embedder로 벡터화하고 코사인 유사도 상위 K개를 반환한다. 점수가 같으면 `memory_id` 오름차순으로 정렬한다. `memory/selector.py`의 `retrieve_candidates`는 현재 Session과 `current_turn` 범위만 조회하고, 별도 경로로 처리할 활성·보호 Constraint를 제외한다. BM25와 Entity Match는 아직 결합하지 않는다.
+
 ## Input
 
 ```text
