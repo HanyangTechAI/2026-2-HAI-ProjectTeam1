@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, mock Tool, Benchmark Runner와 Evaluator가 구현되어 있다. Proposed Query Analyzer·검색·시간 해석·선택 알고리즘, 시나리오 생성기와 실제 LLM/모델별 Tokenizer 연동은 아직 미구현 또는 미연결 상태이다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. Proposed Query Analyzer·검색·시간 해석·선택 알고리즘, 시나리오 생성기와 실제 LLM Planner 연동은 아직 미구현 또는 미연결 상태이다.
 
 ## 배경과 목표
 
@@ -150,13 +150,13 @@ python prototype/run_demo.py
 
 데모는 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 시나리오 `memory_snapshot`과 합성 토큰 수를 사용하는 별도 데모 경로이며 실제 LLM 성능 측정은 아니다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다.
 
-실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token을 공통 `SelectionResult`로 변환한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 활성 integration 시나리오를 전략·반복별로 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector 기반 전략에는 embedding 함수가 필요하며 기본 공백 기준 Token Counter는 실제 모델 사용량이 아니다.
+실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token을 공통 `SelectionResult`로 변환한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 `PipelineAdapter`로 활성 integration 시나리오를 전략·반복별 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. 단계별 선택·Context·행동, 최종 결과와 누적 입력 토큰도 실행 레코드에 보존한다.
 
 `memory/store.py`는 프로세스 내부 인메모리 저장소를 제공한다. 동일 세션·`memory_key`의 새 ACTIVE 항목을 삽입하면 기존 ACTIVE 항목을 비활성화하고 유효 종료 시각과 양방향 대체 참조를 연결한다. ID·버전 참조·시간 순서·ACTIVE 유일성도 검증하지만, 파일이나 DB로 영속화하지는 않는다.
 
 ## 설치와 의존성
 
-현재 핵심 실행 경로는 Python 표준 라이브러리만 사용한다. Python 3.10 이상이 필요하며 현재 개발 환경에서는 Python 3.12로 검증한다. 가상 환경 사용을 권장한다.
+Python 3.10 이상이 필요하며 현재 개발 환경에서는 Python 3.12로 검증한다. 가상 환경 사용을 권장한다.
 
 ```text
 python -m venv .venv
@@ -167,20 +167,32 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-현재 `requirements.txt`에는 설치할 필수 서드파티 패키지가 없으므로 마지막 명령은 추가 설치 없이 정상 종료한다. `unittest`도 표준 라이브러리이므로 별도 테스트 패키지가 필요하지 않다.
+프로젝트의 표준 설치 의존성으로 Gemini CountTokens 연동용 `google-genai>=2.0.0`을 유지한다. `pip install -r requirements.txt`는 이 패키지를 설치한다. 다만 기본 공백 기준 counter와 fake client 기반 단위 테스트는 Gemini API를 호출하지 않으므로 API key가 필요하지 않다. `unittest`는 표준 라이브러리이므로 별도 테스트 패키지가 필요하지 않다.
 
-선택 기능의 의존성은 구현을 주입하는 쪽에서 결정한다.
+`google-genai` 외의 provider 의존성은 구현을 주입하는 쪽에서 결정한다.
 
 | 기능 | 현재 계약 | 추가 의존성 |
 | --- | --- | --- |
 | Sliding Window | 내장 구현을 바로 사용 | 없음 |
 | Vector Top-k | `embedder(text) -> Sequence[float]` 주입 | 선택한 embedding SDK 또는 로컬 모델 |
 | Utility-per-Token | Vector Top-k와 같은 embedder 사용 | 선택한 embedding SDK 또는 로컬 모델 |
-| Token 측정 | 기본 `provisional_token_count` 또는 `TokenCounter` 주입 | 실제 모델 tokenizer를 쓸 때 해당 패키지 |
+| Token 측정 | 기본 `provisional_token_count`, `GeminiTokenCounter` 또는 사용자 `TokenCounter` | `google-genai`는 표준 설치, 실제 Gemini API 호출 시 API key 필요 |
 | Agent | 기본 결정적 규칙 `Planner` | 실제 LLM 연결 시 provider SDK |
 | 저장소 | 프로세스 내부 `MemoryStore` | DB 영속화를 구현할 때 DB driver |
 
-Embedding·LLM·Tokenizer provider는 아직 확정되지 않았다. 연구 실행 전에는 선택한 provider와 정확한 버전을 `requirements.txt`에 고정하고, 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 개발 PC에 우연히 설치된 패키지를 프로젝트 의존성으로 간주하지 않는다.
+Gemini token 측정은 다음처럼 설정한다.
+
+```text
+$env:GEMINI_API_KEY="..."
+
+python -m benchmark.runner ... \
+  --gemini-token-model <model-name> \
+  --gemini-token-cache-size 4096
+```
+
+`GeminiTokenCounter`는 동일 문자열의 CountTokens 결과를 메모리에 캐시한다. `--token-counter module:function`과 `--gemini-token-model`은 동시에 사용할 수 없다. 둘 다 생략하면 `provisional_token_count`를 사용하며, 이 값은 실제 모델 Token Usage로 보고하지 않는다. 실행 결과의 `token_count_mode`에는 `provisional`, `custom`, 또는 `gemini:<model>`이 기록된다.
+
+Embedding과 실제 LLM provider는 아직 확정되지 않았다. 연구 실행 전에는 선택한 provider와 정확한 버전을 고정하고, 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 개발 PC에 우연히 설치된 패키지를 프로젝트 의존성으로 간주하지 않는다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 
@@ -188,7 +200,7 @@ Embedding·LLM·Tokenizer provider는 아직 확정되지 않았다. 연구 실�
 python -m unittest discover -s tests -v
 ```
 
-`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`는 세 Baseline에서 Context Builder, Agent와 mock Tool까지의 경로를 검증하고, `tests/test_pipeline.py`는 다단계 재선택·Context 재조립·Tool feedback, 목표 판정, 예산 중단, Tool 실패와 최대 단계 종료를 검증한다.
+`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_pipeline_adapter.py`는 실행별 Agent 격리, Runner 저장·재평가와 중간 실행 후 예산 실패 기록을 검증하며, `tests/test_tokenizer.py`는 Gemini counter의 입력 검증·API 응답 처리·캐시 동작을 fake client로 검증한다.
 
 ## 기술 스택 후보
 

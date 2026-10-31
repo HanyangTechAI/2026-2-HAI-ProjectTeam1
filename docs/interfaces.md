@@ -71,7 +71,7 @@ benchmark/runner.py
 - memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
 - tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
 - tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
-- context/tokenizer.py의 공용 TokenCounter와 count 검증
+- context/tokenizer.py의 공용 TokenCounter, GeminiTokenCounter, count 검증과 token_count_mode
 - context/builder.py의 Prompt 조립과 최종 Budget Validation
 - memory/baselines.py의 Sliding Window, Vector Top-k, Utility-per-Token
 - 결정적 규칙 Planner, Agent, mock Tool과 ToolExecutor
@@ -79,12 +79,13 @@ benchmark/runner.py
 - pipeline/pipeline_adapter.py의 Agent factory 기반 PipelineAdapter
 - benchmark/runner.py의 Baseline 시나리오 실행과 JSONL/summary 출력
 - benchmark/evaluator.py의 snapshot 평가와 집계
-- tests/test_baseline_context_agent_integration.py와 tests/test_pipeline.py의 경계·파이프라인 테스트
+- tests/test_baseline_context_agent_integration.py, tests/test_pipeline.py, tests/test_pipeline_adapter.py의 경계·파이프라인 테스트
+- tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
 
 스켈레톤 또는 미구현
 - Proposed Query Analyzer와 General Retrieval
 - Proposed Version/Temporal Resolution 및 Mandatory/Flexible Selection
-- benchmark generator, 실제 LLM planner와 모델별 tokenizer/provider adapter
+- benchmark generator, 실제 LLM planner와 embedding/provider adapter
 ```
 
 ---
@@ -162,6 +163,8 @@ Context Builder
 `Agent`와 `Evaluator`는 직접 tokenize하지 않는다. Agent는 완성된 Context만 받고, Evaluator는 실행 결과에 기록된 토큰 수만 읽는다. 이를 통해 `MemoryItem.token_count`, 고정 입력, 최종 Context, usage 사이의 측정 기준을 일치시킨다.
 
 공용 모델 Tokenizer가 연결되기 전에는 임시 counter를 사용할 수 있지만, 임시 측정값은 모델의 실제 Token Usage로 보고하지 않는다. `provisional_token_count`를 여러 모듈에 중복 정의하지 않고 `context/tokenizer.py`를 단일 진입점으로 사용한다.
+
+`GeminiTokenCounter(model, api_key=None, cache_size=4096)`는 Gemini CountTokens API를 `TokenCounter` 계약으로 감싼다. API key는 생성자 인자 또는 `GEMINI_API_KEY`에서 읽고, 동일 문자열 결과를 프로세스 메모리에 LRU 캐시한다. 빈 문자열은 API 호출 없이 0을 반환한다. `token_count_mode`는 실행 로그에 `provisional`, `custom`, `gemini:<model>` 중 하나를 기록한다.
 
 `count_tokens`는 입력이 문자열인지, counter 반환값이 음수가 아닌 정수인지 검증한다. 잘못된 counter 결과는 Token Usage로 기록하지 않고 `TypeError` 또는 `ValueError`로 거부한다.
 
@@ -1360,7 +1363,7 @@ def count_tokens(
 
 `token_counter`는 `context.tokenizer.TokenCounter`를 받는 자리다. 공용 토크나이저가 정해지기 전에는 `context.tokenizer`의 임시 counter를 쓴다. 고정 프롬프트, 섹션, 최종 입력, `usage`는 한 실행에서 같은 함수를 사용한다. 기본 단어 수는 모델 토크나이저 측정값이 아니므로 공용 토크나이저를 넣기 전에는 실험 지표로 보고하지 않는다.
 
-현재 `context/builder.py`는 `context.tokenizer`의 `TokenCounter`, `provisional_token_count`, `count_tokens`를 사용한다. Context 조립과 최종 Budget Validation은 구현되어 있으며, 실제 모델별 Tokenizer 연결은 실행기 통합 단계에서 진행한다.
+현재 `context/builder.py`는 `context.tokenizer`의 `TokenCounter`, `provisional_token_count`, `count_tokens`를 사용한다. Context 조립과 최종 Budget Validation은 구현되어 있으며, Runner는 같은 계약을 통해 `GeminiTokenCounter` 또는 사용자 정의 counter를 전 단계에 주입한다.
 
 프롬프트 섹션 순서는 다음과 같다.
 

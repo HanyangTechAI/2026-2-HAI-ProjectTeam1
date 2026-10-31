@@ -19,7 +19,7 @@ from time import perf_counter
 from typing import Any
 
 from agent.evaluation import scenario_with_granted_approvals
-from context.tokenizer import TokenCounter, count_tokens, provisional_token_count
+from context.tokenizer import TokenCounter, count_tokens, provisional_token_count, GeminiTokenCounter, token_count_mode
 from memory.baselines import Embedder
 from memory.schema import MemoryItem
 from memory.selector import PipelineStatus
@@ -195,7 +195,7 @@ def run_scenarios(
     ids = [scenario.get("scenario_id", scenario.get("sample_id")) for scenario in enabled]
     if any(not isinstance(sid, str) or not sid for sid in ids) or len(set(ids)) != len(ids):
         raise ValueError("scenarios require unique non-empty scenario_id/sample_id")
-    mode = "provisional" if token_counter is provisional_token_count else "supplied_token_counter"
+    mode = token_count_mode(token_counter)
     rows = [
         _run_one(
             scenario, strategy, repeat_id, agent_factory=agent_factory,
@@ -238,7 +238,10 @@ def main() -> None:
     parser.add_argument("--strategies", nargs="+", choices=STRATEGIES, default=STRATEGIES)
     parser.add_argument("--agent-factory", required=True, help="module:function returning a fresh Agent instance")
     parser.add_argument("--embedder", help="module:function taking text and returning a numeric vector")
-    parser.add_argument("--token-counter", help="module:function taking text and returning token count")
+    tokenizer_group = parser.add_mutually_exclusive_group()
+    tokenizer_group.add_argument("--token-counter", help="Custom module:function taking text and returning token count")
+    tokenizer_group.add_argument("--gemini-token-model", help="Use Gemini CountTokens API with this model. Example: gemini-3.8-flash")
+    parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
     parser.add_argument("--system-prompt-file", required=True)
     parser.add_argument("--tool-definitions-file", required=True)
     parser.add_argument("--output", default="experiments/results/baselines")
@@ -262,17 +265,40 @@ def main() -> None:
                or scenario.get("validation_scope", "integration") != "integration"
                for scenario in scenarios):
             parser.error("requested IDs must be enabled integration scenarios")
+    if args.gemini_token_model:
+        token_counter = GeminiTokenCounter(
+            model=args.gemini_token_model,
+            cache_size=args.gemini_token_cache_size,
+        )
+    elif args.token_counter:
+        token_counter = _import_callable(args.token_counter)
+    else:
+        token_counter = provisional_token_count
     result = run_scenarios(
         scenarios, agent_factory=_import_callable(args.agent_factory),
         system_prompt=Path(args.system_prompt_file).read_text(encoding="utf-8"),
         tool_definitions=Path(args.tool_definitions_file).read_text(encoding="utf-8"),
         output_directory=args.output, strategies=args.strategies,
         embedder=_import_callable(args.embedder) if args.embedder else None,
-        token_counter=_import_callable(args.token_counter) if args.token_counter else provisional_token_count,
+        token_counter=token_counter,
         top_k=args.top_k, repeats=args.repeats, utility_weights=tuple(args.utility_weights),
         bootstrap_iterations=args.bootstrap_iterations, seed=args.seed, max_steps=args.max_steps,
     )
-    print(json.dumps(result, ensure_ascii=False))
+    if isinstance(token_counter, GeminiTokenCounter):
+        result["tokenizer"] = {
+            "type": "gemini",
+            "model": token_counter.model,
+            "cache": {
+                "hits": token_counter.cache_info().hits,
+                "misses": token_counter.cache_info().misses,
+                "currsize": token_counter.cache_info().currsize,
+            },
+        }
+    else:
+        result["tokenizer"] = {
+            "type": token_count_mode(token_counter)
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

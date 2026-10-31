@@ -101,3 +101,13 @@ def count_tokens(
         raise ValueError("token_counter must return a non-negative integer")
     
     return count
+
+
+def token_count_mode(token_counter: TokenCounter) -> str:
+    if token_counter is provisional_token_count:
+        return "provisional"
+    
+    if isinstance(token_counter, GeminiTokenCounter):
+        return f"gemini:{token_counter.model}"
+    
+    return "custom"
