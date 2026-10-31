@@ -189,8 +189,8 @@ class PipelineAdapterTests(unittest.TestCase):
                 output, strategies=("sliding_window", "vector_top_k", "utility_per_token"),
                 embedder=embed, repeats=2,
             )
-            rows = [json.loads(line) for line in Path(result["runs_path"]).read_text().splitlines()]
-            summary = json.loads(Path(result["summary_path"]).read_text())
+            rows = [json.loads(line) for line in Path(result["runs_path"]).read_text(encoding="utf-8").splitlines()]
+            summary = json.loads(Path(result["summary_path"]).read_text(encoding="utf-8"))
             self.assertEqual(result["n_runs"], 6)
             self.assertEqual(len(self.agents), 6)
             self.assertEqual(len({id(agent) for agent in self.agents}), 6)
@@ -221,7 +221,7 @@ class PipelineAdapterTests(unittest.TestCase):
         self.scenario["context_budget"] = first_cost
         with tempfile.TemporaryDirectory() as output:
             result = self.run_runner(output, token_counter=len)
-            row = json.loads(Path(result["runs_path"]).read_text())
+            row = json.loads(Path(result["runs_path"]).read_text(encoding="utf-8"))
         run = row["run_result"]
         self.assertEqual(run["status"], "invalid_budget_configuration")
         self.assertEqual(len(run["steps"]), 2)
@@ -235,7 +235,7 @@ class PipelineAdapterTests(unittest.TestCase):
     def test_max_steps_keeps_task_incomplete(self):
         with tempfile.TemporaryDirectory() as output:
             result = self.run_runner(output, max_steps=1)
-            row = json.loads(Path(result["runs_path"]).read_text())
+            row = json.loads(Path(result["runs_path"]).read_text(encoding="utf-8"))
         self.assertEqual(row["run_result"]["stopped_reason"], "max_steps")
         self.assertEqual(len(row["run_result"]["tool_calls"]), 1)
         self.assertFalse(row["run_result"]["goal_completed"])
