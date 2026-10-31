@@ -4,3 +4,5 @@
 # Vector Top-k / Utility-per-Token은 특정 embedding SDK에 의존하지 않는다.
 # 실험에서 사용할 provider 또는 로컬 모델 패키지는 embedder 구현과 함께
 # 별도로 고정한 뒤 이 파일에 추가한다.
+
+google-genai>=2.0.0
