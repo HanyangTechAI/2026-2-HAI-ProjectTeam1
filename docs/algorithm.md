@@ -782,23 +782,22 @@ Protected Memory와 필수 State를 제외한 Memory는 Flexible Candidate가 �
 
 ## Utility
 
-각 Flexible Memory에 대해:
+설계 목표는 Entity Match까지 포함하지만, 현재 V1 구현은 각 Flexible Memory에 대해 다음 세 항을 사용한다.
 
 ```text
 U_i =
 α · Relevance_i
 + β · Importance_i
 + γ · Recency_i
-+ δ · EntityMatch_i
 ```
 
 단:
 
 ```text
-α + β + γ + δ = 1
+(α, β, γ) = (0.6, 0.3, 0.1)
 ```
 
-초기 가중치는 실험 전에 고정하고 이후 Ablation 또는 Validation Set을 통해 조정한다.
+가중치는 호출 시 바꿀 수 있으며 음수가 아니고 합이 양수여야 한다. Relevance는 `[0, 1]`로 제한한다. 현재 Recency는 turn 거리를 이용해 `1 / (1 + max(current_turn - memory.turn_id, 0))`로 계산한다. Entity Match 항과 Historical Query별 시간 거리 함수는 후속 확장 범위다.
 
 ---
 
@@ -906,6 +905,8 @@ FUNCTION SELECT_MANDATORY(
 ):
 
     mandatory ← protected + states
+        DEDUPLICATED BY memory_id
+        PRESERVING protected-then-states order
 
     total_cost ← SUM token_count
 
@@ -978,9 +979,14 @@ FUNCTION SELECT_FLEXIBLE_GREEDY(
     FOR each candidate:
         candidate.efficiency =
             candidate.utility_score
-            / candidate.memory.token_count
+            / max(candidate.memory.token_count, 1)
 
-    SORT candidates BY efficiency DESC
+    SORT candidates BY
+        efficiency DESC,
+        utility DESC,
+        relevance DESC,
+        recency DESC,
+        memory_id ASC
 
     selected ← empty list
     used ← 0

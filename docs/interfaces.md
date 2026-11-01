@@ -72,6 +72,7 @@ benchmark/runner.py
 - memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
 - memory/retrieval.py의 임베딩 검증, 코사인 유사도와 Semantic Top-K
 - memory/selector.py의 Session/turn 필터 및 Protected 분리 General Retrieval
+- memory/selector.py의 효용 계산, Mandatory 중복 제거·예산 검증, Utility-per-Token Flexible Selection과 선택 전 재토큰화
 - tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
 - tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
 - context/tokenizer.py의 공용 TokenCounter, GeminiTokenCounter, count 검증과 token_count_mode
@@ -89,7 +90,7 @@ benchmark/runner.py
 스켈레톤 또는 미구현
 - Proposed Query Analyzer
 - Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution
-- Proposed Utility 및 Flexible Selection
+- 위 미구현 단계에 의존하는 Proposed 상위 `select_memory` 종단 경로
 - benchmark generator, 실제 LLM planner와 embedding/provider adapter
 ```
 
@@ -1041,28 +1042,31 @@ Protected Constraint와 Required State에 포함되지 않은 Candidate는 Flexi
 ```python
 def compute_utility(
     candidate: MemoryCandidate,
-    query_context: QueryContext
+    query_context: QueryContext,
+    *,
+    weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
 ) -> float:
     ...
 ```
 
-개념적 Utility:
+현재 V1 Utility:
 
 ```text
 U_i =
 α · Relevance_i
 + β · Importance_i
 + γ · Recency_i
-+ δ · EntityMatch_i
 ```
 
-계산 결과:
+기본 가중치는 `(0.6, 0.3, 0.1)`이며 세 값은 음수가 아니고 합이 양수여야 한다. Relevance는 `[0, 1]`로 제한하고, `Recency_i = 1 / (1 + max(current_turn - memory.turn_id, 0))`로 계산한다. Entity Match 항은 현재 구현에 포함되지 않는다.
+
+`compute_utility()`는 보정된 `relevance_score`와 계산한 `recency_score`를 Candidate에 반영하고 Utility를 반환한다. 상위 `select_memory()`는 반환값을 다음 필드에 기록한다.
 
 ```python
 candidate.utility_score
 ```
 
-에 기록한다.
+직접 호출하는 경우에는 반환값을 사용해야 한다.
 
 ---
 
@@ -1154,6 +1158,8 @@ C_mandatory <= B_memory
 
 이면 모든 Mandatory Memory를 선택한다.
 
+현재 구현은 `protected` 다음 `states` 순서를 유지하면서 `memory_id`가 같은 항목을 한 번만 계산한다. 입력 항목은 `MemoryItem`, 예산은 0 이상의 정수여야 한다.
+
 다음 조건:
 
 ```text
@@ -1215,6 +1221,8 @@ selected_flexible[-1]
 
 즉 `select_flexible`은 선택된 후보를 **선택 우선순위 내림차순**으로 반환해야 한다. Utility-per-Token, 0/1 Knapsack 등 내부 알고리즘이 달라도 이 반환 순서는 바뀌지 않는다. 동일 우선순위의 tie-break 규칙은 구현에서 결정할 수 있지만 반드시 결정적이어야 한다.
 
+현재 V1은 `utility_score / max(token_count, 1)`을 사용한다. 동률이면 Utility, Relevance, Recency를 차례로 비교하고 마지막에는 `memory_id` 오름차순으로 결정한다. 남은 예산보다 큰 후보는 건너뛰며 각각 `selected_flexible` 또는 `rejected_budget` 선택 사유를 기록한다.
+
 ---
 
 # 16. Final Memory Selection Interface
@@ -1261,10 +1269,15 @@ def select_memory(
     current_turn: int,
     current_time: datetime,
     *,
-    top_k: int = 20
+    embedder: Embedder,
+    token_counter: TokenCounter | None = None,
+    top_k: int = 20,
+    utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
 ) -> SelectionResult:
     ...
 ```
+
+`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. 다만 현재 Query Analyzer, Version Chain Expansion, Temporal/Protected applicability, Required-State Resolution이 미구현이므로 이 상위 함수는 아직 전체 Proposed 실행 경로로 사용할 수 없다.
 
 처리 순서:
 
