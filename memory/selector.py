@@ -3,16 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
+import re
+import logging
 from typing import Protocol, Sequence
 
 from context.tokenizer import TokenCounter, count_tokens
 
-from .query_analyzer import QueryContext, analyze_query
+from .query_analyzer import (
+    QueryContext, TemporalIntent, analyze_query, _detect_tools,
+    _concepts, _specific_entities, _recipients, _actions,
+)
 from .schema import MemoryItem, MemoryType
 from .retrieval import Embedder, semantic_retrieve
+from .store import MemoryStoreConsistencyError
 
 
 DEFAULT_UTILITY_WEIGHTS = (0.6, 0.3, 0.1)
+_LOGGER = logging.getLogger(__name__)
 
 
 class PipelineStatus(str, Enum):
@@ -138,15 +145,101 @@ def expand_version_chains(
     memory_store: MemoryStoreProtocol,
 ) -> list[MemoryCandidate]:
     """Expand versioned candidates by memory_key."""
-    raise NotImplementedError
+    expanded = {}
+    for candidate in candidates:
+        expanded.setdefault((candidate.memory.session_id, candidate.memory.memory_id), candidate)
+    visited = set()
+    for candidate in candidates:
+        memory = candidate.memory
+        if memory.memory_key is None:
+            continue
+        key = (memory.session_id, memory.memory_key)
+        if key in visited:
+            continue
+        visited.add(key)
+        for version in memory_store.find_all_by_key(*key):
+            if (version.session_id, version.memory_key) != key:
+                raise ValueError("version chain contains a different session or key")
+            identity = (version.session_id, version.memory_id)
+            # 새 버전에 검색 점수를 임의로 복사하지 않는다.
+            expanded.setdefault(identity, MemoryCandidate(memory=version))
+    return list(expanded.values())
 
 
 def resolve_temporal_versions(
     candidates: Sequence[MemoryCandidate],
     query_context: QueryContext,
 ) -> list[MemoryCandidate]:
-    """Resolve candidates to the correct temporal version."""
-    raise NotImplementedError
+    """요청 시점 또는 기간에 맞는 버전을 선택한다.
+
+    기간 질의의 시간 관련성은 요청 기간과 유효 기간의 겹치는 길이로
+    계산한다. 길이가 같으면 valid_from이 늦은 버전을 우선하고, 그것도
+    같으면 memory_id 오름차순으로 선택해 입력 순서에 영향을 받지 않는다.
+    이는 프로젝트의 구현 정책이며 문서에 명시된 계산 공식은 아니다.
+    현재 ACTIVE 중복이나 단일 시점의 중복 유효 버전은 오류로 처리한다.
+    """
+    historical = query_context.temporal_intent in (
+        TemporalIntent.HISTORICAL, TemporalIntent.RELATIVE_TIME,
+    )
+    target = query_context.target_time
+    period = query_context.target_range
+    if historical and target is None and period is None:
+        raise ValueError("historical queries require target_time or target_range")
+    if period is not None and period[0] >= period[1]:
+        raise ValueError("target_range must have an increasing start and end")
+    groups = {}
+    resolved = []
+    seen = set()
+    for candidate in candidates:
+        memory = candidate.memory
+        identity = (memory.session_id, memory.memory_id)
+        if identity in seen or memory.turn_id > query_context.current_turn:
+            continue
+        seen.add(identity)
+        if memory.memory_key is None:
+            resolved.append(candidate)
+        else:
+            groups.setdefault((memory.session_id, memory.memory_key), []).append(candidate)
+    for group in groups.values():
+        valid = []
+        for candidate in group:
+            memory = candidate.memory
+            if historical:
+                times = (target,) if target is not None else period
+                if any((time.utcoffset() is None) != (memory.valid_from.utcoffset() is None)
+                       for time in times):
+                    raise ValueError("query and memory timestamps must use compatible timezones")
+            if not historical:
+                matches = memory.is_active
+            elif target is not None:
+                matches = memory.valid_from <= target and (memory.valid_to is None or target < memory.valid_to)
+            else:
+                start, end = period
+                overlap_start = max(start, memory.valid_from)
+                overlap_end = min(end, memory.valid_to) if memory.valid_to is not None else end
+                matches = overlap_start < overlap_end
+            if matches:
+                valid.append(candidate)
+        if len(valid) > 1:
+            if not historical or target is not None:
+                raise MemoryStoreConsistencyError("multiple active or point-in-time valid versions for one key")
+            start, end = period
+
+            def temporal_rank(candidate: MemoryCandidate):
+                memory = candidate.memory
+                overlap_start = max(start, memory.valid_from)
+                overlap_end = min(end, memory.valid_to) if memory.valid_to is not None else end
+                return (overlap_end - overlap_start, memory.valid_from)
+
+            # max는 동점에서 첫 항목을 유지하므로 ID를 먼저 정렬한다.
+            chosen = max(sorted(valid, key=lambda item: item.memory.memory_id), key=temporal_rank)
+            valid = [chosen]
+        if not valid:
+            _LOGGER.info("no_valid_version session=%s key=%s", group[0].memory.session_id, group[0].memory.memory_key)
+        for candidate in valid:
+            candidate.selection_reason = "temporal_range_overlap" if historical and target is None else "temporal_version"
+        resolved.extend(valid)
+    return resolved
 
 
 def is_constraint_applicable(
@@ -154,7 +247,34 @@ def is_constraint_applicable(
     query_context: QueryContext,
 ) -> bool:
     """Return whether a constraint applies to the current task."""
-    raise NotImplementedError
+    if constraint.memory_type != MemoryType.CONSTRAINT:
+        return False
+    # 과거 규칙 자체를 묻는 질문은 일반 검색 경로로 처리한다.
+    if re.search(r"규칙|제약|정책|\b(?:rule|policy|constraint)\b", query_context.query.casefold()) and not re.search(
+        r"보내줘|발송해|삭제해|지워줘|만들어|변경해|처리해|\b(?:send|delete|create|update)\b",
+        query_context.query.casefold(),
+    ):
+        return False
+    text = f"{constraint.memory_key or ''} {constraint.content}".casefold()
+    if ("외부" in text and "내부" in query_context.query) or ("내부" in text and "외부" in query_context.query):
+        return False
+    tools = set(_detect_tools(text))
+    requested = set(query_context.required_tools) | set(_detect_tools(query_context.query))
+    if tools and not tools.intersection(requested):
+        return False
+    targets = set(_recipients(constraint.content))
+    requested_targets = set(_recipients(query_context.query)) | set(query_context.entities)
+    if targets and not targets.intersection(requested_targets):
+        return False
+    filenames = set(re.findall(r"[\w.-]+\.(?:pdf|docx?|txt|csv|xlsx?)\b", constraint.content, re.ASCII | re.I))
+    if filenames and not any(name.casefold() in query_context.query.casefold() for name in filenames):
+        return False
+    constrained_actions = set(_constraint_actions(text))
+    if constrained_actions and not constrained_actions.intersection(_actions(query_context.query)) and "처리해" not in query_context.query:
+        return False
+    return bool(tools.intersection(requested)) or any(
+        entity.casefold() in text for entity in query_context.entities
+    )
 
 
 def retrieve_protected(
@@ -176,12 +296,59 @@ def retrieve_protected(
     return protected
 
 
+
+def _constraint_actions(text: str) -> tuple[str, ...]:
+    actions = _actions(text)
+    # algorithm.md의 축약 예시: '외부 이메일은 승인 필요'.
+    if not actions and "email" in _detect_tools(text) and ("승인" in text or "approval" in text):
+        return ("send",)
+    return actions
+
+
+
+
 def resolve_required_states(
     candidates: Sequence[MemoryCandidate],
     query_context: QueryContext,
 ) -> list[MemoryItem]:
     """Select states required by the current task."""
-    raise NotImplementedError
+    states = []
+    seen = set()
+    for candidate in candidates:
+        memory = candidate.memory
+        if memory.memory_type != MemoryType.STATE:
+            continue
+        text = f"{memory.memory_key or ''} {memory.content}".casefold()
+        if memory.turn_id > query_context.current_turn:
+            continue
+        requested = set(_concepts(query_context.query))
+        available = set(_concepts(text))
+        # '파일' 하나가 맞는다고 모든 파일을 필수로 올리지 않는다.
+        specific_concepts = requested - {"파일", "문서", "이메일"}
+        requested_names = set(_specific_entities(query_context.query)) - set(_recipients(query_context.query))
+        name_match = any(name.casefold() in text for name in requested_names)
+        if requested_names:
+            relevant = name_match
+        elif specific_concepts:
+            relevant = bool(specific_concepts & available)
+            # 보고서를 보낼 수신자 정보도 해당 행동의 필수 State이다.
+            relevant = relevant or ("send" in _actions(query_context.query)
+                                    and "담당자" in available
+                                    and ("이메일" in available or "@" in memory.content))
+        else:
+            relevant = bool(requested & available)
+            if not requested:
+                relevant = any(entity.casefold() in text for entity in query_context.entities)
+        if not relevant:
+            continue
+        key = (memory.session_id, memory.memory_key)
+        if key in seen:
+            raise MemoryStoreConsistencyError("required states contain multiple versions for one key")
+        seen.add(key)
+        candidate.is_applicable = True
+        candidate.selection_reason = "required_state_entity_match"
+        states.append(memory)
+    return states
 
 
 def compute_utility(
@@ -540,6 +707,7 @@ def select_memory(
         memory_tokens=memory_tokens,
         remaining_budget=remaining_budget,
     )
+
     
     
 def _with_token_count(
