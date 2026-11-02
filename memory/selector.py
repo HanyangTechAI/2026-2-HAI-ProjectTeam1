@@ -514,7 +514,11 @@ def select_memory(
     top_k: int = 20,
     utility_weights: tuple[float, float, float] = DEFAULT_UTILITY_WEIGHTS,
 ) -> SelectionResult:
-    """Run the memory-selection pipeline."""
+    
+    # =========================================================
+    # 0. Input validation
+    # =========================================================
+    
     if not isinstance(query, str) or not query.strip():
         raise ValueError("query must be a non-empty string")
 
@@ -536,6 +540,12 @@ def select_memory(
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
 
+    # =========================================================
+    # 1. Calculate memory budget
+    #
+    # B_memory = B_total - C_fixed
+    # =========================================================
+
     status, memory_budget = calculate_memory_budget(
         total_budget=total_budget,
         fixed_tokens=fixed_tokens,
@@ -546,12 +556,23 @@ def select_memory(
             status=status,
             remaining_budget=0,
         )
+        
+    # =========================================================
+    # 2. Query analysis
+    # =========================================================
 
     query_context = analyze_query(
         query=query,
         current_turn=current_turn,
         current_time=current_time,
     )
+    
+    # =========================================================
+    # 3. General retrieval
+    #
+    # Protected active constraints are excluded here.
+    # They use the separate protected retrieval path.
+    # =========================================================
 
     retrieved = retrieve_candidates(
         query_context=query_context,
@@ -566,10 +587,22 @@ def select_memory(
         for candidate in retrieved
     )
 
+    # =========================================================
+    # 4. Version chain expansion
+    # =========================================================
+
     expanded = expand_version_chains(
         candidates=retrieved,
         memory_store=memory_store,
     )
+    
+    # =========================================================
+    # 5. Temporal resolution
+    #
+    # CURRENT       -> active version
+    # HISTORICAL    -> valid version at requested time
+    # RELATIVE_TIME -> resolved historical version
+    # =========================================================
 
     resolved = resolve_temporal_versions(
         candidates=expanded,
@@ -580,19 +613,28 @@ def select_memory(
         resolved,
         token_counter,
     )
+    
+    # =========================================================
+    # 6. Required State
+    # =========================================================
 
     states = resolve_required_states(
         candidates=resolved,
         query_context=query_context,
     )
 
-    states = [
-        _with_token_count(
-            memory,
-            token_counter,
-        )
-        for memory in states
-    ]
+    states = _retokenize_memories(
+        states,
+        token_counter,
+    )
+    
+    # =========================================================
+    # 7. Protected Constraint
+    #
+    # General retrieval과 별도 경로.
+    # Semantic relevance 경쟁 없이 applicable한 active
+    # protected constraint를 확보한다.
+    # =========================================================
 
     protected = retrieve_protected(
         query_context=query_context,
@@ -600,46 +642,82 @@ def select_memory(
         session_id=session_id,
     )
     
-    protected = [
-        _with_token_count(
-            memory,
-            token_counter,
-        )
-        for memory in protected
-    ]
+    protected = _retokenize_memories(
+        protected,
+        token_counter,
+    )
+    
+    # =========================================================
+    # 8. Mandatory selection
+    #
+    # Mandatory = Protected + Required State
+    #
+    # 이 정보들은 Flexible Memory와 relevance 경쟁을 하지 않는다.
+    # =========================================================
 
     mandatory_result = select_mandatory(
         protected=protected,
         states=states,
         memory_budget=memory_budget,
     )
+    
+    # =========================================================
+    # 9. Mandatory budget failure
+    #
+    # C_mandatory > B_memory
+    #
+    # Mandatory를 버려서 행동을 계속하지 않고 Pipeline을 중단한다.
+    # =========================================================
 
     if mandatory_result.status != PipelineStatus.OK:
-        mandatory = tuple(protected) + tuple(states)
+        mandatory_ids = tuple(
+            memory.memory_id
+            for memory in mandatory_result.memories
+        )
+        
+        mandatory_id_set = set(mandatory_ids)
+        
+        rejected_ids = _unique_ids(
+            candidate.memory.memory_id
+            for candidate in resolved
+            if candidate.memory.memory_id not in mandatory_id_set
+        )
         
         return SelectionResult(
-            status=mandatory_result.status,
+            status=PipelineStatus.INSUFFICIENT_CONTEXT_BUDGET,
             protected=tuple(protected),
             states=tuple(states),
+            flexible=(),
             retrieved_memory_ids=retrieved_ids,
-            selected_memory_ids=tuple(memory.memory_id for memory in mandatory),
+            selected_memory_ids=mandatory_ids,
+            rejected_memory_ids=rejected_ids,
             memory_tokens=mandatory_result.used_tokens,
             remaining_budget=0,
         )
-
-    mandatory_ids = {
+        
+    # =========================================================
+    # 10. Remove mandatory memories from flexible pool
+    # =========================================================
+    
+    mandatory_ids = tuple(
         memory.memory_id
         for memory in mandatory_result.memories
-    }
+    )
     
     flexible_candidates: list[MemoryCandidate] = []
 
     for candidate in resolved:
-        if candidate.memory.memory_id in mandatory_ids:
+        memory = candidate.memory
+        
+        if memory.memory_id in mandatory_ids:
             continue
         
-        if candidate.memory.memory_type == MemoryType.CONSTRAINT and candidate.memory.is_active and candidate.memory.is_protected:
+        if memory.memory_type == MemoryType.CONSTRAINT and memory.is_active and memory.is_protected:
             continue
+        
+        # =====================================================
+        # 11. Flexible utility
+        # =====================================================
         
         candidate.utility_score = compute_utility(
             candidate,
@@ -648,53 +726,66 @@ def select_memory(
         )
         
         flexible_candidates.append(candidate)
+        
+    # =========================================================
+    # 12. Flexible budget
+    #
+    # B_flexible = B_memory - C_mandatory
+    # =========================================================
+
+    flexible_budget = mandatory_result.remaining_budget
 
     selected_flexible = select_flexible(
         candidates=flexible_candidates,
-        budget=mandatory_result.remaining_budget,
+        budget=flexible_budget,
     )
 
     flexible_memories = tuple(
         candidate.memory
         for candidate in selected_flexible
     )
-
-    selected_memories = (
-        tuple(protected)
-        + tuple(states)
-        + flexible_memories
-    )
     
-    unique_selected: list[MemoryItem] = []
-    
-    seen_ids: set[str] = set()
+    # =========================================================
+    # 13. Final selection
+    #
+    # Protected
+    #   ↓
+    # Required State
+    #   ↓
+    # Flexible
+    # =========================================================
 
-    for memory in selected_memories:
-        if memory.memory_id in seen_ids:
-            continue
-        
-        seen_ids.add(memory.memory_id)
-        unique_selected.append(memory)
-        
-    selected_ids = tuple(memory.memory_id for memory in unique_selected)
+    selected_memories = tuple(mandatory_result.memories) + flexible_memories
+    
+    selected_memories = _deduplicate_memories(selected_memories)
+    
+    selected_ids = tuple(memory.memory_id for memory in selected_memories)
 
     selected_id_set = set(selected_ids)
     
-    rejected_ids: list[str] = []
-    rejected_seen: set[str] = set()
-
-    for candidate in resolved:
-        memory_id = candidate.memory.memory_id
-        if memory_id not in selected_id_set and memory_id not in rejected_seen:
-            rejected_seen.add(candidate.memory.memory_id)
-            rejected_ids.append(candidate.memory.memory_id)
+    # =========================================================
+    # 14. Rejected memories
+    # =========================================================
+    
+    rejected_ids = _unique_ids(
+        candidate.memory.memory_id
+        for candidate in resolved
+        if candidate.memory.memory_id not in selected_id_set
+    )
+    
+    # =========================================================
+    # 15. Final accounting
+    # =========================================================
 
     memory_tokens = sum(
         memory.token_count
-        for memory in unique_selected
+        for memory in selected_memories
     )
     
-    remaining_budget = max(memory_budget - memory_tokens, 0)
+    if memory_tokens > memory_budget:
+        raise RuntimeError("selector produced memories exceeding the available memory budget")
+    
+    remaining_budget = memory_budget - memory_tokens
 
     return SelectionResult(
         status=PipelineStatus.OK,
@@ -707,7 +798,6 @@ def select_memory(
         memory_tokens=memory_tokens,
         remaining_budget=remaining_budget,
     )
-
     
     
 def _with_token_count(
@@ -743,3 +833,48 @@ def _retokenize_candidates(
         result.append(candidate)
 
     return result
+
+
+def _retokenize_memories(
+    memories: Sequence[MemoryItem],
+    token_counter: TokenCounter | None,
+) -> list[MemoryItem]:
+    return [
+        _with_token_count(
+            memory,
+            token_counter,
+        )
+        for memory in memories
+    ]
+    
+    
+def _unique_ids(
+    ids,
+) -> tuple[str, ...]:
+    result: list[str] = []
+    seen: set[str] = set()
+    
+    for memory_id in ids:
+        if memory_id in seen:
+            continue
+        
+        seen.add(memory_id)
+        result.append(memory_id)
+    
+    return tuple(result)
+
+
+def _deduplicate_memories(
+    memories: Sequence[MemoryItem],
+) -> tuple[MemoryItem, ...]:
+    result: list[MemoryItem] = []
+    seen: set[str] = set()
+    
+    for memory in memories:
+        if memory.memory_id in seen:
+            continue
+        
+        seen.add(memory.memory_id)
+        result.append(memory)
+    
+    return tuple(result)

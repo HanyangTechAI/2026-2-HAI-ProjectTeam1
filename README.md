@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, Proposed 효용 계산·필수/유연 선택, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. Proposed Query Analyzer·Version Expansion·Temporal/Protected/Required-State Resolution 및 실제 LLM Planner 연동에는 아직 미구현 또는 미연결 부분이 있어 Proposed 상위 파이프라인은 종단 실행할 수 없다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. Proposed Selector의 전용 단위·통합 테스트와 Benchmark Runner 전략 연결, 실제 LLM Planner 연동은 아직 남아 있다.
 
 ## 배경과 목표
 
@@ -156,7 +156,7 @@ python prototype/run_demo.py
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
 
-`memory/selector.py`는 기본 가중치 `(relevance, importance, recency) = (0.6, 0.3, 0.1)`의 효용 계산, 중복 제거된 Mandatory 선택과 예산 초과 중단, Utility-per-Token 기반 Flexible 선택을 제공한다. `select_memory()`는 주입된 Token Counter로 후보와 필수 Memory의 비용을 다시 측정할 수 있지만, Query Analyzer와 Version/Temporal/Protected/Required-State 해석 함수가 아직 미구현이어서 전체 Proposed 경로는 연결 전이다.
+`memory/query_analyzer.py`는 절대 날짜, 월·연도, 상대 시각과 현재 시점 표현을 규칙 기반으로 해석하고 Entity·Tool 신호를 추출한다. `memory/selector.py`는 버전 체인 확장, 현재·과거·기간별 Temporal Resolution, 현재 행동에 적용되는 Protected Constraint와 Required State 판정, 기본 가중치 `(relevance, importance, recency) = (0.6, 0.3, 0.1)`의 효용 계산, Mandatory 예산 초과 중단과 Utility-per-Token Flexible 선택을 하나의 `select_memory()` 경로로 제공한다. 주입된 Token Counter가 있으면 선택 전에 비용을 다시 측정한다. 이 V1 해석은 규칙·어휘 기반이며 자유 문장의 일반 의미 추론을 보장하지 않는다.
 
 `memory/store.py`는 프로세스 내부 인메모리 저장소를 제공한다. 동일 세션·`memory_key`의 새 ACTIVE 항목을 삽입하면 기존 ACTIVE 항목을 비활성화하고 유효 종료 시각과 양방향 대체 참조를 연결한다. ID·버전 참조·시간 순서·ACTIVE 유일성도 검증하지만, 파일이나 DB로 영속화하지는 않는다.
 

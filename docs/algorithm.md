@@ -512,9 +512,6 @@ FUNCTION EXPAND_VERSION_CHAINS(
         IF memory.memory_key IS NULL:
             CONTINUE
 
-        IF NOT IS_VERSIONED(memory):
-            CONTINUE
-
         versions ← FIND_ALL_BY_KEY(
             session_id = memory.session_id,
             memory_key = memory.memory_key
@@ -544,6 +541,8 @@ report_final.pdf
 ```
 
 이후 Temporal Resolver가 Query 시점에 맞는 Version을 선택한다.
+
+현재 V1은 별도의 Type 판정보다 `memory_key` 존재 여부를 버전 체인 조회 기준으로 사용한다. Store 결과가 요청한 Session·Key와 다르면 오류로 처리하고, 확장 버전에는 최초 검색 후보의 semantic score를 복사하지 않는다.
 
 ---
 
@@ -626,6 +625,8 @@ FUNCTION RESOLVE_TEMPORAL_VERSION(
 
     RETURN resolved
 ```
+
+기간 Query에서는 유효 구간이 겹치는 후보 중 겹치는 시간이 가장 긴 버전을 선택한다. 동률은 더 늦은 `valid_from`, 이어서 `memory_id` 오름차순으로 결정한다. 현재 또는 단일 시점에 복수 버전이 동시에 유효하면 자동 선택하지 않고 Store 일관성 오류로 처리한다.
 
 ---
 

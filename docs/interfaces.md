@@ -72,7 +72,9 @@ benchmark/runner.py
 - memory/store.py의 인메모리 저장·조회, Version Chain 및 ACTIVE/Constraint 대체 처리
 - memory/retrieval.py의 임베딩 검증, 코사인 유사도와 Semantic Top-K
 - memory/selector.py의 Session/turn 필터 및 Protected 분리 General Retrieval
-- memory/selector.py의 효용 계산, Mandatory 중복 제거·예산 검증, Utility-per-Token Flexible Selection과 선택 전 재토큰화
+- memory/query_analyzer.py의 규칙 기반 Temporal Intent·Entity·Required Tool 분석
+- memory/selector.py의 Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution
+- memory/selector.py의 효용 계산, Mandatory 중복 제거·예산 검증, Utility-per-Token Flexible Selection, 선택 전 재토큰화와 상위 `select_memory` 경로
 - tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
 - tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
 - context/tokenizer.py의 공용 TokenCounter, GeminiTokenCounter, count 검증과 token_count_mode
@@ -88,10 +90,8 @@ benchmark/runner.py
 - tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
 - tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
 
-스켈레톤 또는 미구현
-- Proposed Query Analyzer
-- Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution
-- 위 미구현 단계에 의존하는 Proposed 상위 `select_memory` 종단 경로
+미연결 또는 추가 검증 필요
+- Proposed Selector 전용 단위·통합 테스트와 Benchmark Runner 전략 연결
 - 실제 LLM planner와 embedding/provider adapter
 ```
 
@@ -766,6 +766,8 @@ Required Tool Detection
 
 을 수행한다.
 
+현재 V1은 절대 ISO 날짜·시각, `YYYY년 M월 [D일]`, 연도, N개월·년·주·일·시간 전후, 지난달·지난주·작년, 어제·오늘·내일과 현재 표현을 규칙 기반으로 처리한다. 상대 시각은 시스템 시계가 아니라 `current_time`을 기준으로 계산한다. 지원하지 않는 명시적 과거 표현은 현재 요청으로 간주하지 않고 `ValueError`로 거부한다. Entity와 Tool 추출도 제한된 파일·이메일·일정·작업 어휘 기반이다.
+
 ---
 
 # 7. General Retrieval Interface
@@ -883,6 +885,8 @@ mem_050 → report_final.pdf
 
 세 Version 모두 Temporal Resolver에 전달한다.
 
+현재 구현은 `memory_key`가 있는 후보마다 동일 Session·Key의 전체 항목을 조회하고 `(session_id, memory_id)`로 중복을 제거한다. 확장된 버전에는 원 검색 점수를 복사하지 않으며, Store가 다른 Session 또는 Key의 항목을 반환하면 오류로 처리한다.
+
 ---
 
 # 9. Temporal Resolution Interface
@@ -930,6 +934,8 @@ valid_from <= target_time
 ```
 
 을 만족하면 유효하다.
+
+기간 Query는 Memory 유효 구간과 요청 기간이 겹치는 버전을 후보로 삼고, 겹치는 시간이 가장 긴 버전을 선택한다. 동률은 `valid_from`이 늦은 항목, 다시 동률이면 `memory_id` 오름차순으로 결정한다. 현재 버전 또는 단일 시점에 복수 버전이 유효하면 Store 일관성 오류로 처리하며, Query와 Memory 시각의 timezone 인식 여부가 다르면 거부한다.
 
 ---
 
@@ -1018,6 +1024,8 @@ Protected Retrieval에는 Temporal Filter를 적용하지 않는다.
 
 과거 Constraint 조회는 General Retrieval 경로에서 처리한다.
 
+현재 적용성 판단은 규칙 자체를 묻는 조회와 행동 요청을 구분하고 Tool, Action, 수신자·파일명·Entity, 내부/외부 범위를 비교한다. 이는 제한된 V1 어휘에 기반하므로 일반 의미 추론이나 정책 언어 전체를 지원하지 않는다.
+
 ---
 
 # 11. Required State Interface
@@ -1033,6 +1041,8 @@ def resolve_required_states(
 ```
 
 반환 결과는 Mandatory Memory에 포함된다.
+
+현재 구현은 Temporal Resolution 결과 중 `STATE`만 대상으로 구체 파일·Entity와 보고서/계약서/담당자 등의 개념을 비교한다. 같은 Session·Key의 Required State가 복수 남으면 일관성 오류로 처리하고, 선택된 Candidate에는 `required_state_entity_match` 사유를 기록한다.
 
 ---
 
@@ -1278,7 +1288,7 @@ def select_memory(
     ...
 ```
 
-`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. 다만 현재 Query Analyzer, Version Chain Expansion, Temporal/Protected applicability, Required-State Resolution이 미구현이므로 이 상위 함수는 아직 전체 Proposed 실행 경로로 사용할 수 없다.
+`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. Query 분석부터 최종 회계까지의 Proposed Selector 경로는 구현되어 호출할 수 있다. Mandatory 예산 초과 시 Flexible Memory는 선택하지 않고 나머지 resolved 후보를 rejected로 기록한다. 정상 결과는 Mandatory와 Flexible을 ID로 중복 제거하고, 최종 합계가 Memory Budget을 넘으면 내부 불변식 오류로 중단한다. 다만 이 경로의 전용 단위·통합 테스트와 Benchmark Runner 전략 연결은 아직 없다.
 
 처리 순서:
 
