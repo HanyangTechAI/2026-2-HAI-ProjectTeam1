@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
+from datetime import datetime
 
 from agent.agent import Agent, ActResult, AgentRunResult
 from agent.interaction import Interaction
@@ -13,8 +14,9 @@ from context.tokenizer import TokenCounter, provisional_token_count
 
 from memory.baselines import sliding_window, utility_per_token, vector_top_k
 from memory.schema import MemoryItem
-from memory.selector import PipelineStatus, SelectionResult
+from memory.selector import PipelineStatus, SelectionResult, DEFAULT_UTILITY_WEIGHTS, select_memory
 from memory.retrieval import Embedder
+from memory.store import SnapshotMemoryStore
 
 
 GoalChecker = Callable[
@@ -38,6 +40,7 @@ class SelectionPolicy(Protocol):
         fixed_tokens: int,
         current_turn: int,
         token_counter: TokenCounter,
+        current_time: datetime | None = None,
     ) -> SelectionResult:
         ...
         
@@ -129,6 +132,7 @@ def make_baseline_policy(
         fixed_tokens: int,
         current_turn: int,
         token_counter: TokenCounter,
+        current_time: datetime | None = None,
     ) -> SelectionResult:
         common = {
             "session_id": session_id,
@@ -157,6 +161,52 @@ def make_baseline_policy(
             top_k=top_k,
             weights=utility_weights,
             **common,
+        )
+        
+    return select
+
+
+def make_proposed_policy(
+    *,
+    embedder: Embedder,
+    top_k: int = 20,
+    utility_weights: tuple[float, float, float] = DEFAULT_UTILITY_WEIGHTS,
+) -> SelectionPolicy:
+    if not callable(embedder):
+        raise TypeError("proposed policy requires a callable embedder")
+    
+    if type(top_k) is not int or top_k <= 0:
+        raise ValueError("top_k must be a positive integer")
+    
+    def select(
+        *,
+        query: str,
+        memories: Sequence[MemoryItem],
+        session_id: str,
+        total_budget: int,
+        fixed_tokens: int,
+        current_turn: int,
+        token_counter: TokenCounter,
+        current_time: datetime | None = None,
+    ) -> SelectionResult:
+        
+        if current_time is None:
+            raise ValueError("proposed policy requires current_time")
+        
+        store = SnapshotMemoryStore(tuple(memories))
+        
+        return select_memory(
+            query=query,
+            memory_store=store,
+            embedder=embedder,
+            top_k=top_k,
+            utility_weights=utility_weights,
+            session_id=session_id,
+            total_budget=total_budget,
+            fixed_tokens=fixed_tokens,
+            current_turn=current_turn,
+            token_counter=token_counter,
+            current_time=current_time,
         )
         
     return select
@@ -232,6 +282,7 @@ class Orchestrator:
         memories: Sequence[MemoryItem],
         total_budget: int,
         current_turn: int,
+        current_time: datetime | None = None,
     ) -> PipelineRunResult:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query must be a non-empty string")
@@ -250,6 +301,9 @@ class Orchestrator:
             for memory in memories
         ):
             raise TypeError("memories must contain MemoryItem objects")
+        
+        if current_time is not None and not isinstance(current_time, datetime):
+            raise TypeError("current_time must be datetime or None")
         
         memory_snapshot = tuple(memories)
         
@@ -307,6 +361,7 @@ class Orchestrator:
                     fixed_tokens=fixed_tokens,
                     current_turn=current_turn,
                     token_counter=self.token_counter,
+                    current_time=current_time,
                 )
                 
                 if not isinstance(selection, SelectionResult):

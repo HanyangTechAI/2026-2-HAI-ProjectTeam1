@@ -82,16 +82,17 @@ benchmark/runner.py
 - memory/baselines.py의 Sliding Window, Vector Top-k, Utility-per-Token
 - 결정적 규칙 Planner, Agent, mock Tool과 ToolExecutor
 - pipeline/orchestrator.py의 다단계 선택·Context·Agent 실행 제어
-- pipeline/pipeline_adapter.py의 Agent factory 기반 PipelineAdapter
-- benchmark/runner.py의 Baseline 시나리오 실행과 JSONL/summary 출력
+- pipeline/pipeline_adapter.py의 Baseline·Proposed Policy용 Agent factory 기반 PipelineAdapter
+- benchmark/runner.py의 네 전략 시나리오 실행과 JSONL/summary 출력
 - benchmark/evaluator.py의 snapshot 평가와 집계
 - benchmark/generator.py의 설정 grid 기반 temporal_update/approval 생성, 측정 및 셀별 저장
 - tests/test_baseline_context_agent_integration.py, tests/test_pipeline.py, tests/test_pipeline_adapter.py의 경계·파이프라인 테스트
 - tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
 - tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
+- tests/test_proposed_pipeline.py의 Snapshot Store → Proposed Policy → Agent 현재 State 통합 테스트
 
 미연결 또는 추가 검증 필요
-- Proposed Selector 전용 단위·통합 테스트와 Benchmark Runner 전략 연결
+- Proposed의 과거·기간·Protected·예산 실패 통합 테스트와 Ablation 실행
 - 실제 LLM planner와 embedding/provider adapter
 ```
 
@@ -703,6 +704,8 @@ def list_session_memories(
 
 비활성 버전을 포함한 Session의 모든 Memory를 `turn_id ASC, memory_id ASC`로 반환한다. 기록이 없으면 빈 리스트다.
 
+`SnapshotMemoryStore`는 Pipeline에 전달된 `Sequence[MemoryItem]`을 읽기 전용 Store Protocol로 감싼다. 생성 시 `memory_id` 중복과 동일 Session·Key의 ACTIVE 중복을 거부하며 `list_session_memories`, `find_all_by_key`, `find_active_protected_constraints`를 제공한다. Proposed Policy는 실행마다 이 Snapshot Store를 만들어 시나리오 간 상태를 격리한다. 삽입과 영속화는 지원하지 않는다.
+
 ## 5.7 구현 검증 범위
 
 현재 단위 테스트는 다음 계약을 실행 가능한 형태로 검증한다.
@@ -735,7 +738,7 @@ tests/test_state.py
   INSUFFICIENT_CONTEXT_BUDGET과 context=None을 반환함
 ```
 
-이 테스트의 `selection_from_store`는 미구현 Selector를 대신하는 테스트 전용 helper다. 따라서 General Retrieval, Version Chain Expansion, Temporal Resolution 또는 Budget-Aware Selection의 통합 완료를 의미하지 않는다.
+이 테스트의 `selection_from_store`는 Context Builder 경계만 격리하기 위한 helper이므로 General Retrieval과 Temporal Resolution을 검증하지 않는다. 실제 Proposed 현재 State 통합 경로는 `tests/test_proposed_pipeline.py`가 별도로 검증한다.
 
 ---
 
@@ -1288,7 +1291,7 @@ def select_memory(
     ...
 ```
 
-`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. Query 분석부터 최종 회계까지의 Proposed Selector 경로는 구현되어 호출할 수 있다. Mandatory 예산 초과 시 Flexible Memory는 선택하지 않고 나머지 resolved 후보를 rejected로 기록한다. 정상 결과는 Mandatory와 Flexible을 ID로 중복 제거하고, 최종 합계가 Memory Budget을 넘으면 내부 불변식 오류로 중단한다. 다만 이 경로의 전용 단위·통합 테스트와 Benchmark Runner 전략 연결은 아직 없다.
+`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. Query 분석부터 최종 회계까지의 Proposed Selector 경로는 구현되어 호출할 수 있다. Mandatory 예산 초과 시 Flexible Memory는 선택하지 않고 나머지 resolved 후보를 rejected로 기록한다. 정상 결과는 Mandatory와 Flexible을 ID로 중복 제거하고, 최종 합계가 Memory Budget을 넘으면 내부 불변식 오류로 중단한다. Proposed Policy와 Pipeline Adapter, Benchmark Runner 전략 연결도 구현되어 있으며 현재 State 복원 경로를 통합 테스트한다. 과거·기간·Protected·예산 실패 경로의 통합 검증은 아직 남아 있다.
 
 처리 순서:
 
@@ -2439,7 +2442,8 @@ PipelineAdapter
 → 실행마다 새 Agent와 Orchestrator를 만들어 전략·반복 간 상태를 격리한다.
 
 Benchmark Runner
-→ Baseline 전략별 실행 결과를 Evaluator에 넘기고 runs.jsonl과 summary.json을 기록한다.
+→ 세 Baseline과 Proposed 실행 결과를 Evaluator에 넘기고 runs.jsonl과 summary.json을 기록한다.
+→ Proposed에는 embedder와 Scenario의 current_time을 요구한다.
 
 Evaluator
 → Retrieval, Selection, Action Failure를 분리해 평가한다.

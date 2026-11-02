@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. Proposed Selector의 전용 단위·통합 테스트와 Benchmark Runner 전략 연결, 실제 LLM Planner 연동은 아직 남아 있다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략도 Snapshot Memory Store를 통해 Runner에 연결되어 있다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. 과거·기간·Protected·예산 실패를 포괄하는 Proposed 통합 테스트와 실제 LLM Planner 연동은 아직 남아 있다.
 
 ## 배경과 목표
 
@@ -150,7 +150,7 @@ python prototype/run_demo.py
 
 데모는 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 시나리오 `memory_snapshot`과 합성 토큰 수를 사용하는 별도 데모 경로이며 실제 LLM 성능 측정은 아니다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다.
 
-실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token을 공통 `SelectionResult`로 변환한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 `PipelineAdapter`로 활성 integration 시나리오를 전략·반복별 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. 단계별 선택·Context·행동, 최종 결과와 누적 입력 토큰도 실행 레코드에 보존한다.
+실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token과 `memory/selector.py`의 Proposed를 공통 `SelectionResult`로 변환한다. Proposed Policy는 실행 입력의 Memory Snapshot으로 `SnapshotMemoryStore`를 만들고, 시간 해석 기준인 `current_time`을 요구한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 네 전략을 `PipelineAdapter`로 반복 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector Top-k, Utility-per-Token, Proposed에는 embedder가 필요하며 Proposed 시나리오에는 ISO 8601 `current_time`이 있어야 한다.
 
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
 
@@ -206,7 +206,7 @@ Embedding과 실제 LLM provider는 아직 확정되지 않았다. 연구 실행
 python -m unittest discover -s tests -v
 ```
 
-`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인 유사도·Top-K·동률 정렬을 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_pipeline_adapter.py`는 실행별 Agent 격리, Runner 저장·재평가와 중간 실행 후 예산 실패 기록을 검증하며, `tests/test_tokenizer.py`는 Gemini counter의 입력 검증·API 응답 처리·캐시 동작을 fake client로 검증한다.
+`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인 유사도·Top-K·동률 정렬을 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter가 Version Chain에서 현재 ACTIVE State를 복원하는 종단 경로를 검증한다. `tests/test_pipeline_adapter.py`는 실행별 Agent 격리, Runner 저장·재평가와 중간 실행 후 예산 실패 기록을 검증하며, `tests/test_tokenizer.py`는 Gemini counter의 입력 검증·API 응답 처리·캐시 동작을 fake client로 검증한다.
 
 ## 기술 스택 후보
 

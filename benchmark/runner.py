@@ -20,17 +20,20 @@ from typing import Any
 
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
+
 from context.tokenizer import TokenCounter, count_tokens, provisional_token_count, GeminiTokenCounter, token_count_mode
+
 from memory.retrieval import Embedder
 from memory.schema import MemoryItem
 from memory.selector import PipelineStatus
+
 from pipeline.orchestrator import GoalChecker, PipelineRunResult
-from pipeline.pipeline_adapter import AgentFactory, make_baseline_pipeline_adapter
+from pipeline.pipeline_adapter import AgentFactory, make_baseline_pipeline_adapter, make_proposed_pipeline_adapter
 
 from .evaluator import aggregate_results, evaluate
 
 
-STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token")
+STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
 
@@ -98,18 +101,36 @@ def _run_one(
             return environment_agent_factory(_environment_snapshot(scenario))
     else:
         runtime_agent_factory = agent_factory
-    adapter = make_baseline_pipeline_adapter(
-        strategy,
-        system_prompt=system_prompt,
-        tool_definitions=tool_definitions,
-        agent_factory=runtime_agent_factory,
-        embedder=embedder,
-        top_k=top_k,
-        utility_weights=utility_weights,
-        token_counter=token_counter,
-        max_steps=max_steps,
-        goal_checker=goal_checker,
-    )
+        
+    if strategy == "proposed":
+        if embedder is None:
+            raise ValueError("proposed strategy requires embedder")
+        
+        adapter = make_proposed_pipeline_adapter(
+            system_prompt=system_prompt,
+            tool_definitions=tool_definitions,
+            agent_factory=runtime_agent_factory,
+            embedder=embedder,
+            top_k=top_k,
+            utility_weights=utility_weights,
+            token_counter=token_counter,
+            max_steps=max_steps,
+            goal_checker=goal_checker,
+        )
+    else:
+        adapter = make_baseline_pipeline_adapter(
+            strategy,
+            system_prompt=system_prompt,
+            tool_definitions=tool_definitions,
+            agent_factory=runtime_agent_factory,
+            embedder=embedder,
+            top_k=top_k,
+            utility_weights=utility_weights,
+            token_counter=token_counter,
+            max_steps=max_steps,
+            goal_checker=goal_checker,
+        )
+        
     # policy는 adapter 생성 시 지정하고, 나머지 실행 입력은 Orchestrator.run으로 전달한다.
     outcome = adapter(
         query=scenario["query"],
@@ -117,7 +138,9 @@ def _run_one(
         memories=memories,
         total_budget=scenario["context_budget"],
         current_turn=scenario["current_turn"],
+        current_time=_scenario_current_time(scenario),
     )
+    
     if not isinstance(outcome, PipelineRunResult):
         raise TypeError("pipeline adapter must return PipelineRunResult")
     if not outcome.steps:
@@ -219,8 +242,17 @@ def run_scenarios(
         strategy not in STRATEGIES for strategy in strategies
     ):
         raise ValueError(f"strategies must be distinct names from {STRATEGIES}")
-    if any(strategy != "sliding_window" for strategy in strategies) and embedder is None:
-        raise ValueError("vector_top_k and utility_per_token require embedder")
+    
+    embedding_strategies = {"vector_top_k", "utility_per_token", "proposed"}
+    
+    if any(strategy in embedding_strategies for strategy in strategies) and embedder is None:
+        raise ValueError("vector_top_k, utility_per_token, and proposed require embedder")
+    
+    if "proposed" in strategies:
+        for scenario in enabled:
+            if scenario.get("current_time") is None:
+                raise ValueError("proposed strategy requires scenario.current_time")
+    
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
     if type(repeats) is not int or repeats <= 0:
@@ -275,6 +307,24 @@ def _import_callable(spec: str) -> Callable:
     if not callable(value):
         raise TypeError(f"{spec} is not callable")
     return value
+
+
+def _scenario_current_time(scenario: Mapping[str, Any]) -> datetime | None:
+    raw = scenario.get("current_time")
+    
+    if raw is None:
+        return None
+    
+    if isinstance(raw, datetime):
+        return raw
+    
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("scenario.current_time must be a valid ISO 8601 timestamp") from exc
+        
+    raise TypeError("scenario.current_time must be datetime, ISO string, or None")
 
 
 def main() -> None:

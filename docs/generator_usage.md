@@ -108,7 +108,7 @@ Runner에 전달할 때는 `manifest.json`에 기록된 **단일 셀 JSON**을 `
 python -m benchmark.runner --help
 ```
 
-현재 Runner는 Baseline 실행기이며 실험 설정 파일을 읽어 전체 grid, strategy와 repeat를 자동 실행하지 않는다. Proposed와 Ablation 상위 경로, 실제 LLM Planner 연결도 별도 작업이다. `reference.json`의 Long Context 실행 역시 생성만으로 구현되지 않는다.
+현재 Runner는 단일 셀 JSON에 대해 Sliding Window, Vector Top-k, Utility-per-Token, Proposed와 repeat를 실행한다. Proposed는 외부 embedder와 각 Scenario의 ISO 8601 `current_time`을 요구하며 생성 데이터에는 이 값이 포함된다. 여러 셀을 순회하는 전체 grid 실행, Ablation 상위 경로, 실제 LLM Planner와 `reference.json`의 Long Context 실행은 별도 작업이다.
 
 생성한 시나리오의 파일 목록과 사전 승인 ID를 mock Tool에 넣으려면 `--environment-agent-factory module:function`을 사용한다. 이 함수는 실행마다 해당 시나리오의 `environment` 사본만 받아 새 Agent를 반환한다. 정답, 검색 fixture와 기대 호출은 받지 않는다. 기존 인자 없는 `--agent-factory`와 동시에 지정하지 않는다.
 

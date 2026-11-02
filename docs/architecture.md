@@ -1309,7 +1309,7 @@ Budget-Aware Memory Selection
 │   ├── evaluator.py
 │   │   └── Task / Constraint Evaluation
 │   ├── runner.py
-│   │   └── Baseline 실행 / JSONL / 집계 출력
+│   │   └── Baseline·Proposed 실행 / JSONL / 집계 출력
 │   │
 │   └── scenarios.json
 │

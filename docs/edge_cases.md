@@ -5,9 +5,9 @@
 본 문서는 Constraint-Preserving Budget-Aware Memory 시스템에서 발생할 수 있는 예외 상황과 검증 기준을 정의한다. Memory 저장·검색·시간 해석·예산 할당 과정의 오류가 Agent 행동에 미치는 영향을 확인하는 데 사용한다.
 
 - 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md), [interfaces.md](./interfaces.md)
-- 작성 기준: 2026-09-28에 확인한 설계 문서. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
-- EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. 이 중 EC-02의 정상 삽입 경로와 관련 Store 불변식은 `tests/test_memory.py`, `tests/test_state.py`에서 검증한다. 나머지 항목은 명세만으로 구현 완료나 테스트 통과를 의미하지 않는다.
-- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. Semantic General Retrieval, Version Chain Expansion, Temporal Resolution, Mandatory 합계 초과 반환과 Flexible 단일 항목 건너뛰기는 구현되어 있으나 Selector 전용 단위·통합 테스트는 아직 없다. Store의 전체 Version Chain 조회는 단위 테스트로 검증한다. EC-12의 최종 Context 포맷 초과 경로는 `tests/test_memory_context_integration.py`에서 Store 조회 결과를 테스트 helper로 연결해 검증한다. 그 밖의 항목도 문서만으로 테스트 통과를 의미하지 않는다. EC-09의 규칙 기반 시간 해석은 구현되었지만 Benchmark 포함 여부는 별도로 결정한다.
+- 작성 기준: 2026-11-03 현재 구현과 테스트. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
+- EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. EC-02의 정상 삽입 경로와 Store 불변식은 `tests/test_memory.py`, `tests/test_state.py`에서 검증한다. EC-05의 현재 State 선택은 `tests/test_proposed_pipeline.py`가 Proposed Adapter부터 Agent 실행까지 확인한다. 그 밖의 항목은 명세만으로 테스트 통과를 의미하지 않는다.
+- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. Semantic General Retrieval, Version Chain Expansion, Temporal Resolution, Mandatory 합계 초과 반환과 Flexible 단일 항목 건너뛰기는 구현되어 있다. EC-08의 현재 버전 복원 경로는 `tests/test_proposed_pipeline.py`, Store의 전체 Version Chain 조회는 Store 단위 테스트가 검증한다. EC-12의 최종 Context 포맷 초과 경로는 `tests/test_memory_context_integration.py`에서 테스트 helper로 검증한다. 과거·기간 Query, Protected 적용성, Mandatory/Flexible 예산 경로에는 아직 전용 통합 테스트가 없다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.
 
 ## 2. 공통 검증 원칙
@@ -127,9 +127,9 @@
 
 **입력 예시 B — 필수 Memory:** `B_memory = 100`인데 필수 Protected Memory P1 하나가 120토큰이다. 필수 State 하나가 같은 예산을 초과하는 경우에도 동일한 정책을 적용한다.
 
-**기대 동작 B:** EC-12에 따라 `mandatory_overflow = true`를 기록하고 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다. P1을 제외하거나 임의로 잘라 선택을 계속하지 않는다. Flexible 선택 단계로 진행하지 않으며, Agent와 Tool을 호출하지 않는다.
+**기대 동작 B:** EC-12에 따라 `INSUFFICIENT_CONTEXT_BUDGET`을 반환한다. P1을 제외하거나 임의로 잘라 선택을 계속하지 않는다. `SelectionResult`에는 Mandatory ID와 실제 필요 토큰을 진단 정보로 보존하되, Flexible 선택 단계로 진행하지 않으며 Agent와 Tool을 호출하지 않는다.
 
-**통과 기준:** A의 선택 집합은 `{F2}`이고 비용은 20이다. B에서는 반환 상태가 `INSUFFICIENT_CONTEXT_BUDGET`이고 최종 선택 집합은 비어 있다. Overflow가 기록되며 Flexible 선택, Agent 실행 및 Tool 호출이 발생하지 않는다. 오류 반환은 Task 성공으로 집계하지 않는다.
+**통과 기준:** A의 선택 집합은 `{F2}`이고 비용은 20이다. B에서는 반환 상태가 `INSUFFICIENT_CONTEXT_BUDGET`, `remaining_budget = 0`이며 `memory_tokens`는 예산을 초과한 Mandatory 전체 비용이다. `selected_memory_ids`는 누락된 필수 항목을 추적할 수 있도록 Mandatory ID를 담는다. Flexible 선택, Agent 실행 및 Tool 호출이 발생하지 않으며 오류 반환은 Task 성공으로 집계하지 않는다.
 
 **관련 모듈:** `memory/selector.py`, Context Builder
 
@@ -157,7 +157,7 @@
 
 **입력 예시:** `report.current_file`의 이전 버전만 검색되고, 현재 유효한 `report_final.pdf`는 Store에만 존재한다. Query는 현재 보고서를 요청한다.
 
-**기대 동작:** Retrieval에서 `memory_key`를 발견하면 Versioned type인지 확인한다. Versioned type이면 Store에서 해당 Session과 Key의 version chain을 조회하고, Temporal Resolver가 요청 시점에 맞는 버전을 선택한다.
+**기대 동작:** Retrieval 후보에서 `memory_key`를 발견하면 Store에서 해당 Session과 Key의 Version Chain을 조회하고, Temporal Resolver가 요청 시점에 맞는 버전을 선택한다. 현재 V1은 별도의 Versioned Type 판정보다 `memory_key` 존재 여부를 조회 기준으로 사용한다.
 
 **통과 기준:** 검색 후보에 없는 `report_final.pdf`가 최종 State로 선택된다. 과거 요청에서도 같은 version chain을 대상으로 해당 시점에 유효한 버전을 선택한다.
 
@@ -173,7 +173,7 @@
 
 **관련 모듈:** Temporal Resolver, `memory/selector.py`, `agent/agent.py`, `benchmark/evaluator.py`
 
-**구현 및 평가 범위:** 시간 기준을 분리하는 정책은 확정한다. 구현은 시간 여유가 있을 때 진행하는 후순위 항목으로 두며, Benchmark에서 제외할지는 별도로 결정한다.
+**구현 및 평가 범위:** Query Analyzer가 State의 과거·기간 기준을 `target_time` 또는 `target_range`로 만들고, Protected Retrieval은 현재 ACTIVE Constraint를 별도 경로에서 가져오므로 선택 경로는 구현되어 있다. 다만 이 복합 행동을 검증하는 전용 통합 테스트와 Benchmark 포함 여부는 아직 남아 있다.
 
 ### EC-10. 포맷을 포함한 최종 Context가 예산을 초과하는 경우
 
@@ -222,6 +222,8 @@
 `tests/test_memory_context_integration.py`는 Store에서 가져온 현재 State와 Protected Constraint가 최종 Context에 포함되고 대체된 버전은 제외되는지 확인한다. 또한 Flexible Memory가 없는 상태에서 필수 섹션을 포함한 최종 Context가 예산을 초과하면 EC-12에 따라 생성을 중단하는 경로를 검증한다. 실제 Selector 대신 테스트 helper를 사용하므로 Retrieval·Temporal Resolution까지 포함한 통합 검증은 아니다.
 
 `tests/test_pipeline.py`는 선택 또는 Context 단계의 예산 실패가 Agent·Tool 호출 전에 중단되는지, Tool feedback 이후 고정 비용이 증가해 예산을 넘는 경우 다음 Agent 실행을 막는지 검증한다. Tool 실패와 `max_steps` 종료도 별도 경로로 확인한다. `tests/test_baseline_context_agent_integration.py`는 세 Baseline과 Context Builder, 결정적 Agent, mock Tool의 연결을 검증하지만 Proposed Selector의 정책 검증은 아니다.
+
+`tests/test_proposed_pipeline.py`는 `SnapshotMemoryStore`, Proposed Policy, Pipeline Adapter와 Agent를 연결해 EC-05/EC-08의 현재 시점 경로를 검증한다. 검색된 이전 버전의 Version Chain에서 ACTIVE `report_final.pdf`를 복원하고 `report_v1.pdf`를 최종 선택에서 제외하는지 확인한다. 과거·기간 선택, Protected Constraint, Required State 예산 초과와 Flexible 제거는 이 테스트의 범위가 아니다.
 
 ### Agent 통합 검증
 

@@ -194,10 +194,10 @@ class MemoryStore:
         try:
             return sorted(
                 memories, 
-                key=lambda m: (
-                    m.valid_from, 
-                    m.turn_id, 
-                    m.memory_id,
+                key=lambda memory: (
+                    memory.valid_from, 
+                    memory.turn_id, 
+                    memory.memory_id,
                 ),
             )
             
@@ -225,9 +225,9 @@ class MemoryStore:
         
         return sorted(
             constraints, 
-            key=lambda m: (
-                m.turn_id, 
-                m.memory_id,
+            key=lambda memory: (
+                memory.turn_id, 
+                memory.memory_id,
             ),
         )
 
@@ -249,9 +249,9 @@ class MemoryStore:
         
         return sorted(
             memories, 
-            key=lambda m: (
-                m.turn_id, 
-                m.memory_id,
+            key=lambda memory: (
+                memory.turn_id, 
+                memory.memory_id,
             ),
         )
 
@@ -285,3 +285,118 @@ class MemoryStore:
             
         except TypeError as e:
             raise ValueError("version timestamps must use compatible timezone information") from e
+        
+        
+class SnapshotMemoryStore:
+    def __init__(
+        self, 
+        memories: list[MemoryItem] | tuple[MemoryItem, ...],
+    ) -> None:
+        if any(
+            not isinstance(memory, MemoryItem) 
+            for memory in memories
+        ):
+            raise TypeError("memories must contain MemoryItem objects")
+        
+        seen: set[str] = set()
+        
+        for memory in memories:
+            if memory.memory_id in seen:
+                raise ValueError(f"duplicate memory_id: {memory.memory_id}")
+            
+            seen.add(memory.memory_id)
+            
+        self._memories = tuple(memories)
+        
+        self._validate_active_uniqueness()
+        
+        
+    def list_session_memories(
+        self, 
+        session_id: str,
+    ) -> list[MemoryItem]:
+        MemoryStore._validate_non_empty_string(
+            session_id,
+            "session_id",
+        )
+        
+        return sorted(
+            [
+                memory
+                for memory in self._memories
+                if memory.session_id == session_id
+            ],
+            key=lambda memory: (
+                memory.turn_id, 
+                memory.memory_id,
+            ),
+        )
+        
+        
+    def find_all_by_key(
+        self, 
+        session_id: str, 
+        memory_key: str,
+    ) -> list[MemoryItem]:
+        MemoryStore._validate_non_empty_string(
+            session_id,
+            "session_id",
+        )
+        MemoryStore._validate_non_empty_string(
+            memory_key,
+            "memory_key",
+        )
+        
+        memories = [
+            memory
+            for memory in self._memories
+            if memory.session_id == session_id and memory.memory_key == memory_key
+        ]
+        
+        return sorted(
+            memories, 
+            key=lambda memory: (
+                memory.valid_from, 
+                memory.turn_id, 
+                memory.memory_id,
+            ),
+        )
+        
+        
+    def find_active_protected_constraints(
+        self, 
+        session_id: str,
+    ) -> list[MemoryItem]:
+        MemoryStore._validate_non_empty_string(
+            session_id,
+            "session_id",
+        )
+        
+        return sorted(
+            [
+                memory
+                for memory in self._memories
+                if memory.session_id == session_id and memory.memory_type == MemoryType.CONSTRAINT and memory.is_active and memory.is_protected
+            ], 
+            key=lambda memory: (
+                memory.turn_id, 
+                memory.memory_id,
+            ),
+        )
+        
+        
+    def _validate_active_uniqueness(self) -> None:
+        active_keys: dict[tuple[str, str], str] = {}
+        
+        for memory in self._memories:
+            if not memory.is_active or memory.memory_key is None:
+                continue
+            
+            key = (memory.session_id, memory.memory_key)
+            
+            previous = active_keys.get(key)
+            
+            if previous is not None:
+                raise MemoryStoreConsistencyError(f"multiple active memories found for session/key {key}: {previous}, {memory.memory_id}")
+            
+            active_keys[key] = memory.memory_id
