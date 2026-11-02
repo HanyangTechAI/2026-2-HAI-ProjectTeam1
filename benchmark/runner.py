@@ -248,6 +248,15 @@ def run_scenarios(
     if any(strategy in embedding_strategies for strategy in strategies) and embedder is None:
         raise ValueError("vector_top_k, utility_per_token, and proposed require embedder")
     
+    enabled = [
+        scenario 
+        for scenario in scenarios
+        if scenario.get("benchmark_enabled", True) and scenario.get("validation_scope", "integration") == "integration"
+    ]
+    
+    if not enabled:
+        raise ValueError("no enabled integration scenarios selected")
+    
     if "proposed" in strategies:
         for scenario in enabled:
             if scenario.get("current_time") is None:
