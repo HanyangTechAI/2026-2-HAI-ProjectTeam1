@@ -83,6 +83,7 @@ benchmark/runner.py
 - pipeline/pipeline_adapter.py의 Agent factory 기반 PipelineAdapter
 - benchmark/runner.py의 Baseline 시나리오 실행과 JSONL/summary 출력
 - benchmark/evaluator.py의 snapshot 평가와 집계
+- benchmark/generator.py의 설정 grid 기반 temporal_update/approval 생성, 측정 및 셀별 저장
 - tests/test_baseline_context_agent_integration.py, tests/test_pipeline.py, tests/test_pipeline_adapter.py의 경계·파이프라인 테스트
 - tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
 - tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
@@ -91,7 +92,7 @@ benchmark/runner.py
 - Proposed Query Analyzer
 - Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution
 - 위 미구현 단계에 의존하는 Proposed 상위 `select_memory` 종단 경로
-- benchmark generator, 실제 LLM planner와 embedding/provider adapter
+- 실제 LLM planner와 embedding/provider adapter
 ```
 
 ---
@@ -1950,6 +1951,14 @@ metadata
 ```
 
 `required_state_ids`와 `required_states[*].memory_id`, `applicable_constraint_ids`와 `constraint_rules[*].constraint_id`는 각각 정확히 일치해야 한다.
+
+생성 API는 `generate_scenario(...)`, `generate_dataset(config, token_counter=...)`,
+`write_dataset(payload, output_directory)`, `write_dataset_archive(payload, archive_path)`이다.
+`render_history(history)`로 turn/role/timestamp를 포함한 전체 이력을 측정한다.
+`metadata.history_length_tokens`와 `noise_memory_ratio`는 실험 셀의 요청값을 유지하고,
+`actual_history_length_tokens`와 `actual_noise_memory_ratio`에 실측값을 기록한다.
+Budget/Horizon 간 공유된 ID를 보존하므로 Runner에는 셀 JSON 하나씩 전달한다.
+세부 계약과 CLI는 [generator_usage.md](generator_usage.md)를 따른다.
 
 추가 실험 변수의 코드상 이름:
 

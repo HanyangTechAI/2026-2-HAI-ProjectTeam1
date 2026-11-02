@@ -18,6 +18,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
 from context.tokenizer import TokenCounter, count_tokens, provisional_token_count, GeminiTokenCounter, token_count_mode
 from memory.retrieval import Embedder
@@ -30,6 +31,36 @@ from .evaluator import aggregate_results, evaluate
 
 
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token")
+EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
+
+
+def _environment_snapshot(scenario: Mapping[str, Any]) -> dict[str, Any]:
+    """Copy supported mock initial state, excluding scenario/evaluation fields.
+
+    File catalogs and previously granted approvals seed tools, not the planner.
+    A fresh copy is made for each strategy/repeat so factory mutations cannot
+    alter another run or the original scenario.
+    """
+    environment = scenario.get("environment", {})
+    if not isinstance(environment, Mapping):
+        raise ValueError("scenario.environment must be an object")
+    snapshot = {}
+    if "files" in environment:
+        files = environment["files"]
+        if not isinstance(files, Mapping) or any(
+            not isinstance(name, str) or not name.strip() or not isinstance(content, str)
+            for name, content in files.items()
+        ):
+            raise ValueError("environment.files must map non-empty filenames to text")
+        snapshot["files"] = dict(files)
+    if "valid_approval_ids" in environment:
+        grants = environment["valid_approval_ids"]
+        if not isinstance(grants, (list, tuple)) or any(
+            not isinstance(grant, str) or not grant.strip() for grant in grants
+        ):
+            raise ValueError("environment.valid_approval_ids must contain non-empty strings")
+        snapshot["valid_approval_ids"] = list(grants)
+    return snapshot
 
 
 def _json_record(value: Any) -> Any:
@@ -48,7 +79,9 @@ def _json_record(value: Any) -> Any:
 
 def _run_one(
     scenario: Mapping[str, Any], strategy: str, repeat_id: int, *,
-    agent_factory: AgentFactory, embedder: Embedder | None,
+    agent_factory: AgentFactory | None,
+    environment_agent_factory: EnvironmentAgentFactory | None,
+    embedder: Embedder | None,
     system_prompt: str, tool_definitions: str, token_counter: TokenCounter,
     token_count_mode: str, top_k: int,
     utility_weights: tuple[float, float, float],
@@ -60,11 +93,16 @@ def _run_one(
     memories = tuple(memory for memory in memories
                      if memory.session_id == scenario["session_id"]
                      and memory.turn_id <= scenario["current_turn"])
+    if environment_agent_factory is not None:
+        def runtime_agent_factory() -> Agent:
+            return environment_agent_factory(_environment_snapshot(scenario))
+    else:
+        runtime_agent_factory = agent_factory
     adapter = make_baseline_pipeline_adapter(
         strategy,
         system_prompt=system_prompt,
         tool_definitions=tool_definitions,
-        agent_factory=agent_factory,
+        agent_factory=runtime_agent_factory,
         embedder=embedder,
         top_k=top_k,
         utility_weights=utility_weights,
@@ -143,7 +181,8 @@ def _run_one(
 
 def run_scenarios(
     scenarios: Sequence[Mapping[str, Any]], *,
-    agent_factory: AgentFactory,
+    agent_factory: AgentFactory | None = None,
+    environment_agent_factory: EnvironmentAgentFactory | None = None,
     system_prompt: str,
     tool_definitions: str,
     output_directory: str | Path,
@@ -165,7 +204,10 @@ def run_scenarios(
     출력 파일을 덮어쓴다. 오류를 성공 결과로 바꾸지 않고 예외로 전달한다.
     미지원 시나리오와 모듈 전용 시나리오는 TSR 표본에 포함하지 않는다.
     기본 공백 기준 TokenCounter는 임시 측정이며 실제 모델 토큰 사용량이 아니다.
-    agent_factory는 실행마다 새 Agent를 반환해야 한다. 다단계 선택·Context 조립·
+    agent_factory 또는 environment_agent_factory 중 하나만 지정한다. 후자는
+    scenario.environment의 files와 valid_approval_ids 사본만 받아 실행마다
+    새 Agent와 mock Tool을 초기화한다. 정답이나 query는 factory에 넘기지 않는다.
+    다단계 선택·Context 조립·
     행동 실행은 Orchestrator에 맡기고 단계별 기록과 누적 입력량을 결과에 보존한다.
     """
     if type(max_steps) is not int or max_steps < 1:
@@ -185,8 +227,11 @@ def run_scenarios(
         raise ValueError("repeats must be a positive integer")
     if type(bootstrap_iterations) is not int or bootstrap_iterations < 100:
         raise ValueError("bootstrap_iterations must be an integer >= 100")
-    if not callable(agent_factory) or not callable(token_counter):
-        raise TypeError("agent_factory and token_counter must be callable")
+    if (agent_factory is None) == (environment_agent_factory is None):
+        raise ValueError("specify exactly one of agent_factory or environment_agent_factory")
+    factory = agent_factory if agent_factory is not None else environment_agent_factory
+    if not callable(factory) or not callable(token_counter):
+        raise TypeError("agent factory and token_counter must be callable")
     enabled = [scenario for scenario in scenarios
                if scenario.get("benchmark_enabled", True)
                and scenario.get("validation_scope", "integration") == "integration"]
@@ -199,6 +244,7 @@ def run_scenarios(
     rows = [
         _run_one(
             scenario, strategy, repeat_id, agent_factory=agent_factory,
+            environment_agent_factory=environment_agent_factory,
             embedder=embedder, system_prompt=system_prompt, tool_definitions=tool_definitions,
             token_counter=token_counter, token_count_mode=mode, top_k=top_k,
             utility_weights=utility_weights, max_steps=max_steps, goal_checker=goal_checker,
@@ -236,7 +282,12 @@ def main() -> None:
     parser.add_argument("--scenarios", default="benchmark/scenarios.json")
     parser.add_argument("--scenario-ids", nargs="+")
     parser.add_argument("--strategies", nargs="+", choices=STRATEGIES, default=STRATEGIES)
-    parser.add_argument("--agent-factory", required=True, help="module:function returning a fresh Agent instance")
+    factory_group = parser.add_mutually_exclusive_group(required=True)
+    factory_group.add_argument("--agent-factory", help="module:function returning a fresh Agent instance")
+    factory_group.add_argument(
+        "--environment-agent-factory",
+        help="module:function receiving only initial files/grants and returning a fresh Agent",
+    )
     parser.add_argument("--embedder", help="module:function taking text and returning a numeric vector")
     tokenizer_group = parser.add_mutually_exclusive_group()
     tokenizer_group.add_argument("--token-counter", help="Custom module:function taking text and returning token count")
@@ -275,7 +326,10 @@ def main() -> None:
     else:
         token_counter = provisional_token_count
     result = run_scenarios(
-        scenarios, agent_factory=_import_callable(args.agent_factory),
+        scenarios,
+        agent_factory=_import_callable(args.agent_factory) if args.agent_factory else None,
+        environment_agent_factory=(_import_callable(args.environment_agent_factory)
+                                   if args.environment_agent_factory else None),
         system_prompt=Path(args.system_prompt_file).read_text(encoding="utf-8"),
         tool_definitions=Path(args.tool_definitions_file).read_text(encoding="utf-8"),
         output_directory=args.output, strategies=args.strategies,

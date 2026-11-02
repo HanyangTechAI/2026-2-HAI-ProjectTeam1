@@ -3,6 +3,11 @@
 `benchmark/scenarios.json`에는 39개의 독립적인 입력 시나리오가 있다.
 최상위 `scenarios` 배열에서 하나씩 읽는다. 실행 결과나 성능 측정치는 포함하지 않는다.
 
+이 파일은 예외 상황과 모듈 경계를 검사하는 최소 fixture이다. 실험 설정에 맞춘
+연속된 긴 History와 `temporal_update`·`approval` sample은 별도 생성기
+`benchmark/generator.py`로 만든다. 생성 명령, 측정 기준과 셀별 출력 사용법은
+[generator_usage.md](generator_usage.md)를 참고한다. 기존 39개 fixture는 생성 데이터로 대체하지 않는다.
+
 | 사례 | 검증 대상 |
 |---|---|
 | S01~S08 | 현재/미지정/과거/상대 시간, SUPERSEDED 선택, 유효 구간 경계 |
@@ -28,8 +33,10 @@
 
 `token_count_mode=synthetic_fixture`의 토큰 비용은 예산 경계 검증용 고정 숫자이다.
 실제 LLM 실험에서는 `context.tokenizer.TokenCounter`에 모든 전략이 동일한 모델별 Tokenizer를 주입하여 Memory·고정 입력·최종 Context를 다시 측정한다. 기본 `provisional_token_count` 결과는 실제 모델 Token Usage로 보고하지 않는다.
-`experiment_axes`는 확장 실험 조건이다. 긴 History 생성, Noise 비율 계산, seed별 sample 생성은 별도 구현이 필요하다.
-메타데이터에는 측정하지 않은 History token 수나 Noise token 비율을 넣지 않았다.
+이 파일의 `experiment_axes`는 fixture의 확장 조건 메타데이터이며 실행 설정이 아니다.
+`benchmark/generator.py`는 `experiments/configs/`를 읽어 긴 History 생성, Noise 비율 측정,
+seed별 sample 생성을 수행한다. 생성 데이터에는 요청값과 실측값을 구분해서 기록한다.
+기존 fixture 메타데이터에는 측정하지 않은 History token 수나 Noise token 비율을 추가하지 않았다.
 
 ## 정책과 평가 범위
 

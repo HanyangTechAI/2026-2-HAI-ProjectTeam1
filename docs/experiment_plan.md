@@ -448,7 +448,7 @@ Synthetic dataset에서는 다음 변수를 통제·기록한다. 필수 sweep�
 
 `main.json`의 12개 Budget × Horizon 셀을 네 방식에 공통 적용한다. RQ1은 각 셀의 작업 성공률 비교이고 RQ2는 같은 결과의 Budget/Horizon 추세 비교다. History Length는 25K tokens로 고정하며 독립적인 필수 sweep으로 두지 않는다. Noise 0.5, Constraint 수 3, State 변경 수 2도 고정한다.
 
-각 seed/셀의 20개 sample은 temporal_update 10개(현재 값 요청 5개, 과거 버전 요청 5개)와 approval 10개로 배정한다. 현재·과거 요청은 `state_scope`와 명시적 `expected_value`로 판정하며 `is_active`로 정답을 추정하지 않는다. Task 유형과 State scope는 metadata에 기록하여 유형별로도 집계한다. 이 배정은 향후 생성기의 구현 계약이며 현재 자동 생성되지는 않는다.
+각 seed/셀의 20개 sample은 temporal_update 10개(현재 값 요청 5개, 과거 버전 요청 5개)와 approval 10개로 배정한다. 현재·과거 요청은 `state_scope`와 명시적 `expected_value`로 판정하며 `is_active`로 정답을 추정하지 않는다. Task 유형과 State scope는 metadata에 기록하여 유형별로도 집계한다. `benchmark/generator.py`가 이 배정을 구현하며, 승인 10개는 승인 요청 전 5개와 이미 승인된 발송 5개의 독립 snapshot이다. 생성과 token 재측정은 [generator_usage.md](generator_usage.md)를 참고한다.
 
 같은 seed/sample의 원본 History와 정답을 모든 strategy에서 공유한다. Budget만 바꾸는 비교에서는 동일 sample_id를 유지한다. Horizon 변화는 총 History 길이를 유지하면서 중요 정보의 위치를 조절하고 Task 난이도·업데이트 관계·정답을 유지한다. sample_id에는 데이터 seed와 기본 Task identity를 포함하며 strategy/Budget/repeat를 포함하지 않는다. 실제 token 수와 Horizon 가능 여부는 생성 단계에서 검증한다. 조건에 따라 Task 내용까지 달라지는 혼동을 피한다.
 
@@ -762,6 +762,6 @@ Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능�
 
 결정적 규칙 `Planner`, 단일 행동 `Agent`, mock Tool과 `pipeline/orchestrator.py`의 다단계 실행이 연결되어 있다. Orchestrator는 매 단계 선택과 Context 조립을 다시 수행하고 Tool Interaction을 다음 입력에 feedback으로 제공하며, 목표 완료·Tool 실패·예산 실패·`max_steps`에서 중단한다. `benchmark/runner.py`는 활성 integration 시나리오를 Baseline 전략과 반복별로 실행하여 `runs.jsonl`과 `summary.json`을 기록한다. `pipeline/pipeline_adapter.py`는 실행마다 새 Agent를 생성하는 호출형 adapter를 제공한다.
 
-아직 `benchmark/generator.py`는 빈 파일이고, Proposed Query Analyzer·Version Expansion·Temporal Resolution·Protected applicability·Required-State Resolution 및 Ablation 실행은 구현되지 않았다. 따라서 구현된 Utility/Flexible Selection까지 이어지는 Proposed 상위 경로는 종단 실행할 수 없다. General Retrieval은 Session/turn 필터, 활성 Protected Constraint 분리와 Semantic Top-K까지 구현되어 있다. 실제 LLM planner, embedding provider, 모델 API 사용량과 비용 adapter도 필요하다. 기본 공백 기준 Token Counter, 결정적 test embedder, 합성 token fixture와 oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.
+`benchmark/generator.py`는 실험 grid의 temporal_update/approval 데이터 생성과 셀별 JSON/ZIP 저장을 구현한다. History 길이·Horizon·Noise 비율을 실제 counter로 검증하며, 요청 축 값과 실측값을 분리한다. Proposed Query Analyzer·Version Expansion·Temporal Resolution·Protected applicability·Required-State Resolution 및 Ablation 실행에는 아직 미구현 또는 미연결 부분이 있다. 따라서 구현된 Utility/Flexible Selection까지 이어지는 Proposed 상위 경로는 종단 실행할 수 없다. General Retrieval은 Session/turn 필터, 활성 Protected Constraint 분리와 Semantic Top-K까지 구현되어 있다. 실제 LLM planner, embedding provider, 모델 API 사용량과 비용 adapter도 필요하다. 기본 공백 기준 Token Counter, 결정적 test embedder, 합성 token fixture와 oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.
 
 Python 3.10 이상을 지원하며 `requirements.txt`에는 Gemini CountTokens 연동용 `google-genai>=2.0.0`이 포함되어 있다. `GeminiTokenCounter`는 모델명과 `GEMINI_API_KEY`를 사용하고 동일 문자열 결과를 캐시한다. Runner는 `--gemini-token-model`, `--gemini-token-cache-size` 또는 사용자 `--token-counter module:function`을 받아 실행별 `token_count_mode`를 기록한다. 비교하는 모든 전략에는 같은 embedder와 TokenCounter를 사용한다. Gemini 연동의 단위 테스트는 실제 네트워크 대신 fake client를 사용하므로 API 성능·비용 검증은 아니다.
