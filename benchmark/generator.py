@@ -138,10 +138,9 @@ def _balance_noise(
     memories: list[dict[str, Any]], targets: set[str], ratio: float,
     counter: TokenCounter,
 ) -> float:
-    necessary = [m for m in memories if m["memory_id"] in targets]
     noise = [m for m in memories if m["memory_id"] not in targets]
     for _ in range(8):
-        relevant_tokens = sum(m["token_count"] for m in necessary)
+        relevant_tokens = sum(m["token_count"] for m in memories if m["memory_id"] in targets)
         noise_tokens = sum(m["token_count"] for m in noise)
         total = relevant_tokens + noise_tokens
         if not total or not relevant_tokens:
@@ -346,15 +345,14 @@ def generate_scenario(
             timestamp = _timestamp_for_turn(turn, events, current_turn, current_time).isoformat()
             noise_notes.append(memory(
                 f"{sample_id}_noise_{index}", "experience",
-                f"별도 업무 {digest}-{index} 회의에서 문서 표현과 배치에 관한 의견을 기록했습니다.",
+                f"무관 기록 {digest}-{index}.",
                 turn_id=turn, created_at=timestamp, valid_from=timestamp,
             ))
-    base_noise = sum(item["token_count"] for item in memories if item["memory_id"] not in essential)
     relevant_tokens = sum(item["token_count"] for item in memories if item["memory_id"] in essential)
     # The smallest supported stress ratio is 0.1. Use one fixed relevant cost
     # for all ratios, then change only irrelevant notes. At main ratio=0.5 the
     # pool exceeds 1K, so the smallest budget exercises actual selection.
-    relevant_target = max(640, 9 * base_noise)
+    relevant_target = max(640, relevant_tokens)
     _pad_memory(target, target["token_count"] + max(0, relevant_target - relevant_tokens), token_counter)
     if not ratio:
         memories = [item for item in memories if item not in noise_notes]
@@ -441,9 +439,10 @@ def generate_scenario(
             actual_history_length_tokens=measured_history, history_length_turns=history_turns,
             horizon_turns=horizon_turns, important_turn=important_turn,
             noise_memory_ratio=ratio, actual_noise_memory_ratio=actual_noise,
-            noise_memory_tokens=sum(m["token_count"] for m in memories if m["memory_id"] not in essential),
+            noise_memory_tokens=sum(m["token_count"] for m in noise_notes if m in memories),
+            structural_distractor_tokens = sum(m["token_count"] for m in memories if m["memory_id"] not in essential and m not in noise_notes)
             memory_tokens=sum(m["token_count"] for m in memories),
-            noise_definition="non_target_snapshot_tokens / all_snapshot_tokens",
+            noise_definition="synthetic_noise_tokens / (target_memory_tokens + synthetic_noise_tokens)",
             constraint_count=constraint_count, 
             applicable_constraint_count = len(applicable_constraints),
             state_update_count=state_update_count,

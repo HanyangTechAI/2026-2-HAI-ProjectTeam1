@@ -15,7 +15,7 @@
     "state_update_count": [2]
   },
   "evaluation": {
-    "retrieval_k": 20,
+    "retrieval_k": 5,
     "bootstrap_iterations": 2000,
     "bootstrap_seed": 42,
     "group_by": ["strategy", "context_token_budget", "history_length_tokens", "horizon_turns"],

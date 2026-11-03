@@ -153,7 +153,7 @@ class GeneratorTests(unittest.TestCase):
                 self.assertEqual(max(essential_turns), scenario["current_turn"] - 10)
                 self.assertEqual(scenario["token_count_mode"], "provisional")
 
-    def test_noise_is_token_weighted_and_includes_wrong_versions(self):
+    def test_noise_ratio_counts_only_synthetic_noise(self):
         for ratio in (0.1, 0.5, 0.9):
             scenario = self.scenario(noise_memory_ratio=ratio)
             necessary = set(scenario["target_memory_ids"])
