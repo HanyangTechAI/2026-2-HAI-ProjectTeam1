@@ -16,6 +16,7 @@ from .query_analyzer import (
 from .schema import MemoryItem, MemoryType
 from .retrieval import Embedder, semantic_retrieve
 from .store import MemoryStoreConsistencyError
+from .ablation import FULL_ABLATION, SelectorAblationConfig
 
 
 DEFAULT_UTILITY_WEIGHTS = (0.6, 0.3, 0.1)
@@ -96,6 +97,7 @@ def retrieve_candidates(
     *,
     embedder: Embedder,
     top_k: int,
+    exclude_active_protected: bool = True,
 ) -> list[MemoryCandidate]:
     """Retrieve memories relevant to the query."""
     if not isinstance(query_context, QueryContext):
@@ -110,6 +112,9 @@ def retrieve_candidates(
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
     
+    if type(exclude_active_protected) is not bool:
+        raise TypeError("exclude_active_protected must be bool")
+    
     memories = memory_store.list_session_memories(session_id)
     
     available: list[MemoryItem] = []
@@ -118,7 +123,7 @@ def retrieve_candidates(
         if memory.turn_id > query_context.current_turn:
             continue
         
-        if memory.memory_type == MemoryType.CONSTRAINT and memory.is_protected and memory.is_active:
+        if exclude_active_protected and memory.memory_type == MemoryType.CONSTRAINT and memory.is_protected and memory.is_active:
             continue
         
         available.append(memory)
@@ -453,9 +458,14 @@ def select_mandatory(
 def select_flexible(
     candidates: Sequence[MemoryCandidate],
     budget: int,
+    *,
+    token_aware: bool = True,
 ) -> list[MemoryCandidate]:
     if type(budget) is not int or budget < 0:
         raise ValueError("budget must be a non-negative integer")
+    
+    if type(token_aware) is not bool:
+        raise TypeError("token_aware must be bool")
     
     if any(
         not isinstance(candidate, MemoryCandidate)
@@ -464,7 +474,10 @@ def select_flexible(
         raise TypeError("candidates must contain MemoryCandidate objects")
     
     def score(candidate: MemoryCandidate) -> float:
-        return candidate.utility_score / max(candidate.memory.token_count, 1)
+        if token_aware:
+            return candidate.utility_score / max(candidate.memory.token_count, 1)
+        
+        return candidate.utility_score
         
     ranked = sorted(
         candidates,
@@ -513,6 +526,7 @@ def select_memory(
     token_counter: TokenCounter | None = None,
     top_k: int = 20,
     utility_weights: tuple[float, float, float] = DEFAULT_UTILITY_WEIGHTS,
+    ablation: SelectorAblationConfig = FULL_ABLATION,
 ) -> SelectionResult:
     
     # =========================================================
@@ -539,6 +553,9 @@ def select_memory(
     
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
+    
+    if not isinstance(ablation, SelectorAblationConfig):
+        raise TypeError("ablation must be SelectorAblationConfig")
 
     # =========================================================
     # 1. Calculate memory budget
@@ -580,6 +597,7 @@ def select_memory(
         session_id=session_id,
         embedder=embedder,
         top_k=top_k,
+        exclude_active_protected=ablation.constraint_preservation,
     )
 
     retrieved_ids = tuple(
@@ -591,23 +609,27 @@ def select_memory(
     # 4. Version chain expansion
     # =========================================================
 
-    expanded = expand_version_chains(
-        candidates=retrieved,
-        memory_store=memory_store,
-    )
-    
-    # =========================================================
-    # 5. Temporal resolution
-    #
-    # CURRENT       -> active version
-    # HISTORICAL    -> valid version at requested time
-    # RELATIVE_TIME -> resolved historical version
-    # =========================================================
+    if ablation.temporal_resolution:
+        expanded = expand_version_chains(
+            candidates=retrieved,
+            memory_store=memory_store,
+        )
+        
+        # =========================================================
+        # 5. Temporal resolution
+        #
+        # CURRENT       -> active version
+        # HISTORICAL    -> valid version at requested time
+        # RELATIVE_TIME -> resolved historical version
+        # =========================================================
 
-    resolved = resolve_temporal_versions(
-        candidates=expanded,
-        query_context=query_context,
-    )
+        resolved = resolve_temporal_versions(
+            candidates=expanded,
+            query_context=query_context,
+        )
+        
+    else:
+        resolved = list(retrieved)
     
     resolved = _retokenize_candidates(
         resolved,
@@ -618,15 +640,19 @@ def select_memory(
     # 6. Required State
     # =========================================================
 
-    states = resolve_required_states(
-        candidates=resolved,
-        query_context=query_context,
-    )
+    if ablation.mandatory_state:
+        states = resolve_required_states(
+            candidates=resolved,
+            query_context=query_context,
+        )
 
-    states = _retokenize_memories(
-        states,
-        token_counter,
-    )
+        states = _retokenize_memories(
+            states,
+            token_counter,
+        )
+        
+    else:
+        states = []
     
     # =========================================================
     # 7. Protected Constraint
@@ -636,16 +662,20 @@ def select_memory(
     # protected constraint를 확보한다.
     # =========================================================
 
-    protected = retrieve_protected(
-        query_context=query_context,
-        memory_store=memory_store,
-        session_id=session_id,
-    )
+    if ablation.constraint_preservation:
+        protected = retrieve_protected(
+            query_context=query_context,
+            memory_store=memory_store,
+            session_id=session_id,
+        )
+        
+        protected = _retokenize_memories(
+            protected,
+            token_counter,
+        )
     
-    protected = _retokenize_memories(
-        protected,
-        token_counter,
-    )
+    else:
+        protected = []
     
     # =========================================================
     # 8. Mandatory selection
@@ -712,7 +742,7 @@ def select_memory(
         if memory.memory_id in mandatory_ids:
             continue
         
-        if memory.memory_type == MemoryType.CONSTRAINT and memory.is_active and memory.is_protected:
+        if ablation.constraint_preservation and memory.memory_type == MemoryType.CONSTRAINT and memory.is_active and memory.is_protected:
             continue
         
         # =====================================================
@@ -738,6 +768,7 @@ def select_memory(
     selected_flexible = select_flexible(
         candidates=flexible_candidates,
         budget=flexible_budget,
+        token_aware=ablation.token_aware_packing,
     )
 
     flexible_memories = tuple(

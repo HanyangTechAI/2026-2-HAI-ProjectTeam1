@@ -90,9 +90,11 @@ benchmark/runner.py
 - tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
 - tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
 - tests/test_proposed_pipeline.py의 Snapshot Store → Proposed Policy → Agent 현재 State 통합 테스트
+- memory/ablation.py의 SelectorAblationConfig와 다섯 preset, Runner의 Proposed 변형 반복·결과 기록
+- tests/test_ablation.py의 preset 검증, 축별 독립성, Selector 결과와 hard Budget 단위 테스트
 
 미연결 또는 추가 검증 필요
-- Proposed의 과거·기간·Protected·예산 실패 통합 테스트와 Ablation 실행
+- Proposed의 과거·기간·Protected·예산 실패와 Ablation Runner 결과 기록 통합 테스트
 - 실제 LLM planner와 embedding/provider adapter
 ```
 
@@ -814,7 +816,8 @@ def retrieve_candidates(
     session_id: str,
     *,
     embedder: Embedder,
-    top_k: int
+    top_k: int,
+    exclude_active_protected: bool = True,
 ) -> list[MemoryCandidate]:
     ...
 ```
@@ -834,7 +837,7 @@ Entity Match
 
 반환 결과는 최종 Context가 아니라 **Candidate Pool**이다.
 
-현재 구현은 `memory_store.list_session_memories(session_id)`에서 `current_turn` 이후 항목과 활성·보호 Constraint를 제외한 뒤 `memory.retrieval.semantic_retrieve`를 호출한다. 활성·보호 Constraint는 별도 Protected Retrieval 경로에서 처리한다. 반환 후보의 `semantic_score`에는 코사인 점수, `relevance_score`에는 `max(score, 0)`을 기록한다. 동률은 `memory_id` 오름차순이며 embedding 차원 불일치, 빈 벡터와 비유한 값은 오류로 거부한다.
+현재 구현은 `memory_store.list_session_memories(session_id)`에서 `current_turn` 이후 항목을 제외한 뒤 `memory.retrieval.semantic_retrieve`를 호출한다. 기본적으로 활성·보호 Constraint도 제외해 별도 Protected Retrieval 경로에서 처리하지만 Constraint 보존 Ablation에서는 `exclude_active_protected=False`로 일반 후보에 남긴다. 반환 후보의 `semantic_score`에는 코사인 점수, `relevance_score`에는 `max(score, 0)`을 기록한다. 동률은 `memory_id` 오름차순이며 embedding 차원 불일치, 빈 벡터와 비유한 값은 오류로 거부한다.
 
 ---
 
@@ -1198,7 +1201,9 @@ Agent는 실행하지 않는다.
 ```python
 def select_flexible(
     candidates: Sequence[MemoryCandidate],
-    budget: int
+    budget: int,
+    *,
+    token_aware: bool = True,
 ) -> list[MemoryCandidate]:
     ...
 ```
@@ -1235,7 +1240,7 @@ selected_flexible[-1]
 
 즉 `select_flexible`은 선택된 후보를 **선택 우선순위 내림차순**으로 반환해야 한다. Utility-per-Token, 0/1 Knapsack 등 내부 알고리즘이 달라도 이 반환 순서는 바뀌지 않는다. 동일 우선순위의 tie-break 규칙은 구현에서 결정할 수 있지만 반드시 결정적이어야 한다.
 
-현재 V1은 `utility_score / max(token_count, 1)`을 사용한다. 동률이면 Utility, Relevance, Recency를 차례로 비교하고 마지막에는 `memory_id` 오름차순으로 결정한다. 남은 예산보다 큰 후보는 건너뛰며 각각 `selected_flexible` 또는 `rejected_budget` 선택 사유를 기록한다.
+현재 V1은 기본적으로 `utility_score / max(token_count, 1)`을 사용한다. `token_aware=False` Ablation에서는 Utility 자체로 순위를 정하되 실제 Budget 상한은 계속 지킨다. 동률이면 Utility, Relevance, Recency를 차례로 비교하고 마지막에는 `memory_id` 오름차순으로 결정한다. 남은 예산보다 큰 후보는 건너뛰며 각각 `selected_flexible` 또는 `rejected_budget` 선택 사유를 기록한다.
 
 ---
 
@@ -1287,11 +1292,14 @@ def select_memory(
     token_counter: TokenCounter | None = None,
     top_k: int = 20,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
+    ablation: SelectorAblationConfig = FULL_ABLATION,
 ) -> SelectionResult:
     ...
 ```
 
 `token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. Query 분석부터 최종 회계까지의 Proposed Selector 경로는 구현되어 호출할 수 있다. Mandatory 예산 초과 시 Flexible Memory는 선택하지 않고 나머지 resolved 후보를 rejected로 기록한다. 정상 결과는 Mandatory와 Flexible을 ID로 중복 제거하고, 최종 합계가 Memory Budget을 넘으면 내부 불변식 오류로 중단한다. Proposed Policy와 Pipeline Adapter, Benchmark Runner 전략 연결도 구현되어 있으며 현재 State 복원 경로를 통합 테스트한다. 과거·기간·Protected·예산 실패 경로의 통합 검증은 아직 남아 있다.
+
+`SelectorAblationConfig`는 `constraint_preservation`, `temporal_resolution`, `mandatory_state`, `token_aware_packing` 네 boolean 축을 가진다. `mandatory_state=True`는 `temporal_resolution=True`를 요구한다. 제공 preset은 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing`이며 Runner는 변형 결과의 전략명을 `proposed/<preset>`으로 기록하고 설정 dict도 실행 레코드에 보존한다.
 
 처리 순서:
 

@@ -10,6 +10,7 @@ from context.tokenizer import TokenCounter, provisional_token_count
 
 from memory.schema import MemoryItem
 from memory.retrieval import Embedder
+from memory.ablation import FULL_ABLATION, SelectorAblationConfig
 
 from pipeline.orchestrator import GoalChecker, Orchestrator, PipelineRunResult, SelectionPolicy, make_baseline_policy, make_proposed_policy
 
@@ -150,6 +151,7 @@ def make_proposed_pipeline_adapter(
     embedder: Embedder,
     top_k: int = 20,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
+    ablation: SelectorAblationConfig = FULL_ABLATION,
     token_counter: TokenCounter = provisional_token_count,
     max_steps: int = 8,
     goal_checker: GoalChecker | None = None,
@@ -159,6 +161,7 @@ def make_proposed_pipeline_adapter(
         embedder=embedder,
         top_k=top_k,
         utility_weights=utility_weights,
+        ablation=ablation,
     )
     
     return PipelineAdapter(

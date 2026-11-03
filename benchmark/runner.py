@@ -26,6 +26,7 @@ from context.tokenizer import TokenCounter, count_tokens, provisional_token_coun
 from memory.retrieval import Embedder
 from memory.schema import MemoryItem
 from memory.selector import PipelineStatus
+from memory.ablation import ABLATION_PRESETS, FULL_ABLATION, SelectorAblationConfig, get_ablation_config
 
 from pipeline.orchestrator import GoalChecker, PipelineRunResult
 from pipeline.pipeline_adapter import AgentFactory, make_baseline_pipeline_adapter, make_proposed_pipeline_adapter
@@ -81,14 +82,22 @@ def _json_record(value: Any) -> Any:
 
 
 def _run_one(
-    scenario: Mapping[str, Any], strategy: str, repeat_id: int, *,
+    scenario: Mapping[str, Any], 
+    strategy: str, 
+    repeat_id: int, 
+    *,
     agent_factory: AgentFactory | None,
     environment_agent_factory: EnvironmentAgentFactory | None,
     embedder: Embedder | None,
-    system_prompt: str, tool_definitions: str, token_counter: TokenCounter,
-    token_count_mode: str, top_k: int,
+    system_prompt: str, 
+    tool_definitions: str, 
+    token_counter: TokenCounter,
+    token_count_mode: str, 
+    top_k: int,
     utility_weights: tuple[float, float, float],
-    max_steps: int, goal_checker: GoalChecker | None,
+    max_steps: int, 
+    goal_checker: GoalChecker | None,
+    proposed_ablation: SelectorAblationConfig | None,
 ) -> dict[str, Any]:
     start = perf_counter()
     # Store에 재삽입하지 않고 기존 버전 관계를 유지한 채 스냅샷을 복원한다.
@@ -106,6 +115,8 @@ def _run_one(
         if embedder is None:
             raise ValueError("proposed strategy requires embedder")
         
+        ablation = proposed_ablation or FULL_ABLATION
+        
         adapter = make_proposed_pipeline_adapter(
             system_prompt=system_prompt,
             tool_definitions=tool_definitions,
@@ -113,10 +124,14 @@ def _run_one(
             embedder=embedder,
             top_k=top_k,
             utility_weights=utility_weights,
+            ablation=ablation,
             token_counter=token_counter,
             max_steps=max_steps,
             goal_checker=goal_checker,
         )
+        
+        strategy_label = "proposed" if ablation.name == "full" else f"proposed/{ablation.name}"
+        
     else:
         adapter = make_baseline_pipeline_adapter(
             strategy,
@@ -130,6 +145,8 @@ def _run_one(
             max_steps=max_steps,
             goal_checker=goal_checker,
         )
+        
+        strategy_label = strategy
         
     # policy는 adapter 생성 시 지정하고, 나머지 실행 입력은 Orchestrator.run으로 전달한다.
     outcome = adapter(
@@ -194,10 +211,11 @@ def _run_one(
     # 대기 중인 승인 요청을 유효한 승인으로 평가하지 않도록 기존 보조 함수를 사용한다.
     evaluation_scenario = scenario_with_granted_approvals(scenario, outcome.tool_results)
     evaluation = evaluate(
-        evaluation_scenario, run, strategy=strategy, repeat_id=repeat_id, k=top_k,
+        evaluation_scenario, run, strategy=strategy_label, repeat_id=repeat_id, k=top_k,
     )
     return dict(
-        scenario=evaluation_scenario, strategy=strategy, repeat_id=repeat_id,
+        scenario=evaluation_scenario, strategy=strategy_label, repeat_id=repeat_id,
+        ablation=proposed_ablation.to_dict() if proposed_ablation is not None else None,
         run_result=run, evaluation=evaluation.to_dict(),
     )
 
@@ -219,6 +237,7 @@ def run_scenarios(
     seed: int = 42,
     max_steps: int = 8,
     goal_checker: GoalChecker | None = None,
+    proposed_ablations: Sequence[str] = ("full",),
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
@@ -248,15 +267,6 @@ def run_scenarios(
     if any(strategy in embedding_strategies for strategy in strategies) and embedder is None:
         raise ValueError("vector_top_k, utility_per_token, and proposed require embedder")
     
-    enabled = [
-        scenario 
-        for scenario in scenarios
-        if scenario.get("benchmark_enabled", True) and scenario.get("validation_scope", "integration") == "integration"
-    ]
-    
-    if not enabled:
-        raise ValueError("no enabled integration scenarios selected")
-    
     if "proposed" in strategies:
         for scenario in enabled:
             if scenario.get("current_time") is None:
@@ -281,17 +291,52 @@ def run_scenarios(
     ids = [scenario.get("scenario_id", scenario.get("sample_id")) for scenario in enabled]
     if any(not isinstance(sid, str) or not sid for sid in ids) or len(set(ids)) != len(ids):
         raise ValueError("scenarios require unique non-empty scenario_id/sample_id")
+    
+    proposed_ablations = tuple(proposed_ablations)
+    
+    if not proposed_ablations or len(set(proposed_ablations)) != len(proposed_ablations):
+        raise ValueError("proposed_ablations must be non-empty and unique")
+    
+    unknown_ablations = set(proposed_ablations) - set(ABLATION_PRESETS)
+    
+    if unknown_ablations:
+        raise ValueError(f"unknown proposed ablations: {sorted(unknown_ablations)}")
+    
     mode = token_count_mode(token_counter)
-    rows = [
-        _run_one(
-            scenario, strategy, repeat_id, agent_factory=agent_factory,
-            environment_agent_factory=environment_agent_factory,
-            embedder=embedder, system_prompt=system_prompt, tool_definitions=tool_definitions,
-            token_counter=token_counter, token_count_mode=mode, top_k=top_k,
-            utility_weights=utility_weights, max_steps=max_steps, goal_checker=goal_checker,
-        )
-        for scenario in enabled for strategy in strategies for repeat_id in range(repeats)
-    ]
+    rows = []
+    
+    for scenario in enabled:
+        for strategy in strategies:
+            if strategy == "proposed":
+                variants = tuple(
+                    get_ablation_config(name)
+                    for name in proposed_ablations
+                )
+            else:
+                variants = (None,)
+                
+            for ablation in variants:
+                for repeat_id in range(repeats):
+                    rows.append(
+                        _run_one(
+                            scenario,
+                            strategy,
+                            repeat_id,
+                            agent_factory=agent_factory,
+                            environment_agent_factory=environment_agent_factory,
+                            embedder=embedder,
+                            system_prompt=system_prompt,
+                            tool_definitions=tool_definitions,
+                            token_count_mode=mode,
+                            token_counter=token_counter,
+                            top_k=top_k,
+                            utility_weights=utility_weights,
+                            max_steps=max_steps,
+                            goal_checker=goal_checker,
+                            proposed_ablation=ablation,
+                        )
+                    )
+    
     summary = aggregate_results(
         [row["evaluation"] for row in rows],
         bootstrap_iterations=bootstrap_iterations, seed=seed,
@@ -405,6 +450,7 @@ def main() -> None:
     parser.add_argument("--gemini-token-cache", default=(".cache/gemini_token_cache.sqlite3"))
     parser.add_argument("--gemini-token-retries", type=int, default=3)
     parser.add_argument("--gemini-token-retry-base-seconds", type=float, default=0.5)
+    parser.add_argument("--proposed-ablations", nargs="+", choices=tuple(ABLATION_PRESETS.keys()), default=["full"])
     args = parser.parse_args()
     payload = json.loads(Path(args.scenarios).read_text(encoding="utf-8"))
     scenarios = payload["scenarios"] if isinstance(payload, dict) else payload
@@ -443,6 +489,7 @@ def main() -> None:
         token_counter=token_counter,
         top_k=args.top_k, repeats=args.repeats, utility_weights=tuple(args.utility_weights),
         bootstrap_iterations=args.bootstrap_iterations, seed=args.seed, max_steps=args.max_steps,
+        proposed_ablations=args.proposed_ablations,
     )
     if isinstance(token_counter, GeminiTokenCounter):
         result["tokenizer"] = {

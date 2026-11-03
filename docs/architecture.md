@@ -1271,10 +1271,13 @@ Budget-Aware Memory Selection
 │   │   └── Embedding 검증 / Cosine Similarity
 │   │       / Semantic Top-K
 │   │
-│   └── selector.py
-│       └── Retrieval / Protected Resolution
-│           / Temporal Resolution
-│           / Budget-Aware Selection
+│   ├── selector.py
+│   │   └── Retrieval / Protected Resolution
+│   │       / Temporal Resolution
+│   │       / Budget-Aware Selection
+│   │
+│   └── ablation.py
+│       └── Proposed 구성 요소 제거 preset
 │
 ├── agent/
 │   ├── agent.py

@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략도 Snapshot Memory Store를 통해 Runner에 연결되어 있다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. 과거·기간·Protected·예산 실패를 포괄하는 Proposed 통합 테스트와 실제 LLM Planner 연동은 아직 남아 있다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector 수준의 Ablation 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. 과거·기간·Protected·예산 실패를 포괄하는 Proposed 통합 테스트, Ablation Runner 결과 기록 검증과 실제 LLM Planner 연동은 아직 남아 있다.
 
 ## 배경과 목표
 
@@ -152,6 +152,8 @@ python prototype/run_demo.py
 
 실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token과 `memory/selector.py`의 Proposed를 공통 `SelectionResult`로 변환한다. Proposed Policy는 실행 입력의 Memory Snapshot으로 `SnapshotMemoryStore`를 만들고, 시간 해석 기준인 `current_time`을 요구한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 네 전략을 `PipelineAdapter`로 반복 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector Top-k, Utility-per-Token, Proposed에는 embedder가 필요하며 Proposed 시나리오에는 ISO 8601 `current_time`이 있어야 한다.
 
+`memory/ablation.py`는 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing` preset을 제공한다. Runner의 `--proposed-ablations`로 하나 이상을 선택하며, 변형 실행은 `proposed/<preset>` 전략명과 설정 snapshot을 결과에 기록한다. `no_temporal`은 Required State 강제 선택도 함께 끈다.
+
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
@@ -206,7 +208,7 @@ Embedding과 실제 LLM provider는 아직 확정되지 않았다. 연구 실행
 python -m unittest discover -s tests -v
 ```
 
-`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인 유사도·Top-K·동률 정렬을 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter가 Version Chain에서 현재 ACTIVE State를 복원하는 종단 경로를 검증한다. `tests/test_pipeline_adapter.py`는 실행별 Agent 격리, Runner 저장·재평가와 중간 실행 후 예산 실패 기록을 검증하며, `tests/test_tokenizer.py`는 Gemini counter의 입력 검증·API 응답 처리·캐시 동작을 fake client로 검증한다.
+`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter가 Version Chain에서 현재 ACTIVE State를 복원하는 종단 경로를 검증한다. `tests/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/test_pipeline_adapter.py`는 실행별 Agent 격리, Runner 저장·재평가와 중간 실행 후 예산 실패 기록을 검증하며, `tests/test_tokenizer.py`는 Gemini counter의 입력 검증·API 응답 처리·캐시 동작을 fake client로 검증한다.
 
 ## 기술 스택 후보
 

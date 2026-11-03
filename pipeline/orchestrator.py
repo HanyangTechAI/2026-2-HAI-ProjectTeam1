@@ -17,6 +17,7 @@ from memory.schema import MemoryItem
 from memory.selector import PipelineStatus, SelectionResult, DEFAULT_UTILITY_WEIGHTS, select_memory
 from memory.retrieval import Embedder
 from memory.store import SnapshotMemoryStore
+from memory.ablation import FULL_ABLATION, SelectorAblationConfig
 
 
 GoalChecker = Callable[
@@ -171,12 +172,16 @@ def make_proposed_policy(
     embedder: Embedder,
     top_k: int = 20,
     utility_weights: tuple[float, float, float] = DEFAULT_UTILITY_WEIGHTS,
+    ablation: SelectorAblationConfig = FULL_ABLATION,
 ) -> SelectionPolicy:
     if not callable(embedder):
         raise TypeError("proposed policy requires a callable embedder")
     
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
+    
+    if not isinstance(ablation, SelectorAblationConfig):
+        raise TypeError("ablation must be SelectorAblationConfig")
     
     def select(
         *,
@@ -197,16 +202,17 @@ def make_proposed_policy(
         
         return select_memory(
             query=query,
+            session_id=session_id,
             memory_store=store,
             embedder=embedder,
             top_k=top_k,
             utility_weights=utility_weights,
-            session_id=session_id,
             total_budget=total_budget,
             fixed_tokens=fixed_tokens,
             current_turn=current_turn,
             token_counter=token_counter,
             current_time=current_time,
+            ablation=ablation,
         )
         
     return select

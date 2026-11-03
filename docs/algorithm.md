@@ -1580,7 +1580,30 @@ Final Context Token Validation
 Context Builder
 Tool Action
 Automatic Evaluation
+Ablation Preset Execution
 ```
+
+## Selector Ablation
+
+V1은 동일한 Budget 상한과 평가 경로를 유지하면서 네 구성 요소만 끌 수 있다.
+
+```text
+no_constraint_preservation
+→ Protected 별도 검색과 Mandatory 보존을 끄고 활성 Constraint를 일반 후보에 남김
+
+no_temporal
+→ Version Chain Expansion과 Temporal Resolution을 끄며 Required State Mandatory도 함께 끔
+
+no_state_mandatory
+→ Temporal Resolution은 유지하고 Required State의 Mandatory 승격만 끔
+
+no_budget_aware_packing
+→ Utility-per-Token 순위 대신 Utility 순위를 사용하되 Budget 상한은 유지
+```
+
+`full`은 모든 축을 활성화한 Proposed 기준 조건이다. Runner는 선택한 preset별로 같은 Scenario와 repeat를 실행하며 결과를 `proposed/<preset>`으로 구분한다.
+
+`tests/test_ablation.py`는 각 preset이 의도한 축만 변경하는지, Constraint가 일반 후보로 이동하는지, Temporal 확장·해석이 생략되는지, State의 Mandatory 보장만 제거되는지, Utility-only Packing도 hard Budget을 넘지 않는지를 검증한다.
 
 ## 이후 추가
 
