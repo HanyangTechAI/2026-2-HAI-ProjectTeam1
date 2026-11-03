@@ -167,14 +167,33 @@ def _run_one(
     context = final_step.context_result
     # 누적 입력량은 단일 Context 예산과 비교하지 않는다. 정상 실행의 input_tokens에는
     # 실제 Agent에 전달된 단계별 입력량의 최댓값을 기록하고 누적량은 별도로 보존한다.
-    delivered = [step.context_result.total_input_tokens for step in outcome.steps
-                 if step.action_result is not None]
+    executed_steps = [
+        step
+        for step in outcome.steps
+        if step.action_result is not None
+    ]
     if outcome.status == PipelineStatus.OK:
-        input_tokens = max(delivered, default=0)
+        if executed_steps:
+            peak_step = max(
+                executed_steps,
+                key=lambda step: step.context_result.total_input_tokens,
+            )
+            
+            input_tokens = peak_step.context_result.total_input_tokens
+            
+            fixed_input_tokens = peak_step.fixed_tokens
+        else:
+            input_tokens = 0
+            fixed_input_tokens = final_step.fixed_tokens
+            
     elif outcome.status == PipelineStatus.INVALID_BUDGET_CONFIGURATION:
         input_tokens = None
+        fixed_input_tokens = final_step.fixed_tokens
+        
     else:
         input_tokens = context.total_input_tokens
+        fixed_input_tokens = final_step.fixed_tokens
+        
     run = _json_record(outcome)
     run.update(
         selection_result=_json_record(selection),
@@ -187,7 +206,7 @@ def _run_one(
             for memory in memories if memory.memory_id == mid
         ],
         usage=dict(
-            fixed_input_tokens=final_step.fixed_tokens,
+            fixed_input_tokens=fixed_input_tokens,
             input_tokens=input_tokens,
             total_input_tokens=outcome.total_input_tokens,
             output_tokens=None,
@@ -308,6 +327,18 @@ def run_scenarios(
         raise ValueError(f"unknown proposed ablations: {sorted(unknown_ablations)}")
     
     mode = token_count_mode(token_counter)
+    
+    scenario_modes = {
+        scenario.get("token_count_mode")
+        for scenario in enabled
+    }
+    
+    if None in scenario_modes:
+        raise ValueError("all scenarios must declare token_count_mode")
+    
+    if scenario_modes != {mode}:
+        raise ValueError(f"scenario/runtime token counter mismatch: scenario={sorted(scenario_modes)}, runtime={mode}")
+    
     rows = []
     
     for scenario in enabled:

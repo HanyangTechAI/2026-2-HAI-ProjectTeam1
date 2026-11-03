@@ -8,7 +8,7 @@
   "repeats": 1,
   "grid": {
     "context_token_budget": [2048],
-    "history_length_tokens": [10000],
+    "history_length_tokens": [15000],
     "horizon_turns": [50],
     "noise_memory_ratio": [0.5],
     "constraint_count": [1],

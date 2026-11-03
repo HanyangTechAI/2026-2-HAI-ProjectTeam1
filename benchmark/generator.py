@@ -445,7 +445,7 @@ def generate_scenario(
             memory_tokens=sum(m["token_count"] for m in memories),
             noise_definition="non_target_snapshot_tokens / all_snapshot_tokens",
             constraint_count=constraint_count, 
-            applicable_constraint_count = applicable_constraints,
+            applicable_constraint_count = len(applicable_constraints),
             state_update_count=state_update_count,
             token_count_mode=token_count_mode(token_counter),
         ),
@@ -607,6 +607,9 @@ def main() -> None:
     group.add_argument("--token-counter", help="module:function for the shared TokenCounter")
     group.add_argument("--gemini-token-model", help="Explicitly measure with Gemini CountTokens API")
     parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
+    parser.add_argument("--gemini-token-cache", default=".cache/gemini_token_cache.sqlite3")
+    parser.add_argument("--gemini-token-retries", type=int, default=3)
+    parser.add_argument("--gemini-token-retry-base-seconds", type=float, default=0.5)
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.output:
@@ -616,9 +619,16 @@ def main() -> None:
         if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             parser.error("config name must contain only letters, digits, _ or -; or pass --output")
         output = Path("benchmark/generated") / (name + ".zip" if args.archive else name)
-    counter = (GeminiTokenCounter(model=args.gemini_token_model, cache_size=args.gemini_token_cache_size)
-               if args.gemini_token_model else
-               _import_counter(args.token_counter) if args.token_counter else provisional_token_count)
+    counter = (
+        GeminiTokenCounter(
+            model=args.gemini_token_model, 
+            cache_size=args.gemini_token_cache_size,
+            persistent_cache_path=args.gemini_token_cache,
+            max_retries=args.gemini_token_retries,
+            retry_base_seconds=args.gemini_token_retry_base_seconds,
+        )
+        if args.gemini_token_model else _import_counter(args.token_counter) if args.token_counter else provisional_token_count
+    )
     payload = generate_dataset(config, token_counter=counter)
     manifest = (write_dataset_archive(payload, output) if args.archive else write_dataset(payload, output))
     print(json.dumps(dict(output=str(output),

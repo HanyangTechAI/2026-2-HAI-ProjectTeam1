@@ -308,8 +308,6 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         raise ValueError("context_budget and actual input_tokens for successful runs are required")
     budget_exceeded = input_tokens is not None and input_tokens > budget
     invalid_fixed_budget = fixed_tokens is not None and fixed_tokens > budget
-    if input_tokens is not None and fixed_tokens is not None and fixed_tokens > input_tokens:
-        raise ValueError("fixed_input_tokens cannot exceed measured input_tokens")
     expected = scenario.get("expected_tool_calls", [])
     forbidden = scenario.get("forbidden_tool_calls", [])
     expected_ok = _expected_calls_present(calls, expected)

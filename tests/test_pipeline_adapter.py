@@ -202,6 +202,12 @@ class PipelineAdapterTests(unittest.TestCase):
                 self.assertEqual(run["final_turn"], 11)
                 costs = [step["context_result"]["total_input_tokens"] for step in run["steps"]]
                 self.assertEqual(run["usage"]["input_tokens"], max(costs))
+                peak_step = max(
+                    run["steps"],
+                    key=lambda step:
+                        step["context_result"]["total_input_tokens"],
+                )
+                self.assertEqual(run["usage"]["fixed_input_tokens"], peak_step["fixed_tokens"])
                 self.assertEqual(run["usage"]["total_input_tokens"], sum(costs))
                 self.assertEqual(run["context_result"]["selected_memory_ids"], ["report_final"])
                 replay = evaluate(

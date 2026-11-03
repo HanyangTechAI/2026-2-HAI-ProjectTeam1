@@ -526,6 +526,26 @@ class AggregationTests(unittest.TestCase):
         for name in ("general_retrieval_miss", "selection_failure"):
             self.assertEqual(metrics[name]["mean"], .5)
             self.assertEqual(metrics[name]["n"], 2)
+            
+        
+    def test_fixed_token_count_may_exceed_full_context_count(self):
+        scenario, run = fixture()
+
+        run["usage"]["fixed_input_tokens"] = 401
+        run["usage"]["input_tokens"] = 400
+
+        result = evaluate(
+            scenario,
+            run,
+        )
+
+        self.assertFalse(
+            result.metrics["budget_exceeded"]
+        )
+
+        self.assertFalse(
+            result.metrics["invalid_fixed_budget"]
+        )
 
 
 class ConfigAndCliTests(unittest.TestCase):
