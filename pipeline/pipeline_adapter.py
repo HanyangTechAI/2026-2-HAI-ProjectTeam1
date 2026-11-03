@@ -173,3 +173,10 @@ def make_proposed_pipeline_adapter(
         max_steps=max_steps,
         goal_checker=goal_checker,
     )
+
+
+def make_pipeline_adapter(strategy: str, **options) -> PipelineAdapter:
+    """네 전략의 공개 factory를 동일한 PipelineAdapter로 연결한다."""
+    if strategy == "proposed":
+        return make_proposed_pipeline_adapter(**options)
+    return make_baseline_pipeline_adapter(strategy, **options)

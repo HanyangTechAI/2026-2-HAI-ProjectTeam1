@@ -198,7 +198,12 @@ def make_proposed_policy(
         if current_time is None:
             raise ValueError("proposed policy requires current_time")
         
-        store = SnapshotMemoryStore(tuple(memories))
+        # baseline과 같은 session/turn 범위를 먼저 적용한다. 미래 버전은
+        # 현재 snapshot의 ACTIVE 일관성 검사에도 참여하면 안 된다.
+        store = SnapshotMemoryStore(tuple(
+            memory for memory in memories
+            if memory.session_id == session_id and memory.turn_id <= current_turn
+        ))
         
         return select_memory(
             query=query,

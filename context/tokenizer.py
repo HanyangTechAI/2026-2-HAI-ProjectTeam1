@@ -9,7 +9,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
 from pathlib import Path
-from contextlib import closing
+from contextlib import closing, contextmanager
 
 
 TokenCounter = Callable[[str], int]
@@ -30,7 +30,7 @@ class GeminiTokenCounter:
     
     def __init__(
         self,
-        model: str,
+        model: str | None = None,
         api_key: str | None = None,
         cache_size: int = 4096,
         persistent_cache_path: str | Path | None = None,
@@ -39,8 +39,9 @@ class GeminiTokenCounter:
         client: Any | None = None,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
+        model = model if model is not None else os.getenv("GEMINI_TOKEN_MODEL")
         if not isinstance(model, str) or not model.strip():
-            raise ValueError("model must be a non-empty string")
+            raise ValueError("model must be a non-empty string; set GEMINI_TOKEN_MODEL or pass model")
         
         if type(cache_size) is not int or cache_size < 0:
             raise ValueError("cache_size must be a non-negative integer")
@@ -248,6 +249,18 @@ class GeminiTokenCounter:
             connection.commit()
     
     
+    @contextmanager
+    def isolated_cache(self):
+        """실험 실행 간 캐시 이점을 제거한다. 기존 SQLite 파일은 변경하지 않는다."""
+        original_path = self._persistent_cache_path
+        self.clear_cache()
+        self._persistent_cache_path = None
+        try:
+            yield
+        finally:
+            self.clear_cache()
+            self._persistent_cache_path = original_path
+
     def clear_cache(self) -> None:
         self._cached_count.cache_clear()
         
@@ -289,6 +302,8 @@ class GeminiTokenCounter:
         return {
             "type": "gemini",
             "model": self.model,
+            "method": "countTokens",
+            "request_shape": "single_user_text",
             "memory_cache_size": self.cache_size,
             "max_retries": self.max_retries,
             "retry_base_seconds": self.retry_base_seconds,

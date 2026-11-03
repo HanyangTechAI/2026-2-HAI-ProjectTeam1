@@ -1,0 +1,211 @@
+{
+  "strategies": [
+    "sliding_window",
+    "vector_top_k",
+    "utility_per_token",
+    "proposed"
+  ],
+  "n_scenarios": 8,
+  "repeats": 2,
+  "top_k": 20,
+  "utility_weights": [
+    0.6,
+    0.3,
+    0.1
+  ],
+  "max_steps": 8,
+  "token_count_mode": "provisional",
+  "tokenizer": {
+    "type": "provisional"
+  },
+  "token_cache_policy": null,
+  "scenario_ids": [
+    "seed2026_approval_051_granted",
+    "seed2026_approval_053_granted",
+    "seed2026_approval_050_pending",
+    "seed2026_approval_052_pending",
+    "seed2026_temporal_update_000_current",
+    "seed2026_temporal_update_001_current",
+    "seed2026_temporal_update_025_historical",
+    "seed2026_temporal_update_026_historical"
+  ],
+  "pilot_kind": "offline_integration_only_not_llm_performance",
+  "source_file": "benchmark/generated/pilot/cell_01e2ddce9162.json",
+  "source_sha256": "c9ccec74ce6df4d29eca2a9f768b3a24dc4300123a16248c42b30b458704db09",
+  "sample_selection": "first 2 examples per task/state-scope/approval-status stratum; independent of outcomes",
+  "strata": [
+    {
+      "task_type": "approval",
+      "state_scope": "current",
+      "approval_status": "granted",
+      "samples": 2
+    },
+    {
+      "task_type": "approval",
+      "state_scope": "current",
+      "approval_status": "pending",
+      "samples": 2
+    },
+    {
+      "task_type": "temporal_update",
+      "state_scope": "current",
+      "approval_status": null,
+      "samples": 2
+    },
+    {
+      "task_type": "temporal_update",
+      "state_scope": "historical",
+      "approval_status": null,
+      "samples": 2
+    }
+  ],
+  "embedding": {
+    "kind": "offline_lexical_sha256_character_ngrams",
+    "dimensions": 384,
+    "widths": [
+      2,
+      3
+    ],
+    "trained_semantic_model": false
+  },
+  "planner": "agent.planner.Planner (deterministic rules)",
+  "runtime_clock": "2026-01-03T09:00:00+09:00",
+  "actual_llm_calls": 0,
+  "actual_gemini_count_tokens_calls": 0,
+  "audits": {
+    "common_run_schema": true,
+    "common_evaluator_schema": true,
+    "paired_conditions": true,
+    "fresh_agents_and_executors": true,
+    "original_inputs_unchanged": true,
+    "evaluator_replay_matches": true,
+    "aggregate_replay_matches": true,
+    "per_step_input_within_budget": true
+  },
+  "reproduction_script": "\"\"\"Offline integration pilot; neither Gemini nor an LLM performance experiment.\"\"\"\nfrom collections import Counter, defaultdict\nfrom datetime import datetime\nfrom hashlib import sha256\nimport json\nfrom pathlib import Path\nimport re\nimport sys\n\nsys.path.insert(0, str(Path.cwd()))\nfrom agent.agent import Agent\nfrom agent.tools.email import EmailTool\nfrom agent.tools.executor import ToolExecutor\nfrom agent.tools.file import FileTool\nfrom benchmark.evaluator import aggregate_results, evaluate\nfrom benchmark.runner import STRATEGIES, run_scenarios\nfrom context.tokenizer import provisional_token_count\n\nsource = Path('benchmark/generated/pilot/cell_01e2ddce9162.json')\nsource_bytes = source.read_bytes()\nall_scenarios = json.loads(source_bytes)['scenarios']\ngroups = defaultdict(list)\nfor scenario in all_scenarios:\n    meta = scenario['metadata']\n    key = (meta['task_type'], meta.get('state_scope'), meta.get('approval_status'))\n    groups[key].append(scenario)\nscenarios = [scenario for key in sorted(groups, key=str) for scenario in groups[key][:2]]\nassert len(scenarios) == 8 and len(groups) == 4\noriginal = json.dumps(scenarios, sort_keys=True, ensure_ascii=False)\nclocks = {scenario['current_time'] for scenario in scenarios}\nassert len(clocks) == 1\nruntime_clock = datetime.fromisoformat(next(iter(clocks)))\nagents = []\n\n\ndef offline_embedder(text):\n    # Query/content only. No target IDs, expected calls, or scenario annotations.\n    # Stable lexical hash vectors, not a trained semantic embedding model.\n    normalized = re.sub(r'\\s+', ' ', text.casefold()).strip()\n    vector = [0.0] * 384\n    for width in (2, 3):\n        for index in range(max(0, len(normalized) - width + 1)):\n            gram = normalized[index:index + width].encode('utf-8')\n            bucket = int.from_bytes(sha256(gram).digest()[:8], 'big') % len(vector)\n            vector[bucket] += 1.0\n    return vector\n\n\ndef completed(response, calls, results):\n    if not response or not results or not all(result.success for result in results):\n        return False\n    last = results[-1]\n    if (last.tool_name, last.action) == ('file', 'find_file'):\n        return bool(last.output.get('found'))\n    if (last.tool_name, last.action) == ('email', 'request_approval'):\n        return last.output.get('status') == 'pending'\n    if (last.tool_name, last.action) == ('email', 'send_email'):\n        return last.output.get('approved') is True\n    return False\n\n\ndef make_agent(environment):\n    assert set(environment) <= {'files', 'valid_approval_ids'}\n    agent = Agent(\n        executor=ToolExecutor(\n            file=FileTool(environment.get('files', {})),\n            email=EmailTool(granted_approval_ids=environment.get('valid_approval_ids', [])),\n        ),\n        goal_checker=completed,\n        clock=lambda: runtime_clock,\n    )\n    agents.append(agent)\n    return agent\n\n\noutput = Path('experiments/results') / ('pilot_offline_' + datetime.now().strftime('%Y%m%d_%H%M%S'))\nassert not output.exists()\nresult = run_scenarios(\n    scenarios,\n    environment_agent_factory=make_agent,\n    system_prompt='주어진 기억과 현재 제약을 바탕으로 도구를 사용하여 요청을 수행하세요.',\n    tool_definitions='file.find_file(filename)\\nemail.request_approval(recipient, attachment=None)\\nemail.send_email(recipient, attachment=None, approval_id=None)',\n    output_directory=output,\n    strategies=STRATEGIES,\n    embedder=offline_embedder,\n    token_counter=provisional_token_count,\n    top_k=20,\n    repeats=2,\n    max_steps=8,\n    bootstrap_iterations=2000,\n    seed=2026,\n)\nrows = [json.loads(line) for line in Path(result['runs_path']).read_text(encoding='utf-8').splitlines()]\nassert len(rows) == 64 and len(agents) == 64\nassert len({id(agent) for agent in agents}) == 64\nassert len({id(agent.executor) for agent in agents}) == 64\nassert original == json.dumps(scenarios, sort_keys=True, ensure_ascii=False)\nrun_schema = set(rows[0]['run_result'])\neval_schema = set(rows[0]['evaluation'])\nby_pair = defaultdict(list)\nfor row in rows:\n    run = row['run_result']\n    assert set(run) == run_schema and set(row['evaluation']) == eval_schema\n    assert run['token_count_mode'] == 'provisional'\n    assert evaluate(row['scenario'], run, strategy=row['strategy'], repeat_id=row['repeat_id'], k=20).to_dict() == row['evaluation']\n    if run['status'] == 'ok':\n        assert run['usage']['input_tokens'] <= row['scenario']['context_budget']\n    by_pair[(row['scenario']['scenario_id'], row['repeat_id'])].append(row)\nassert all({row['strategy'] for row in pair} == set(STRATEGIES) for pair in by_pair.values())\nassert aggregate_results([row['evaluation'] for row in rows], bootstrap_iterations=2000, seed=2026) == result['summary']\nmetadata_path = Path(result['experiment_path'])\nmetadata = json.loads(metadata_path.read_text(encoding='utf-8'))\nmetadata.update(\n    pilot_kind='offline_integration_only_not_llm_performance',\n    source_file=str(source),\n    source_sha256=sha256(source_bytes).hexdigest(),\n    sample_selection='first 2 examples per task/state-scope/approval-status stratum; independent of outcomes',\n    strata=[dict(task_type=key[0], state_scope=key[1], approval_status=key[2], samples=2) for key in sorted(groups, key=str)],\n    embedding=dict(kind='offline_lexical_sha256_character_ngrams', dimensions=384, widths=[2, 3], trained_semantic_model=False),\n    planner='agent.planner.Planner (deterministic rules)',\n    runtime_clock=runtime_clock.isoformat(),\n    actual_llm_calls=0,\n    actual_gemini_count_tokens_calls=0,\n    audits=dict(common_run_schema=True, common_evaluator_schema=True, paired_conditions=True,\n                fresh_agents_and_executors=True, original_inputs_unchanged=True,\n                evaluator_replay_matches=True, aggregate_replay_matches=True, per_step_input_within_budget=True),\n    reproduction_script=Path(__file__).read_text(encoding='utf-8'),\n)\nmetadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\\n', encoding='utf-8')\nprint('OUTPUT', output)\nprint('RUNS', len(rows))\nfor strategy in STRATEGIES:\n    selected = [row for row in rows if row['strategy'] == strategy]\n    print(strategy, 'success', sum(row['evaluation']['task_success'] for row in selected), '/', len(selected),\n          'status', dict(Counter(row['run_result']['status'] for row in selected)),\n          'failures', dict(Counter(reason for row in selected for reason in row['evaluation']['failure_types'])))\nprint('AUDIT', json.dumps(metadata['audits']))\n",
+  "pilot_observations": {
+    "results": {
+      "proposed": {
+        "successes": 16,
+        "runs": 16,
+        "unique_scenarios": 8,
+        "strata_successes_and_runs": {
+          "approval/current/granted": [
+            4,
+            4
+          ],
+          "approval/current/pending": [
+            4,
+            4
+          ],
+          "temporal_update/current/None": [
+            4,
+            4
+          ],
+          "temporal_update/historical/None": [
+            4,
+            4
+          ]
+        },
+        "constraint_violation_runs": 0,
+        "selection_failure_runs": 16,
+        "budget_failure_runs": 0
+      },
+      "sliding_window": {
+        "successes": 12,
+        "runs": 16,
+        "unique_scenarios": 8,
+        "strata_successes_and_runs": {
+          "approval/current/granted": [
+            4,
+            4
+          ],
+          "approval/current/pending": [
+            4,
+            4
+          ],
+          "temporal_update/current/None": [
+            4,
+            4
+          ],
+          "temporal_update/historical/None": [
+            0,
+            4
+          ]
+        },
+        "constraint_violation_runs": 0,
+        "selection_failure_runs": 0,
+        "budget_failure_runs": 0
+      },
+      "utility_per_token": {
+        "successes": 0,
+        "runs": 16,
+        "unique_scenarios": 8,
+        "strata_successes_and_runs": {
+          "approval/current/granted": [
+            0,
+            4
+          ],
+          "approval/current/pending": [
+            0,
+            4
+          ],
+          "temporal_update/current/None": [
+            0,
+            4
+          ],
+          "temporal_update/historical/None": [
+            0,
+            4
+          ]
+        },
+        "constraint_violation_runs": 0,
+        "selection_failure_runs": 0,
+        "budget_failure_runs": 0
+      },
+      "vector_top_k": {
+        "successes": 0,
+        "runs": 16,
+        "unique_scenarios": 8,
+        "strata_successes_and_runs": {
+          "approval/current/granted": [
+            0,
+            4
+          ],
+          "approval/current/pending": [
+            0,
+            4
+          ],
+          "temporal_update/current/None": [
+            0,
+            4
+          ],
+          "temporal_update/historical/None": [
+            0,
+            4
+          ]
+        },
+        "constraint_violation_runs": 0,
+        "selection_failure_runs": 0,
+        "budget_failure_runs": 0
+      }
+    },
+    "interpretation": "Descriptive integration results only: 8 unique synthetic samples, deterministic repeats, lexical hash vectors and whitespace token counts. Not Gemini or LLM performance.",
+    "diagnostic_caveats": [
+      "failure_types contains selection/context diagnostics and does not mean task_success must be false.",
+      "Proposed excludes file-specific protected constraints for unrelated restricted filenames; the source lists these as targets, producing selection_failure diagnostics despite correct actions.",
+      "Baselines may include superseded memories and still choose the correct action; temporal context diagnostics and action success are separate."
+    ]
+  },
+  "artifact_role": "historical_offline_reference_excluded_from_main_experiment",
+  "generation_base_commit": "9084f85",
+  "generation_worktree_dirty": true,
+  "compatibility_note": "Generated before the later mandatory_memory_overflow and evaluator/tokenizer updates. Preserved without relabeling or recomputing run metrics. Not current-version benchmark evidence.",
+  "artifact_integrity": {
+    "runs.jsonl_sha256": "8fb265dc14d614156e7e9d57dac2cc26aea513b3ce1b87c865b7e4b7641f2550",
+    "runs.jsonl.gz_sha256": "b7f8d308f07a14f04f7c87201d333d79961ded6871281468140469de93015590",
+    "summary.json_sha256": "82c99fabc2d58f948b82a55ebb2af15397f084f9e2512b896b12f9b6983a522e",
+    "rows": 64,
+    "compression": "gzip; decompress to reproduce original runs.jsonl byte-for-byte"
+  }
+}
