@@ -304,8 +304,49 @@ def run_scenarios(
     output.mkdir(parents=True, exist_ok=True)
     (output / "runs.jsonl").write_text(runs_text, encoding="utf-8")
     (output / "summary.json").write_text(summary_text, encoding="utf-8")
-    return dict(n_runs=len(rows), n_scenarios=len(enabled), summary=summary,
-                runs_path=str(output / "runs.jsonl"), summary_path=str(output / "summary.json"))
+    
+    if isinstance(token_counter, GeminiTokenCounter):
+        tokenizer_metadata = token_counter.metadata()
+    else:
+        tokenizer_metadata = {
+            "type": token_count_mode(token_counter)
+        }
+        
+    experiment_metadata = {
+        "strategies": list(strategies),
+        "n_scenarios": len(enabled),
+        "repeats": repeats,
+        "top_k": top_k,
+        "utility_weights": list(utility_weights),
+        "max_steps": max_steps,
+        "token_count_mode": mode,
+        "tokenizer": tokenizer_metadata,
+        "scenario_ids": ids,
+    }
+    
+    experiment_text = json.dumps(
+        experiment_metadata,
+        ensure_ascii=False,
+        indent=2,
+        allow_nan=False,
+    ) + "\n"
+    
+    experiment_path = output / "experiment.json"
+    
+    experiment_path.write_text(
+        experiment_text,
+        encoding="utf-8",
+    )
+    
+    return dict(
+        n_runs=len(rows), 
+        n_scenarios=len(enabled), 
+        summary=summary,
+        runs_path=str(output / "runs.jsonl"), 
+        summary_path=str(output / "summary.json"),
+        experiment_path=str(experiment_path),
+        tokenizer=tokenizer_metadata,
+    )
 
 
 def _import_callable(spec: str) -> Callable:
@@ -361,6 +402,9 @@ def main() -> None:
     parser.add_argument("--utility-weights", type=float, nargs=3, default=(0.6, 0.3, 0.1))
     parser.add_argument("--bootstrap-iterations", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--gemini-token-cache", default=(".cache/gemini_token_cache.sqlite3"))
+    parser.add_argument("--gemini-token-retries", type=int, default=3)
+    parser.add_argument("--gemini-token-retry-base-seconds", type=float, default=0.5)
     args = parser.parse_args()
     payload = json.loads(Path(args.scenarios).read_text(encoding="utf-8"))
     scenarios = payload["scenarios"] if isinstance(payload, dict) else payload
@@ -379,6 +423,9 @@ def main() -> None:
         token_counter = GeminiTokenCounter(
             model=args.gemini_token_model,
             cache_size=args.gemini_token_cache_size,
+            persistent_cache_path=args.gemini_token_cache,
+            max_retries=args.gemini_token_retries,
+            retry_base_seconds=args.gemini_token_retry_base_seconds,
         )
     elif args.token_counter:
         token_counter = _import_callable(args.token_counter)
