@@ -1,14 +1,15 @@
 {
   "name": "ablation",
-  "description": "Optional supporting ablation for RQ1/RQ2; strategy implementations must be connected by the runner.",
+  "description": "Optional supporting ablation for RQ1/RQ2 using the proposed selector ablation presets.",
   "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
   "dataset": {"source": "synthetic", "samples_per_cell": 20, "task_types": ["temporal_update", "approval"]},
-  "strategies": ["proposed", "without_protected_memory", "without_state_versioning", "without_budget_optimization"],
+  "strategies": ["proposed", "proposed/no_constraint_preservation", "proposed/no_temporal", "proposed/no_state_mandatory", "proposed/no_budget_aware_packing"],
   "strategy_options": {
-    "proposed": {"protect_constraints": true, "resolve_state_versions": true, "flexible_selection": "utility_per_token"},
-    "without_protected_memory": {"protect_constraints": false, "resolve_state_versions": true, "flexible_selection": "utility_per_token"},
-    "without_state_versioning": {"protect_constraints": true, "resolve_state_versions": false, "flexible_selection": "utility_per_token"},
-    "without_budget_optimization": {"protect_constraints": true, "resolve_state_versions": true, "flexible_selection": "retrieval_order"}
+    "proposed": {"constraint_preservation": true, "temporal_resolution": true, "mandatory_state": true, "token_aware_packing": true},
+    "proposed/no_constraint_preservation": {"constraint_preservation": false, "temporal_resolution": true, "mandatory_state": true, "token_aware_packing": true},
+    "proposed/no_temporal": {"constraint_preservation": true, "temporal_resolution": false, "mandatory_state": false, "token_aware_packing": true},
+    "proposed/no_state_mandatory": {"constraint_preservation": true, "temporal_resolution": true, "mandatory_state": false, "token_aware_packing": true},
+    "proposed/no_budget_aware_packing": {"constraint_preservation": true, "temporal_resolution": true, "mandatory_state": true, "token_aware_packing": false}
   },
   "seeds": [42, 43],
   "repeats": 2,

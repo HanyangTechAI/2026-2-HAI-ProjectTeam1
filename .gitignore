@@ -1,4 +1,62 @@
+# =========================
+# Python
+# =========================
 __pycache__/
 *.py[cod]
+*$py.class
+
+# =========================
+# Virtual environments
+# =========================
 .venv/
+venv/
+env/
+
+# =========================
+# Cache
+# =========================
 .cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# Environment / secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Test / coverage outputs
+# =========================
+.coverage
+coverage.xml
+htmlcov/
+
+# =========================
+# Experiment results
+# =========================
+experiments/results/*
+!experiments/results/.gitkeep
+
+# =========================
+# Temporary runner inputs
+# =========================
+system_prompt.txt
+tools.txt
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini

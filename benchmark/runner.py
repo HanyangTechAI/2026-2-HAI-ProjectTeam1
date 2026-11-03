@@ -267,6 +267,15 @@ def run_scenarios(
     if any(strategy in embedding_strategies for strategy in strategies) and embedder is None:
         raise ValueError("vector_top_k, utility_per_token, and proposed require embedder")
     
+    enabled = [
+        scenario 
+        for scenario in scenarios
+        if scenario.get("benchmark_enabled", True) and scenario.get("validation_scope", "integration") == "integration"
+    ]
+    
+    if not enabled:
+        raise ValueError("no enabled integration scenarios selected")
+    
     if "proposed" in strategies:
         for scenario in enabled:
             if scenario.get("current_time") is None:
@@ -283,11 +292,7 @@ def run_scenarios(
     factory = agent_factory if agent_factory is not None else environment_agent_factory
     if not callable(factory) or not callable(token_counter):
         raise TypeError("agent factory and token_counter must be callable")
-    enabled = [scenario for scenario in scenarios
-               if scenario.get("benchmark_enabled", True)
-               and scenario.get("validation_scope", "integration") == "integration"]
-    if not enabled:
-        raise ValueError("no enabled integration scenarios selected")
+    
     ids = [scenario.get("scenario_id", scenario.get("sample_id")) for scenario in enabled]
     if any(not isinstance(sid, str) or not sid for sid in ids) or len(set(ids)) != len(ids):
         raise ValueError("scenarios require unique non-empty scenario_id/sample_id")
