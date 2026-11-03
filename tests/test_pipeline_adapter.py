@@ -17,7 +17,7 @@ from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.evaluator import aggregate_results, evaluate
 from benchmark.runner import run_scenarios
-from context.tokenizer import provisional_token_count
+from context.tokenizer import provisional_token_count, token_count_mode
 from memory.schema import MemoryItem, MemoryType
 from memory.selector import PipelineStatus
 from pipeline.orchestrator import PipelineRunResult, make_baseline_policy
@@ -110,12 +110,32 @@ class PipelineAdapterTests(unittest.TestCase):
 
     def run_runner(self, output, **options):
         settings = dict(
-            agent_factory=self.factory, system_prompt=SYSTEM,
-            tool_definitions=TOOLS, output_directory=output,
-            strategies=("sliding_window",), bootstrap_iterations=100,
+            agent_factory=self.factory,
+            system_prompt=SYSTEM,
+            tool_definitions=TOOLS,
+            output_directory=output,
+            strategies=("sliding_window",),
+            bootstrap_iterations=100,
         )
         settings.update(options)
-        return run_scenarios([self.scenario], **settings)
+
+        counter = settings.get(
+            "token_counter",
+            provisional_token_count,
+        )
+
+        scenario = copy.deepcopy(
+            self.scenario
+        )
+
+        scenario["token_count_mode"] = (
+            token_count_mode(counter)
+        )
+
+        return run_scenarios(
+            [scenario],
+            **settings,
+        )
 
     def test_execution_inputs_reach_policy_and_feedback_reaches_agent(self):
         """입력 다섯 항목과 공통 설정이 실제 정책·Agent 실행까지 전달되는지 확인한다."""
@@ -246,6 +266,32 @@ class PipelineAdapterTests(unittest.TestCase):
         self.assertEqual(len(row["run_result"]["tool_calls"]), 1)
         self.assertFalse(row["run_result"]["goal_completed"])
         self.assertFalse(row["evaluation"]["task_success"])
+        
+        
+    def test_runner_rejects_tokenizer_mode_mismatch(self):
+        scenario = copy.deepcopy(
+            self.scenario
+        )
+
+        scenario["token_count_mode"] = (
+            "gemini:gemini-3.8-flash"
+        )
+
+        with tempfile.TemporaryDirectory() as output:
+            with self.assertRaisesRegex(
+                ValueError,
+                "token counter mismatch",
+            ):
+                run_scenarios(
+                    [scenario],
+                    agent_factory=self.factory,
+                    system_prompt=SYSTEM,
+                    tool_definitions=TOOLS,
+                    output_directory=output,
+                    strategies=("sliding_window",),
+                    bootstrap_iterations=100,
+                    token_counter=provisional_token_count,
+            )
 
 
 if __name__ == "__main__":

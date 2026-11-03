@@ -586,17 +586,88 @@ class ConfigAndCliTests(unittest.TestCase):
 
     def test_cli_round_trip(self):
         scenario, run = fixture()
+
+        config = load_config(
+            "experiments/configs/smoke.json"
+        )
+
+        scenario["context_budget"] = (
+            config["grid"]["context_token_budget"][0]
+        )
+
+        for key, values in config["grid"].items():
+            if key == "context_token_budget":
+                continue
+
+            scenario["metadata"][key] = values[0]
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "runs.jsonl"
-            source.write_text(json.dumps({"scenario": scenario, "run_result": run}) + "\n", encoding="utf-8")
-            command = [sys.executable, "-m", "benchmark.evaluator", "--config",
-                       "experiments/configs/smoke.json", "--output", str(root / "output")]
-            subprocess.run(command + ["--plan-only"], check=True, capture_output=True)
-            self.assertEqual(len(json.loads((root / "output/plan.json").read_text())), 4)
-            subprocess.run(command + ["--input", str(source)], check=True, capture_output=True)
-            summary = json.loads((root / "output/summary.json").read_text())
-            self.assertEqual(summary[0]["metrics"]["task_success"]["mean"], 1)
+
+            source.write_text(
+                json.dumps({
+                    "scenario": scenario,
+                    "run_result": run,
+                }) + "\n",
+                encoding="utf-8",
+            )
+
+            command = [
+                sys.executable,
+                "-m",
+                "benchmark.evaluator",
+                "--config",
+                "experiments/configs/smoke.json",
+                "--output",
+                str(root / "output"),
+            ]
+
+            subprocess.run(
+                command + ["--plan-only"],
+                check=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(
+                len(
+                    json.loads(
+                        (
+                            root
+                            / "output/plan.json"
+                        ).read_text()
+                    )
+                ),
+                4,
+            )
+
+            subprocess.run(
+                command
+                + [
+                    "--input",
+                    str(source),
+                ],
+                check=True,
+                capture_output=True,
+            )
+
+            summary = json.loads(
+                (
+                    root
+                    / "output/summary.json"
+                ).read_text()
+            )
+
+            self.assertEqual(
+                summary[0][
+                    "metrics"
+                ][
+                    "task_success"
+                ][
+                    "mean"
+                ],
+                1,
+            )
 
 
 if __name__ == "__main__":
