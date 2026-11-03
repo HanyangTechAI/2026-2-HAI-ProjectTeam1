@@ -53,7 +53,7 @@ write_dataset(payload, "benchmark/generated/smoke")
 
 `experiments/configs/pilot.json`은 단일 seed·단일 셀에서 서로 다른 기본 sample 100개를 생성한다. 현재 보고서 조회 25개, 과거 보고서 조회 25개, 승인 요청 25개, 이미 승인된 발송 25개로 구성한다. Budget/Horizon을 바꾸어 같은 과제를 반복 배치한 개수가 아니며, `sample_id`, `scenario_id`, `session_id`가 각각 100개 모두 고유하다. seed는 기존 main/smoke의 42·43과 겹치지 않도록 2026을 사용한다.
 
-설정은 Budget 2048, History 25000, Horizon 50 turns, Noise 0.5, Constraint 3개, State update 2회다. History token은 기존과 같은 공백 기준 개발용 counter로 측정한다. 이 전달물은 기존 템플릿에 서로 다른 과제 식별자·파일·세션을 부여한 합성 입력이며 실제 Agent 실행 결과는 포함하지 않는다.
+설정은 Budget 2048, History 25000, Horizon 50 turns, Noise 0.5, 저장된 Constraint 3개, State update 2회다. 현재 생성기의 적용 제약은 `temporal_update`에서 0개, `approval`에서 발송 승인 제약 1개다. 저장 수는 `metadata.constraint_count`, 적용 수는 `metadata.applicable_constraint_count`와 `applicable_constraint_ids`로 구분한다. 옵션을 생략한 생성 명령은 공백 기준 개발용 counter를 사용한다. 이 전달물은 기존 템플릿에 서로 다른 과제 식별자·파일·세션을 부여한 합성 입력이며 실제 Agent 실행 결과는 포함하지 않는다.
 
 ```powershell
 python -m benchmark.generator --config experiments/configs/pilot.json --output benchmark/generated/pilot
@@ -63,6 +63,70 @@ python -m benchmark.generator --config experiments/configs/pilot.json --archive 
 압축 없는 JSON은 `benchmark/generated/pilot/manifest.json`의 `cells[0].path`에 있다. `benchmark/generated/pilot.zip`에도 같은 manifest와 셀 JSON이 들어 있어 전달용으로 사용할 수 있다. 기존 Scenario와 같은 최상위 `scenarios` 배열을 유지하므로 JSON을 읽는 기존 코드에 전달할 수 있다.
 
 개수는 `dataset.samples_per_cell`, seed는 `seeds`에서 바꾼다. `grid.horizon_turns`, `noise_memory_ratio`, `state_update_count`, `constraint_count`도 조절할 수 있다. 최소 100개의 서로 다른 기본 과제가 필요하면 `samples_per_cell >= 100`을 유지한다. 여러 Budget/Horizon 셀에 같은 ID가 반복되는 것은 비교용 재사용이므로 고유 sample 수로 중복 계산하지 않는다.
+
+### Gemini CountTokens로 같은 pilot 재생성
+
+이 절차는 `experiments/configs/pilot.json`을 그대로 사용하면서 History와 Memory의 token 측정만 Gemini CountTokens로 수행한다. Agent가 답변을 생성하거나 Tool 행동을 수행하는 벤치마크는 실행하지 않는다. seed 2026, sample 100개, Budget 2048, Horizon 50, History 목표 25000, Noise 목표 0.5, 저장된 Constraint 3개와 State update 2회는 유지한다. 적용 제약은 현재 조회·과거 조회에서 0개, 승인 과제에서 1개다.
+
+먼저 해당 Python 환경에 `requirements.txt`의 의존성이 설치되어 있어야 한다. API key는 로컬의 `GEMINI_API_KEY` 환경변수로 설정하고, 프로젝트에서 확인한 정확한 모델명을 아래 `MODEL` 자리에 넣는다. API key를 문서, 실행 로그나 Git에 기록하지 않는다.
+
+```powershell
+python -m pip install -r requirements.txt
+$geminiModel = "MODEL"
+if (-not $env:GEMINI_API_KEY) { throw "현재 PowerShell 세션에 GEMINI_API_KEY를 설정하세요." }
+python -m benchmark.generator --config experiments/configs/pilot.json --output benchmark/generated/pilot_gemini --gemini-token-model $geminiModel --gemini-token-cache-size 4096 --gemini-token-cache .cache/pilot_gemini_token_cache.sqlite3 --gemini-token-retries 3 --gemini-token-retry-base-seconds 0.5
+```
+
+CLI는 `.env` 파일을 자동으로 읽지 않는다. `.env`에 key가 있는 경우에도 현재 프로세스 환경변수로 내보내거나 `.env`를 읽는 로컬 실행 wrapper를 사용해야 한다. `GeminiTokenCounter()` 자체는 모델 인자가 없을 때 `GEMINI_TOKEN_MODEL`을 읽을 수 있지만, 현재 생성기 CLI는 `--gemini-token-model` 옵션이 있어야 Gemini counter를 선택한다. 환경변수의 모델명이나 `pilot.json`의 `model.name`만 바꾸고 이 옵션을 생략하면 Gemini 측정으로 전환되지 않는다.
+
+출력 경로를 `pilot_gemini`로 분리해 기존 provisional 생성물을 덮지 않는다. 현재 `.gitignore`는 이 생성 경로와 `.cache/`를 제외하므로 로컬 재생성만으로 Git 커밋 대상이 되지는 않는다. Counter가 달라지면 같은 조건과 ID를 유지해도 padding 길이, Memory 비용과 실제 대화 내용은 달라질 수 있다. 비교할 때는 같은 코드 버전에서 만든 provisional 생성물을 사용한다. 구버전 생성물은 Noise 정의나 적용 제약 규칙도 다를 수 있다.
+
+`--gemini-token-cache-size`는 프로세스 안의 LRU 캐시 크기이며, `--gemini-token-cache`는 모델명과 원문 SHA-256을 기준으로 token 수를 저장하는 SQLite 파일이다. 성공한 API 응답은 캐시에 저장되어 재실행에서 재사용할 수 있다. `--gemini-token-retries 3`은 재시도 가능한 오류에 최초 호출 후 최대 3회 재시도를 허용하고, `--gemini-token-retry-base-seconds 0.5`는 지수 backoff의 기준 간격이다. 인증 오류나 지속되는 호출 한도 오류는 해결되지 않을 수 있으며, 재시도 종료 후에는 오류로 중단한다. 같은 문장을 padding 탐색에서 여러 번 측정하므로 100개 sample당 API 호출이 100회로 제한되는 것은 아니다.
+
+생성 명령이 정상 종료되면 같은 PowerShell 세션에서 저장된 결과를 확인한다.
+
+```powershell
+$manifest = Get-Content -LiteralPath benchmark/generated/pilot_gemini/manifest.json -Encoding UTF8 -Raw | ConvertFrom-Json
+$cellPath = Join-Path benchmark/generated/pilot_gemini $manifest.cells[0].path
+$dataset = Get-Content -LiteralPath $cellPath -Encoding UTF8 -Raw | ConvertFrom-Json
+$manifest | Select-Object n_cells, n_scenarios, token_count_mode
+$dataset.scenarios | Group-Object token_count_mode | Select-Object Count, Name
+$dataset.scenarios | ForEach-Object { $_.metadata } | Measure-Object actual_history_length_tokens -Minimum -Maximum
+$dataset.scenarios | ForEach-Object { $_.metadata } | Measure-Object actual_noise_memory_ratio -Minimum -Maximum
+```
+
+기대값은 셀 1개, sample 100개, manifest의 `token_count_mode`가 `gemini:MODEL`이고 시나리오 그룹도 `Count=100`, `Name=gemini:MODEL`인 것이다. 여기서 `MODEL`은 지정한 실제 모델명이다. 각 시나리오의 `metadata.token_count_mode`도 같아야 한다. `actual_history_length_tokens`는 24750~25250, `actual_noise_memory_ratio`는 0.49~0.51 범위이며 요청값 `history_length_tokens=25000`, `noise_memory_ratio=0.5`와 따로 확인한다.
+
+이 표시는 어떤 counter를 사용했는지에 대한 기록이다. 실제 API 연결 근거를 남기려면 실행에서 사용한 counter의 `metadata()` 또는 `stats()`로 API 호출, 메모리 hit, persistent hit, retry 수를 함께 보존한다. `api_calls`에는 실패한 호출 시도도 포함된다. 기존 캐시의 값만 재사용한 실행과 새 API 응답으로 측정한 실행을 구분하며, 필요하면 별도 캐시 경로를 지정한다. 이 가이드의 명령과 기대값 자체는 pilot의 실제 Gemini 측정 성공을 의미하지 않는다.
+
+### 확인한 Gemini pilot 실행 결과
+
+커밋 `f74d01859894e023f851548ca29d12b04e1024b2`의 생성기와 기존 `pilot.json`으로 실제 Gemini CountTokens 재생성 및 검증을 완료했다. 측정 모델은 기존 `smoke_gemini`와 같은 `gemini-3.8-flash`, SDK는 `google-genai 2.34.0`을 사용했다. `pilot.json`, `generator.py`, `context/tokenizer.py`, `runner.py`는 변경하지 않았다. 새 측정 기준에 맞추어 padding을 다시 생성했으며 Agent·Planner·Tool 행동 벤치마크는 실행하지 않았다.
+
+| 확인 항목 | 결과 |
+|---|---|
+| 측정 표기 | `gemini:gemini-3.8-flash` |
+| sample / 고유 ID | 100개 / 100개 |
+| 유형별 개수 | 현재 조회 25, 과거 조회 25, 승인 요청 25, 승인된 발송 25 |
+| 실제 History token 범위 | 25145~25152, 목표 25000의 1% 이내 |
+| 실제 Noise 비율 범위 | 약 0.499608~0.500391, 목표 0.5의 허용 오차 이내 |
+| 생성 counter의 API 호출 기록 | 3984회, persistent hit 0회, retry 0회 |
+| 별도 캐시 없는 API 호출 기록 | 연결 검사 1회 + 대표 이력 4개 + 해당 Memory 41개 = 46회 |
+| 별도 재측정 결과 | 네 유형에서 한 sample씩, 이력과 모든 Memory의 저장 token 수 일치 |
+| 설정·스키마·정답 확인 | 기존 설정 유지, Memory 스키마·버전·시간·파일·승인 정답 검사 통과 |
+
+같은 최신 코드로 provisional 데이터를 메모리에서 별도 생성해 비교했을 때도 100개 과제의 ID·질문·요구 State·기대 행동·승인 정답은 동일했다. 이 검증은 구버전의 커밋된 pilot 생성물과 비교한 것이 아니다. 전체 100개는 Gemini counter로 생성했고, 그중 네 유형의 대표 4개를 캐시 없이 독립 재측정했다는 범위로 해석한다.
+
+로컬 산출물은 다음과 같다. 전달용 ZIP에는 셀 JSON, manifest와 검증 보고서 세 파일이 들어 있으며 압축 전 파일과 바이트 단위로 일치한다.
+
+```text
+benchmark/generated/pilot_gemini/cell_01e2ddce9162.json
+benchmark/generated/pilot_gemini/manifest.json
+benchmark/generated/pilot_gemini/verification.json
+benchmark/generated/pilot_gemini.zip
+```
+
+`verification.json`에는 사용한 코드 커밋, config SHA-256, SDK 버전, counter 통계, 독립 재측정 sample과 추가 정답 검증 결과를 보존했다. 이 생성 경로들은 현재 Git 제외 대상이므로 자동으로 커밋되지는 않는다. API key는 데이터·보고서·문서에 기록하지 않았다.
 
 출력 디렉터리의 `manifest.json`에는 셀 파일 경로, 시나리오 수, 사용한 설정과 token 측정 방식이 기록된다. 각 셀 JSON은 최상위 `scenarios` 배열을 가지며, 해당 셀의 모든 seed에 대한 입력을 포함한다. `samples_per_cell`은 **seed당 전체 sample 수**이다. strategy와 repeat는 데이터 복제 축이 아니다.
 
@@ -82,9 +146,9 @@ python -m benchmark.generator --config experiments/configs/pilot.json --archive 
 
 History는 중간 turn을 생략한 핵심 사건 목록이 아니라 연속된 합성 대화이다. `memory_snapshot`은 이력에서 보존할 정보를 요약한 입력으로, State의 이전 버전과 대체 참조를 유지한다. 같은 사실을 늘려 쓴 History와 요약된 Memory는 길이가 다르므로 두 비용을 혼용하지 않는다.
 
-생성기는 주입된 counter로 History를 측정하여 목표 길이의 1% 이내인지 확인한다. Noise 비율은 snapshot의 전체 Memory token 중 최종 행동에 불필요한 Memory token의 비율로 측정하며, 요청 비율과의 차이를 0.01 이내로 검증한다. 정답이 아닌 동일 State의 다른 버전도 Noise에 포함된다. 이 비율은 History의 무관한 대화 turn 비율이나 Memory 항목 수 비율과 다르다.
+생성기는 주입된 counter로 History를 측정하여 목표 길이의 1% 이내인지 확인한다. 현재 Noise 비율은 별도로 생성한 synthetic noise note의 token 수를 `target_memory_ids`의 Memory token 수와 synthetic noise note token 수의 합으로 나눈 값이다. 계산식은 `synthetic_noise_tokens / (target_memory_tokens + synthetic_noise_tokens)`이며, 요청 비율과의 차이를 0.01 이내로 검증한다. 정답이 아닌 State 버전과 현재 행동에 적용되지 않는 Constraint는 이 비율에서 제외하고 `structural_distractor_tokens`로 따로 기록한다. 따라서 이 비율은 전체 snapshot 중 모든 무관 정보의 비율이나 History의 무관한 turn 비율을 뜻하지 않는다.
 
-같은 Task의 Noise 조건을 비교할 때 필수 Memory의 비용이 함께 바뀌지 않도록, 필수 정보의 기본 token 비용을 먼저 맞춘 뒤 무관한 Memory 쪽의 길이를 조절한다. 기본 비용은 640 token과 최소 무관 Memory 비용의 9배 중 큰 값으로 정하며, 요청한 Noise 비율로 결정하지 않는다. 버전 이력만으로 이미 포함되는 무관 정보 때문에 만족할 수 없는 낮은 Noise 비율이나, padding 후 필요한 이력을 담을 수 없는 짧은 History는 오류로 반환한다.
+같은 Task의 Noise 조건을 비교할 때 target Memory의 비용이 함께 바뀌지 않도록, target Memory의 합계 비용을 `max(640, 기존 target 비용)`으로 맞춘 뒤 synthetic noise note의 길이를 조절한다. 이미 존재하는 synthetic note의 최소 비용 때문에 만족할 수 없는 낮은 Noise 비율이나, padding 후 필요한 정보를 담을 수 없는 짧은 History는 오류로 반환한다. `noise_memory_tokens`는 synthetic note 비용이며 `memory_tokens`는 target, synthetic note, structural distractor를 모두 합한 전체 snapshot 비용이다.
 
 Horizon은 필수 State와 적용 가능한 Constraint, 이미 승인된 경우 승인 기록을 포함한 **Task 필수 정보 중 가장 가까운 정보**와 최종 Task의 turn 거리이다. 가장 가까운 필수 정보는 `current_turn - horizon_turns`에 두고, 나머지 필수 정보는 그보다 앞에 둔다. 과거 요청의 대상 시각은 Horizon을 바꾸어도 같은 버전을 가리키도록 유지한다. History 길이, 업데이트 수와 요청 Horizon을 함께 만족할 수 없는 입력은 정답을 바꾸어 생성하지 않고 오류로 알린다.
 
@@ -97,6 +161,8 @@ Metadata의 `history_length_tokens`와 `noise_memory_ratio`는 설정 grid의 �
 `temporal_update`는 현재 값 또는 명시한 과거 시점에 유효한 파일로 `file.find_file`을 호출하도록 평가한다. `required_states[].state_scope`와 `expected_value`를 명시하며, 과거 요청에서는 `is_active`만으로 정답을 판단하지 않는다. State 변경 횟수가 0인 조건에는 경쟁 버전이 없으므로 temporal version 판단의 적용 여부도 구분한다.
 
 `approval`은 올바른 보고서 파일을 `attachment`로 사용한 이메일 행동을 평가한다. 승인 전 snapshot은 `email.request_approval`이 정답이며 발송은 금지한다. 이미 승인된 snapshot은 실행 전에 허용된 승인 ID를 사용한 `email.send_email`이 정답이다. 승인 요청이 반환한 `pending` ID를 승인 완료로 취급하지 않는다. 승인 전후는 각각 독립 입력이며, 요청이 자동 승인으로 이어지는 시뮬레이션이 아니다.
+
+생성된 모든 Constraint를 현재 행동에 적용되는 정답으로 지정하지 않는다. 현재 구현은 `temporal_update`의 파일 조회에는 적용 제약을 지정하지 않고, `approval`에는 첫 번째 승인 제약만 적용한다. 나머지 저장된 금지 파일 규칙은 현재 요청 파일과 다른 대상을 제한하므로 적용 제약 ID와 평가 규칙에서 제외한다. `constraint_rules`는 `applicable_constraint_ids`와 정확히 일치하며, 저장된 전체 Constraint 수와는 구분한다.
 
 `query_context`, 정답 Memory ID, `required_states`, `constraint_rules`, 기대 Tool 호출은 평가용이다. 이 값을 실제 Agent나 retrieval의 정답 지름길로 전달하지 않는다. Runner는 실행 입력으로 query, session, snapshot, Budget과 현재 turn을 사용한다.
 
