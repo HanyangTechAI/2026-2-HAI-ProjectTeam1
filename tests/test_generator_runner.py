@@ -16,6 +16,7 @@ from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.generator import generate_scenario
 from benchmark.runner import main, run_scenarios
+from context.tokenizer import provisional_token_count
 
 
 def completed_action(response, calls, results):
@@ -143,12 +144,16 @@ class GeneratorRunnerTests(unittest.TestCase):
                 "--environment-agent-factory", "test_factory:build",
                 "--system-prompt-file", str(system_path), "--tool-definitions-file", str(tools_path),
                 "--output", str(root / "results"), "--bootstrap-iterations", "100",
+                "--token-counter", "context.tokenizer:provisional_token_count",
             ]
             with patch.object(sys, "argv", arguments), patch(
-                "benchmark.runner._import_callable", return_value=environment_agent,
+                "benchmark.runner._import_callable", side_effect=lambda spec: (
+                    provisional_token_count if spec == "context.tokenizer:provisional_token_count"
+                    else environment_agent),
             ) as imported, redirect_stdout(io.StringIO()) as stdout:
                 main()
-            imported.assert_called_once_with("test_factory:build")
+            self.assertEqual([call.args[0] for call in imported.call_args_list],
+                             ["context.tokenizer:provisional_token_count", "test_factory:build"])
             report = json.loads(stdout.getvalue())
             self.assertEqual(report["n_runs"], 1)
             row = json.loads((root / "results" / "runs.jsonl").read_text(encoding="utf-8"))

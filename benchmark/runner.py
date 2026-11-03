@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass, replace
 from datetime import datetime
@@ -29,7 +30,7 @@ from memory.selector import PipelineStatus
 from memory.ablation import ABLATION_PRESETS, FULL_ABLATION, SelectorAblationConfig, get_ablation_config
 
 from pipeline.orchestrator import GoalChecker, PipelineRunResult
-from pipeline.pipeline_adapter import AgentFactory, make_baseline_pipeline_adapter, make_proposed_pipeline_adapter
+from pipeline.pipeline_adapter import AgentFactory, make_pipeline_adapter
 
 from .evaluator import aggregate_results, evaluate
 
@@ -81,6 +82,24 @@ def _json_record(value: Any) -> Any:
     return value
 
 
+def _mandatory_memory_overflow(outcome: PipelineRunResult) -> bool | None:
+    """선택/Context 실행 기록으로 필수 기억 초과를 판정한다. 추가 토큰 호출은 없다.
+
+    고정 입력만으로 중단되어 선택을 한 번도 수행하지 못했으면 미측정(None).
+    Flexible 제거 후 필수 기억의 formatting 비용 때문에 중단된 경우도 포함한다.
+    """
+    evaluated = [step for step in outcome.steps
+                 if step.selection_result.status != PipelineStatus.INVALID_BUDGET_CONFIGURATION]
+    if not evaluated:
+        return None
+    return any(
+        bool(step.selection_result.protected or step.selection_result.states)
+        and (step.selection_result.status == PipelineStatus.INSUFFICIENT_CONTEXT_BUDGET
+             or step.context_result.status == PipelineStatus.INSUFFICIENT_CONTEXT_BUDGET)
+        for step in evaluated
+    )
+
+
 def _run_one(
     scenario: Mapping[str, Any], 
     strategy: str, 
@@ -117,7 +136,8 @@ def _run_one(
         
         ablation = proposed_ablation or FULL_ABLATION
         
-        adapter = make_proposed_pipeline_adapter(
+        adapter = make_pipeline_adapter(
+            strategy,
             system_prompt=system_prompt,
             tool_definitions=tool_definitions,
             agent_factory=runtime_agent_factory,
@@ -133,7 +153,7 @@ def _run_one(
         strategy_label = "proposed" if ablation.name == "full" else f"proposed/{ablation.name}"
         
     else:
-        adapter = make_baseline_pipeline_adapter(
+        adapter = make_pipeline_adapter(
             strategy,
             system_prompt=system_prompt,
             tool_definitions=tool_definitions,
@@ -186,7 +206,8 @@ def _run_one(
             input_tokens = 0
             fixed_input_tokens = final_step.fixed_tokens
             
-    elif outcome.status == PipelineStatus.INVALID_BUDGET_CONFIGURATION:
+    elif selection.status != PipelineStatus.OK:
+        # 선택 중단 시 조립되지 않은 Context의 입력량은 미측정이다.
         input_tokens = None
         fixed_input_tokens = final_step.fixed_tokens
         
@@ -199,6 +220,9 @@ def _run_one(
         selection_result=_json_record(selection),
         context_result=_json_record(context),
         token_count_mode=token_count_mode,
+        token_counter_metadata=({key: value for key, value in token_counter.metadata().items()
+                                 if key != "stats"}
+                                if isinstance(token_counter, GeminiTokenCounter) else None),
         strategy_options=dict(top_k=top_k, utility_weights=list(utility_weights), max_steps=max_steps),
         retrieved_memories=[
             replace(memory, token_count=count_tokens(memory.content, token_counter)).to_dict()
@@ -213,6 +237,7 @@ def _run_one(
         ),
         planning_latency_ms=None, total_llm_cost=None,
         agent_executed=outcome.agent_executed,
+        mandatory_memory_overflow=_mandatory_memory_overflow(outcome),
     )
     final_ids = set(context.selected_memory_ids) if outcome.status == PipelineStatus.OK else set()
     run["context_result"]["memory_tokens"] = sum(
@@ -248,7 +273,7 @@ def run_scenarios(
     output_directory: str | Path,
     strategies: Sequence[str] = STRATEGIES,
     embedder: Embedder | None = None,
-    token_counter: TokenCounter = provisional_token_count,
+    token_counter: TokenCounter | None = provisional_token_count,
     top_k: int = 20,
     repeats: int = 1,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
@@ -309,6 +334,8 @@ def run_scenarios(
     if (agent_factory is None) == (environment_agent_factory is None):
         raise ValueError("specify exactly one of agent_factory or environment_agent_factory")
     factory = agent_factory if agent_factory is not None else environment_agent_factory
+    if token_counter is None:
+        token_counter = GeminiTokenCounter()
     if not callable(factory) or not callable(token_counter):
         raise TypeError("agent factory and token_counter must be callable")
     
@@ -353,25 +380,29 @@ def run_scenarios(
                 
             for ablation in variants:
                 for repeat_id in range(repeats):
-                    rows.append(
-                        _run_one(
-                            scenario,
-                            strategy,
-                            repeat_id,
-                            agent_factory=agent_factory,
-                            environment_agent_factory=environment_agent_factory,
-                            embedder=embedder,
-                            system_prompt=system_prompt,
-                            tool_definitions=tool_definitions,
-                            token_count_mode=mode,
-                            token_counter=token_counter,
-                            top_k=top_k,
-                            utility_weights=utility_weights,
-                            max_steps=max_steps,
-                            goal_checker=goal_checker,
-                            proposed_ablation=ablation,
+                    # 영속 캐시도 실행 간 공유하지 않는다. 원본 DB는 보존한다.
+                    cache_scope = (token_counter.isolated_cache()
+                                   if isinstance(token_counter, GeminiTokenCounter) else nullcontext())
+                    with cache_scope:
+                        rows.append(
+                            _run_one(
+                                scenario,
+                                strategy,
+                                repeat_id,
+                                agent_factory=agent_factory,
+                                environment_agent_factory=environment_agent_factory,
+                                embedder=embedder,
+                                system_prompt=system_prompt,
+                                tool_definitions=tool_definitions,
+                                token_count_mode=mode,
+                                token_counter=token_counter,
+                                top_k=top_k,
+                                utility_weights=utility_weights,
+                                max_steps=max_steps,
+                                goal_checker=goal_checker,
+                                proposed_ablation=ablation,
+                            )
                         )
-                    )
     
     summary = aggregate_results(
         [row["evaluation"] for row in rows],
@@ -402,6 +433,7 @@ def run_scenarios(
         "max_steps": max_steps,
         "token_count_mode": mode,
         "tokenizer": tokenizer_metadata,
+        "token_cache_policy": "isolated_per_run" if isinstance(token_counter, GeminiTokenCounter) else None,
         "scenario_ids": ids,
     }
     
@@ -472,7 +504,7 @@ def main() -> None:
     parser.add_argument("--embedder", help="module:function taking text and returning a numeric vector")
     tokenizer_group = parser.add_mutually_exclusive_group()
     tokenizer_group.add_argument("--token-counter", help="Custom module:function taking text and returning token count")
-    tokenizer_group.add_argument("--gemini-token-model", help="Use Gemini CountTokens API with this model. Example: gemini-3.8-flash")
+    tokenizer_group.add_argument("--gemini-token-model", "--gemini-model", help="Use Gemini CountTokens API with this model. Example: gemini-3.8-flash")
     parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
     parser.add_argument("--system-prompt-file", required=True)
     parser.add_argument("--tool-definitions-file", required=True)
@@ -501,7 +533,7 @@ def main() -> None:
                or scenario.get("validation_scope", "integration") != "integration"
                for scenario in scenarios):
             parser.error("requested IDs must be enabled integration scenarios")
-    if args.gemini_token_model:
+    if args.gemini_token_model or not args.token_counter:
         token_counter = GeminiTokenCounter(
             model=args.gemini_token_model,
             cache_size=args.gemini_token_cache_size,

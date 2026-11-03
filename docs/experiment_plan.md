@@ -18,7 +18,7 @@ JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다
    - Protected Memory와 Required State를 Version-Aware State Resolution으로 우선 보존한다. Historical Query에서는 요청 시점의 과거 버전을 선택한다.
    - 남은 예산 안에서 Flexible Memory를 선택한다.
 2. **Sliding Window**
-   - 최신 interaction부터 Budget이 허용하는 범위까지 제공한다.
+   - 현재 실행기는 공통 Memory snapshot의 항목을 최신 turn부터 예산 안에서 연속 선택한다. 원본 interaction 문자열을 자르는 방식과 구분하며, 본 문서의 실행 비교는 이 항목 단위 기준을 사용한다.
 3. **Vector Top-k Memory**
    - 현재 요청과의 vector similarity를 기준으로 Memory를 선택한다.
 4. **Utility-per-Token Memory**
@@ -84,7 +84,7 @@ Fixed Input Tokens
 
 각 실행에서 `B`, 고정 입력 token 수, Memory에 실제로 할당 가능한 token 수, Memory가 실제 사용한 token 수와 전체 input token 수를 함께 기록한다. 모든 strategy는 설정된 `B`를 초과할 수 없다.
 
-Protected Constraint와 Required State만으로 가용 Memory Budget을 초과하면 `INSUFFICIENT_CONTEXT_BUDGET`으로 중단하고 LLM과 Tool을 호출하지 않는다. 실행기가 확인한 필수 Memory 초과는 `mandatory_memory_overflow`로 별도 표시한다. 이 조건에서도 제안 방식만 예산을 초과하도록 허용하지 않으며, 필수 정보 보존이 가능한 범위와 실패 한계를 별도로 보고한다.
+Protected Constraint와 Required State만으로 가용 Memory Budget을 초과하면 `INSUFFICIENT_CONTEXT_BUDGET`으로 중단하고 LLM과 Tool을 호출하지 않는다. 실행기가 확인한 필수 Memory 초과는 `mandatory_memory_overflow`로 별도 표시한다. Runner는 선택 단계의 필수 기억 초과 또는 Flexible Memory를 모두 제거한 뒤에도 필수 기억의 형식 비용 때문에 예산을 초과한 경우 `true`를 기록한다. 선택을 수행했고 해당 초과가 없으면 `false`, 고정 입력만으로 중단되어 한 번도 선택을 수행하지 못했으면 미측정(`null`)이다. 여러 단계 중 한 번이라도 필수 기억 초과가 확인되면 `true`이며, 단순 Flexible 제외나 고정 입력 초과와 구분한다. 선택 단계에서 중단되어 Context를 조립하지 못한 경우 입력 token 수는 `0`이 아닌 미측정(`null`)으로 기록하고, 이전에 실행한 단계의 누적 사용량은 보존한다. 이 조건에서도 제안 방식만 예산을 초과하도록 허용하지 않으며, 필수 정보 보존이 가능한 범위와 실패 한계를 별도로 보고한다.
 
 ### 2.2 Full Context 비교 원칙
 
@@ -471,21 +471,21 @@ Long Context는 전체 원본 History와 고정 입력이 동일 Budget 및 모�
 
 실행 수는 `grid 조건 수 × strategy 수 × seed 수 × repeat × samples_per_cell`로 계산한다. sample 수는 task 유형별 수가 아니라 각 seed/조건의 전체 수이다. 한 Agent 실행에는 여러 LLM/Tool 호출이 있을 수 있으므로 아래 숫자는 API 호출 수나 비용 추정치가 아니다. 예산 중단도 예정된 실행 단위에 포함한다.
 
-| 설정 | 필수 여부 | 조건 수 전→후 | seed 수 전→후 | repeat 전→후 | sample/seed/조건 전→후 | 방식 수 | Agent 실행 수 전→후 |
+| 설정 | 필수 여부 | 조건 수 전→후 | seed 수 전→후 | repeat 전→후 | sample/seed/조건 전→후 | 방식 수(전→후) | Agent 실행 수 전→후 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | main | 필수 RQ1/RQ2 | 36→12 | 3→2 | 3→2 | 30→20 | 4 | 38,880→3,840 |
 | smoke | 필수 통합 확인 | 1→1 | 1→1 | 1→1 | 5→5 | 4 | 20→20 |
 | stress | 선택적 보조 | 27→27 | 3→1 | 3→2 | 30→10 | 4 | 29,160→2,160 |
-| ablation | 선택적 보조 | 12→2 | 3→2 | 3→2 | 30→20 | 4 | 12,960→640 |
+| ablation | 선택적 보조 | 12→2 | 3→2 | 3→2 | 30→20 | 4→5 | 12,960→800 |
 | reference | 선택적 고예산 참고 | 9→3 | 3→2 | 3→2 | 30→20 | 1 | 2,430→240 |
 
-변경 전 모든 설정의 합계는 **83,450회**, 변경 후 합계는 **6,900회**이다. 변경 전 main+smoke는 38,900회였고, 새 필수 범위는 **3,860회**, 선택적 보조 설정은 **3,040회**이다. 기존 구성은 stress를 핵심 RQ2로 명명했으므로 변경 전에는 main+stress+smoke 68,060회가 핵심 범위로 읽힐 수 있었다.
+변경 전 모든 설정의 합계는 **83,450회**, 변경 후 합계는 **7,060회**이다. 변경 전 main+smoke는 38,900회였고, 새 필수 범위는 **3,860회**, 선택적 보조 설정은 **3,200회**이다. 기존 구성은 stress를 핵심 RQ2로 명명했으므로 변경 전에는 main+stress+smoke 68,060회가 핵심 범위로 읽힐 수 있었다.
 
-main은 History 길이 3수준을 25K 하나로 고정하고 seed를 `[42, 43]`, repeat를 2, sample을 20으로 줄였다. ablation은 Budget 2K/4K, Horizon 100만 사용한다. stress는 제약 수 × 업데이트 수 × Noise의 27개 셀을 보조 분석으로 유지하되 seed `[42]`, repeat 2, sample 10으로 줄였다. reference는 main과 같은 25K History와 Horizon 3수준을 사용한다. smoke는 그대로 유지한다.
+main은 History 길이 3수준을 25K 하나로 고정하고 seed를 `[42, 43]`, repeat를 2, sample을 20으로 줄였다. ablation은 Budget 2K/4K, Horizon 100만 사용하며 Full Proposed와 제거 변형 4개, 총 5개 설정을 실행한다. stress는 제약 수 × 업데이트 수 × Noise의 27개 셀을 보조 분석으로 유지하되 seed `[42]`, repeat 2, sample 10으로 줄였다. reference는 main과 같은 25K History와 Horizon 3수준을 사용한다. smoke는 그대로 유지한다.
 
 반복 축소는 실행 부담을 줄이는 계획이며 통계적 검정력을 보장하지 않는다. CI와 적용 sample 수를 보고하고, 넓은 CI나 결과 불안정성이 확인되면 시간·비용 여유에 따라 반복을 늘린다. 중단·실패 실행과 누락된 pair도 보고한다.
 
-`expand_config()`는 sample 생성 전 계획 행만 만든다. 변경 후 계획 행 수는 main 192, smoke 4, stress 216, ablation 32, reference 12이다. 여기에 각 설정의 samples_per_cell을 곱하면 위 실행 수가 된다.
+`expand_config()`는 sample 생성 전 계획 행만 만든다. 변경 후 계획 행 수는 main 192, smoke 4, stress 216, ablation 40, reference 12이다. 여기에 각 설정의 samples_per_cell을 곱하면 위 실행 수가 된다.
 
 ---
 
@@ -756,12 +756,25 @@ Evaluator
 
 초기 단계에서는 복잡한 자동 평가보다 **재현 가능한 deterministic metric과 logging pipeline을 먼저 완성하는 것**을 우선한다.
 
-## 14. 현재 실행 가능 범위
+## 14. 현재 구현 및 본실험 연결 범위
 
-Offline evaluator의 snapshot 평가·JSONL 집계·plan-only는 사용 가능하다. 인메모리 Store와 State Versioning, 공용 Token Counter, Context 조립 및 최종 Budget Validation이 구현되어 있다. `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도와 결정적 Semantic Top-K를 제공하며 Baseline과 General Retrieval이 공유한다. `memory/query_analyzer.py`와 `memory/selector.py`에는 규칙 기반 Query 분석, Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution, 3항 효용 계산, Mandatory 중복 제거·예산 검증, Utility-per-Token Flexible Selection과 선택 전 재측정을 포함한 Proposed Selector 경로가 구현되어 있다. `memory/baselines.py`에는 항목 단위 Sliding Window, embedding 기반 Vector Top-k와 Utility-per-Token이 구현되어 모두 공통 `SelectionResult`를 반환한다. Vector 계열에는 외부 embedder를 명시적으로 주입해야 하며, baseline은 Version Expansion·Protected 우선 보존·Temporal Resolution을 수행하지 않는다.
+Snapshot 기반 evaluator, JSONL 결과 저장, sample 단위 집계와 실행 계획 생성이 구현되어 있다. `memory/retrieval.py`는 Baseline과 Proposed가 공유하는 코사인 유사도 Top-K 검색을 제공한다. Proposed는 Query 분석, Version Chain Expansion, Temporal Resolution, Protected Constraint 적용성 판단, Required State 선택과 남은 예산의 Flexible Selection을 수행한다. 현재 Query·Constraint·Required State 해석은 제한된 규칙과 어휘 기반이다. Baseline은 Version Expansion·Protected 우선 보존·Temporal Resolution을 수행하지 않는다.
 
-결정적 규칙 `Planner`, 단일 행동 `Agent`, mock Tool과 `pipeline/orchestrator.py`의 다단계 실행이 연결되어 있다. Orchestrator는 매 단계 선택과 Context 조립을 다시 수행하고 Tool Interaction을 다음 입력에 feedback으로 제공하며, 목표 완료·Tool 실패·예산 실패·`max_steps`에서 중단한다. `pipeline/pipeline_adapter.py`는 Baseline과 Proposed용 호출형 adapter를 제공하고 실행마다 새 Agent를 생성한다. `benchmark/runner.py`는 Sliding Window, Vector Top-k, Utility-per-Token, Proposed를 전략·반복별 실행하여 `runs.jsonl`과 `summary.json`을 기록한다. Proposed는 Scenario의 `current_time`과 외부 embedder를 요구한다.
+네 전략은 공통 `PipelineAdapter → Orchestrator → PipelineRunResult` 경로를 사용한다. Orchestrator는 매 단계 기억 선택, Context 조립, Agent 행동과 Tool feedback을 처리하고 목표 완료·Tool 실패·예산 실패·`max_steps`에서 중단한다. Runner는 같은 직렬화와 evaluator로 결과를 저장·평가한다. Proposed에는 Scenario의 명시적 `current_time`과 외부 embedder가 필요하다.
 
-`benchmark/generator.py`는 실험 grid의 temporal_update/approval 데이터 생성과 셀별 JSON/ZIP 저장을 구현한다. History 길이·Horizon·Noise 비율을 실제 counter로 검증하며, 요청 축 값과 실측값을 분리한다. Proposed의 현재 State 복원은 `tests/test_proposed_pipeline.py`에서 Snapshot Store부터 Agent까지 검증하며 Runner 전략 연결도 구현되어 있다. Constraint 보존, Temporal Resolution, State Mandatory, Token-aware Packing을 각각 제거하는 preset과 Runner 반복 실행도 구현되어 있다. `tests/test_ablation.py`는 preset 유효성, 축별 독립성, Selector 결과 차이와 Budget 상한 유지를 검증한다. 과거·기간 Query, Protected 적용성, Required State 예산 실패와 Ablation Runner 결과 기록에는 아직 전용 통합 테스트가 없다. Query·Constraint·Required State 해석은 제한된 규칙과 어휘 기반이므로 실제 LLM planner, embedding provider, 모델 API 사용량·비용 adapter와 함께 실험 전 검증해야 한다. 기본 공백 기준 Token Counter, 결정적 test embedder, 합성 token fixture와 oracle snapshot 테스트는 실제 모델 성능 측정 결과가 아니다.
+`benchmark/generator.py`는 temporal_update/approval 시나리오를 grid별 JSON 또는 ZIP으로 생성한다. History 길이·Horizon·Noise 비율의 요청값과 측정값을 구분한다. Ablation은 Full Proposed와 Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 제거하는 4개 변형으로 구성한다.
 
-Python 3.10 이상을 지원하며 `requirements.txt`에는 Gemini CountTokens 연동용 `google-genai>=2.0.0`이 포함되어 있다. `GeminiTokenCounter`는 모델명과 `GEMINI_API_KEY`를 사용하고 동일 문자열 결과를 캐시한다. Runner는 `--gemini-token-model`, `--gemini-token-cache-size` 또는 사용자 `--token-counter module:function`을 받아 실행별 `token_count_mode`를 기록한다. 비교하는 모든 전략에는 같은 embedder와 TokenCounter를 사용한다. Gemini 연동의 단위 테스트는 실제 네트워크 대신 fake client를 사용하므로 API 성능·비용 검증은 아니다.
+Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있다. 실행 환경에는 `google-genai`, `GEMINI_API_KEY`와 측정 모델 설정이 필요하다. CLI는 `GEMINI_TOKEN_MODEL` 또는 `--gemini-token-model`로 모델을 지정하고, 사용자 카운터는 `--token-counter module:function`으로 주입한다. `benchmark/experiment_runtime.py`에는 다국어 SentenceTransformer embedder와 초기 환경 기반 Agent factory가 제공된다. 해당 모델의 의존성과 가중치를 준비하고 실행 인자로 지정해야 한다. 실제 생성 LLM Planner와 모델 응답의 사용량·비용 연동은 본실험 전에 연결해야 한다. 현재 규칙 기반 Planner의 실행을 생성 LLM 성능으로 보고하지 않는다.
+
+## 15. 본실험 실행 조건
+
+Memory strategy 외의 조건은 동일하게 적용한다.
+
+- 같은 query, session, 원본 History, Memory snapshot, 현재 turn과 `current_time`을 사용한다.
+- 같은 생성 모델, decoding 설정, system prompt, Tool 정의와 초기 환경을 사용한다.
+- 같은 Context Budget, TokenCounter, embedder, Top-k, 공통 효용 가중치와 최대 실행 단계를 적용한다.
+- 각 strategy/repeat마다 새 Agent와 Tool 실행 환경을 생성한다. 입력 snapshot은 변경하지 않으며 다른 session과 미래 turn의 기억은 제외한다.
+- 정답 Memory ID, 기대 Tool 호출과 평가 전용 주석은 Memory policy와 Agent에 전달하지 않는다.
+- 모든 전략의 성공·실패 결과를 공통 `PipelineRunResult`와 evaluator schema로 기록한다. Sliding Window에는 기존 계약에 따라 retrieval 지표를 적용하지 않는다.
+
+Runner는 각 실행에서 GeminiTokenCounter의 메모리 캐시를 초기화하고 영속 캐시 읽기·쓰기를 우회한다. 기존 캐시 DB는 보존하며, 한 실행 안에서의 메모리 캐시 재사용은 유지한다. 이 설정을 `experiment.json`의 `token_cache_policy`에 기록한다. Embedder 내부 캐시, 서버 캐시 및 네트워크 지연은 별도로 통제하거나 측정 한계로 명시한다.

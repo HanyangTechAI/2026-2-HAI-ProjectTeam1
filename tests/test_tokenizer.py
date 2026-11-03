@@ -34,6 +34,36 @@ class FakeClient:
 
 
 class TokenizerTests(unittest.TestCase):
+    def test_isolated_cache_bypasses_persistent_entries_and_restores_after_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            client = FakeClient()
+            counter = GeminiTokenCounter(
+                model="fake-gemini", client=client,
+                persistent_cache_path=Path(directory) / "tokens.sqlite3",
+            )
+            self.assertEqual(counter("hello"), 5)
+            initial_bytes = (Path(directory) / "tokens.sqlite3").read_bytes()
+            for _ in range(2):
+                with counter.isolated_cache():
+                    before = client.models.call_count
+                    self.assertFalse(counter.metadata()["persistent_cache"])
+                    self.assertEqual(counter("hello"), 5)
+                    self.assertEqual(counter("hello"), 5)
+                    self.assertEqual(client.models.call_count - before, 1)
+                    counter("uncached text")
+                self.assertEqual(counter.cache_info().currsize, 0)
+                self.assertTrue(counter.metadata()["persistent_cache"])
+            with self.assertRaisesRegex(RuntimeError, "failed run"):
+                with counter.isolated_cache():
+                    raise RuntimeError("failed run")
+            self.assertTrue(counter.metadata()["persistent_cache"])
+            self.assertEqual((Path(directory) / "tokens.sqlite3").read_bytes(), initial_bytes)
+            before = client.models.call_count
+            self.assertEqual(counter("hello"), 5)
+            self.assertEqual(client.models.call_count, before)
+            counter("uncached text")
+            self.assertEqual(client.models.call_count, before + 1)
+
     def test_provisional_token_count(self):
         self.assertEqual(
             provisional_token_count("hello world"),
