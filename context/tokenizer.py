@@ -9,6 +9,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
 from pathlib import Path
+from contextlib import closing
 
 
 TokenCounter = Callable[[str], int]
@@ -65,7 +66,7 @@ class GeminiTokenCounter:
             try:
                 from google import genai
             except ImportError as exc:
-                raise ImportError("google-genai is required gor GeminiTokenCounter. Install it with: pip install google-genai") from exc
+                raise ImportError("google-genai is required for GeminiTokenCounter. Install it with: pip install google-genai") from exc
             
             resolved_api_key = api_key or os.getenv("GEMINI_API_KEY")
             
@@ -91,7 +92,7 @@ class GeminiTokenCounter:
         self._persistent_hits = 0
         self._retry_count = 0
         
-        self._cached_count = lru_cache(maxsize=cache_size)(self._count_tokens_from_api)
+        self._cached_count = lru_cache(maxsize=cache_size)(self._count_tokens_cached)
         
     def __call__(self, text: str) -> int:
         if not isinstance(text, str):
@@ -179,7 +180,7 @@ class GeminiTokenCounter:
         if self._persistent_cache_path is None:
             return
         
-        with sqlite3.connect(self._persistent_cache_path) as connection:
+        with closing(sqlite3.connect(self._persistent_cache_path)) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS token_cache (
@@ -208,7 +209,7 @@ class GeminiTokenCounter:
         
         text_hash = self._hash_text(text)
         
-        with sqlite3.connect(self._persistent_cache_path) as connection:
+        with closing(sqlite3.connect(self._persistent_cache_path)) as connection:
             row = connection.execute(
                 """
                 SELECT token_count
@@ -235,7 +236,7 @@ class GeminiTokenCounter:
         
         text_hash = self._hash_text(text)
         
-        with sqlite3.connect(self._persistent_cache_path) as connection:
+        with closing(sqlite3.connect(self._persistent_cache_path)) as connection:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO token_cache (model, text_hash, token_count)
@@ -255,7 +256,7 @@ class GeminiTokenCounter:
         if self._persistent_cache_path is None:
             return
         
-        with sqlite3.connect(self._persistent_cache_path) as connection:
+        with closing(sqlite3.connect(self._persistent_cache_path)) as connection:
             connection.execute(
                 """
                 DELETE FROM token_cache
