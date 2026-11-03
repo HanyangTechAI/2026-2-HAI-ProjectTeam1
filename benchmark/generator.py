@@ -135,32 +135,41 @@ def _pad_memory(memory: dict[str, Any], target: int, counter: TokenCounter) -> N
 
 
 def _balance_noise(
-    memories: list[dict[str, Any]], targets: set[str], ratio: float,
+    memories: list[dict[str, Any]], 
+    targets: set[str], 
+    noise_notes: list[dict[str, Any]],
+    ratio: float,
     counter: TokenCounter,
 ) -> float:
-    noise = [m for m in memories if m["memory_id"] not in targets]
+    relevant_tokens = sum(m["token_count"] for m in memories if m["memory_id"] in targets)
+    
+    if relevant_tokens <= 0:
+        raise ValueError("token_counter must align positive cost to target memory")
+    
+    noise = [m for m in noise_notes if m in memories]
+    
+    if not ratio:
+        if noise:
+            raise ValueError("zero noise ratio requires synthetic noise to be removed")
+        return 0.0
+    
+    if not noise:
+        raise ValueError("positive noise ratio requires synthetic noise memories")
+    
     for _ in range(8):
-        relevant_tokens = sum(m["token_count"] for m in memories if m["memory_id"] in targets)
         noise_tokens = sum(m["token_count"] for m in noise)
-        total = relevant_tokens + noise_tokens
-        if not total or not relevant_tokens:
-            raise ValueError("token_counter must assign positive cost to required memory")
-        actual = noise_tokens / total
+        actual = noise_tokens / (relevant_tokens + noise_tokens)
         if abs(actual - ratio) <= NOISE_TOLERANCE:
             return actual
-        if not ratio:
-            raise ValueError("zero noise is incompatible with non-target state versions")
         if actual > ratio:
             raise ValueError(
                 "requested noise ratio is below the cost of existing non-target versions/notes; "
                 "required memory is held fixed across noise conditions"
             )
-        else:
-            if not noise:
-                raise ValueError("positive noise requires a non-target memory")
-            desired = math.ceil(relevant_tokens * ratio / (1 - ratio))
-            memory = noise[-1]
-            _pad_memory(memory, memory["token_count"] + desired - noise_tokens, counter)
+            
+        desired = math.ceil(relevant_tokens * ratio / (1 - ratio))
+        memory = noise[-1]
+        _pad_memory(memory, memory["token_count"] + desired - noise_tokens, counter)
     raise ValueError("cannot satisfy noise_memory_ratio with this token_counter")
 
 
@@ -356,7 +365,7 @@ def generate_scenario(
     _pad_memory(target, target["token_count"] + max(0, relevant_target - relevant_tokens), token_counter)
     if not ratio:
         memories = [item for item in memories if item not in noise_notes]
-    actual_noise = _balance_noise(memories, essential, ratio, token_counter)
+    actual_noise = _balance_noise(memories, essential, noise_notes, ratio, token_counter)
 
     # Every past turn exists. Verbose conversation is measured separately from
     # its compact, deterministic memory summaries (no extraction model needed).
@@ -440,7 +449,7 @@ def generate_scenario(
             horizon_turns=horizon_turns, important_turn=important_turn,
             noise_memory_ratio=ratio, actual_noise_memory_ratio=actual_noise,
             noise_memory_tokens=sum(m["token_count"] for m in noise_notes if m in memories),
-            structural_distractor_tokens = sum(m["token_count"] for m in memories if m["memory_id"] not in essential and m not in noise_notes)
+            structural_distractor_tokens = sum(m["token_count"] for m in memories if m["memory_id"] not in essential and m not in noise_notes),
             memory_tokens=sum(m["token_count"] for m in memories),
             noise_definition="synthetic_noise_tokens / (target_memory_tokens + synthetic_noise_tokens)",
             constraint_count=constraint_count, 

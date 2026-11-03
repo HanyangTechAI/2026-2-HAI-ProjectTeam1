@@ -155,17 +155,70 @@ class GeneratorTests(unittest.TestCase):
 
     def test_noise_ratio_counts_only_synthetic_noise(self):
         for ratio in (0.1, 0.5, 0.9):
-            scenario = self.scenario(noise_memory_ratio=ratio)
-            necessary = set(scenario["target_memory_ids"])
-            total = sum(m["token_count"] for m in scenario["memory_snapshot"])
-            unnecessary = sum(m["token_count"] for m in scenario["memory_snapshot"]
-                              if m["memory_id"] not in necessary)
+            scenario = self.scenario(
+                noise_memory_ratio=ratio
+            )
+
+            targets = set(
+                scenario["target_memory_ids"]
+            )
+
+            synthetic_noise = [
+                memory
+                for memory in scenario["memory_snapshot"]
+                if "_noise_" in memory["memory_id"]
+            ]
+
+            target_tokens = sum(
+                memory["token_count"]
+                for memory in scenario["memory_snapshot"]
+                if memory["memory_id"] in targets
+            )
+
+            noise_tokens = sum(
+                memory["token_count"]
+                for memory in synthetic_noise
+            )
+
+            actual = (
+                noise_tokens
+                / (target_tokens + noise_tokens)
+            )
+
             with self.subTest(ratio=ratio):
-                self.assertTrue(set(scenario["wrong_version_memory_ids"]) - necessary)
-                self.assertLessEqual(abs(unnecessary / total - ratio), 0.01)
-                self.assertEqual(scenario["metadata"]["noise_memory_ratio"], ratio)
-                self.assertAlmostEqual(scenario["metadata"]["actual_noise_memory_ratio"],
-                                       unnecessary / total)
+                self.assertTrue(
+                    set(
+                        scenario[
+                            "wrong_version_memory_ids"
+                        ]
+                    ) - targets
+                )
+
+                self.assertLessEqual(
+                    abs(actual - ratio),
+                    0.01,
+                )
+
+                self.assertEqual(
+                    scenario["metadata"][
+                        "noise_memory_ratio"
+                    ],
+                    ratio,
+                )
+
+                self.assertAlmostEqual(
+                    scenario["metadata"][
+                        "actual_noise_memory_ratio"
+                    ],
+                    actual,
+                )
+
+                self.assertEqual(
+                    scenario["metadata"][
+                        "noise_memory_tokens"
+                    ],
+                    noise_tokens,
+                )
 
     def test_noise_axis_keeps_essential_memory_content_and_cost_fixed(self):
         scenarios = [self.scenario(noise_memory_ratio=ratio) for ratio in (0.1, 0.5, 0.9)]
@@ -440,13 +493,20 @@ class GeneratorTests(unittest.TestCase):
 
     def test_conflicting_axis_conditions_fail_instead_of_changing_ground_truth(self):
         for parameters in (
-            {"task_type": "approval", "constraint_count": 0},
-            {"state_scope": "historical", "state_update_count": 5, "horizon_turns": 5},
-            {"state_update_count": 2, "noise_memory_ratio": 0},
+            {
+                "task_type": "approval",
+                "constraint_count": 0,
+            },
+            {
+                "state_scope": "historical",
+                "state_update_count": 5,
+                "horizon_turns": 5,
+            },
         ):
             with self.subTest(parameters=parameters):
                 with self.assertRaises(ValueError):
                     self.scenario(**parameters)
+
         clean = self.scenario(
             task_type="temporal_update",
             state_update_count=0,
@@ -458,14 +518,11 @@ class GeneratorTests(unittest.TestCase):
             0,
         )
 
-        # Temporal lookup에서는 required state만 ground-truth target이다.
         self.assertEqual(
             set(clean["target_memory_ids"]),
             set(clean["required_state_ids"]),
         )
 
-        # 현재 query와 무관한 constraint는 snapshot에는 존재하지만
-        # applicable ground truth에는 포함되지 않는다.
         self.assertEqual(
             clean["applicable_constraint_ids"],
             [],
@@ -489,6 +546,53 @@ class GeneratorTests(unittest.TestCase):
                 clean["target_memory_ids"]
             )
         )
+        
+        
+    def test_zero_synthetic_noise_allows_wrong_versions(self):
+        scenario = self.scenario(
+            task_type="temporal_update",
+            state_update_count=2,
+            noise_memory_ratio=0,
+        )
+
+        self.assertEqual(
+            scenario["metadata"]["noise_memory_ratio"],
+            0,
+        )
+
+        self.assertEqual(
+            scenario["metadata"]["actual_noise_memory_ratio"],
+            0,
+        )
+
+        self.assertEqual(
+            scenario["metadata"]["noise_memory_tokens"],
+            0,
+        )
+
+        synthetic_noise = [
+            memory
+            for memory in scenario["memory_snapshot"]
+            if "_noise_" in memory["memory_id"]
+        ]
+
+        self.assertEqual(
+            synthetic_noise,
+            [],
+        )
+
+        # Wrong versions are structural distractors,
+        # not synthetic noise.
+        self.assertEqual(
+            len(scenario["wrong_version_memory_ids"]),
+            2,
+        )
+
+        self.assertGreater(
+            scenario["metadata"]["structural_distractor_tokens"],
+            0,
+        )
+        
 
     def test_duplicate_config_axes_and_seeds_are_rejected(self):
         configs = [small_config(context_token_budget=[2048, 2048]),
