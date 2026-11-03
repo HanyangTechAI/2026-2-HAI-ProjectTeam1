@@ -321,16 +321,30 @@ class EvaluatorTests(unittest.TestCase):
 
         run["context_result"] = {
             "selected_memory_ids": [
-                "approval"
+                "approval",
             ]
         }
 
-        self.assertFalse(
-            evaluate(
-                scenario,
-                run,
-            ).metrics[
+        result = evaluate(
+            scenario,
+            run,
+        )
+
+        self.assertTrue(
+            result.metrics[
                 "temporal_version_correct"
+            ]
+        )
+
+        self.assertFalse(
+            result.metrics[
+                "temporal_context_correct"
+            ]
+        )
+
+        self.assertTrue(
+            result.metrics[
+                "selection_failure"
             ]
         )
 
