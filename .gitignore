@@ -60,3 +60,14 @@ tools.txt
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# =========================
+# Generated benchmark datasets
+# =========================
+benchmark/generated/*
+!benchmark/generated/.gitkeep
+
+# Canonical reproducibility fixtures
+!benchmark/generated/smoke/
+!benchmark/generated/smoke/**
+!benchmark/generated/main.zip
