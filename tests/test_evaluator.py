@@ -45,13 +45,42 @@ def fixture():
 class EvaluatorTests(unittest.TestCase):
     def test_success_and_no_mutation(self):
         scenario, run = fixture()
-        original = copy.deepcopy((scenario, run))
-        result = evaluate(scenario, run).to_dict()
-        self.assertTrue(result["task_success"])
-        self.assertEqual(result["current_state_accuracy"], 1)
-        self.assertTrue(result["temporal_version_correct"])
-        self.assertEqual(result["failure_types"], [])
-        self.assertEqual((scenario, run), original)
+        original = copy.deepcopy(
+            (scenario, run)
+        )
+
+        result = evaluate(
+            scenario,
+            run,
+        ).to_dict()
+
+        self.assertTrue(
+            result["task_success"]
+        )
+
+        self.assertEqual(
+            result["current_state_accuracy"],
+            1,
+        )
+
+        self.assertTrue(
+            result["temporal_version_correct"]
+        )
+
+        self.assertTrue(
+            result["temporal_context_correct"]
+        )
+
+        self.assertEqual(
+            result["failure_types"],
+            [],
+        )
+
+        self.assertEqual(
+            (scenario, run),
+            original,
+        )
+
         json.dumps(result)
 
     def test_general_top_k_is_preserved_after_other_paths_recover_targets(self):
@@ -123,17 +152,79 @@ class EvaluatorTests(unittest.TestCase):
 
     def test_stale_selection_and_usage_are_distinct(self):
         scenario, run = fixture()
-        run["selection_result"]["selected_memory_ids"] = ["old", "approval"]
-        result = evaluate(scenario, run).to_dict()
-        self.assertFalse(result["temporal_version_correct"])
-        self.assertFalse(result["stale_state_used"])
-        # Correct action can still succeed despite imperfect context selection.
-        self.assertTrue(result["task_success"])
-        run["tool_calls"][0]["arguments"]["attachment"] = "v1.pdf"
-        result = evaluate(scenario, run).to_dict()
-        self.assertFalse(result["task_success"])
-        self.assertTrue(result["stale_state_used"])
-        self.assertEqual(result["state_error_count"], 0)
+
+        run["selection_result"][
+            "selected_memory_ids"
+        ] = [
+            "old",
+            "approval",
+        ]
+
+        result = evaluate(
+            scenario,
+            run,
+        ).to_dict()
+
+        # Context는 잘못된 version을 포함한다.
+        self.assertFalse(
+            result["temporal_context_correct"]
+        )
+
+        # 하지만 실제 Action은 올바른 state를 사용한다.
+        self.assertTrue(
+            result["temporal_version_correct"]
+        )
+
+        self.assertFalse(
+            result["stale_state_used"]
+        )
+
+        self.assertNotIn(
+            "temporal_failure",
+            result["failure_types"],
+        )
+
+        # Context가 imperfect하더라도
+        # 실제 행동이 올바르면 task는 성공할 수 있다.
+        self.assertTrue(
+            result["task_success"]
+        )
+
+        # 이제 실제 Action도 stale version을 사용하게 만든다.
+        run["tool_calls"][0][
+            "arguments"
+        ]["attachment"] = "v1.pdf"
+
+        result = evaluate(
+            scenario,
+            run,
+        ).to_dict()
+
+        self.assertFalse(
+            result["temporal_version_correct"]
+        )
+
+        self.assertFalse(
+            result["temporal_context_correct"]
+        )
+
+        self.assertTrue(
+            result["stale_state_used"]
+        )
+
+        self.assertIn(
+            "temporal_failure",
+            result["failure_types"],
+        )
+
+        self.assertFalse(
+            result["task_success"]
+        )
+
+        self.assertEqual(
+            result["state_error_count"],
+            0,
+        )
 
     def test_wrong_and_missing_states(self):
         scenario, run = fixture()
@@ -227,8 +318,21 @@ class EvaluatorTests(unittest.TestCase):
 
     def test_final_context_overrides_selection(self):
         scenario, run = fixture()
-        run["context_result"] = {"selected_memory_ids": ["approval"]}
-        self.assertFalse(evaluate(scenario, run).metrics["temporal_version_correct"])
+
+        run["context_result"] = {
+            "selected_memory_ids": [
+                "approval"
+            ]
+        }
+
+        self.assertFalse(
+            evaluate(
+                scenario,
+                run,
+            ).metrics[
+                "temporal_version_correct"
+            ]
+        )
 
     def test_budget_and_pipeline_failure(self):
         scenario, run = fixture()
@@ -419,8 +523,13 @@ class ConfigAndCliTests(unittest.TestCase):
             self.assertEqual(plan[0]["repeat_id"], 0)
 
     def test_planned_agent_execution_counts(self):
-        expected = {"main": (192, 3840), "smoke": (4, 20), "stress": (216, 2160),
-                    "ablation": (32, 640), "reference": (12, 240)}
+        expected = {
+            "main": (192, 3840),
+            "smoke": (4, 20),
+            "stress": (216, 2160),
+            "ablation": (40, 800),
+            "reference": (12, 240),
+        }
         for name, (plan_rows, agent_runs) in expected.items():
             with self.subTest(config=name):
                 config = load_config(f"experiments/configs/{name}.json")

@@ -279,13 +279,25 @@ def generate_scenario(
         )
     target_index = 0 if scope == "historical" else state_update_count
     target = versions[target_index]
-    target_ids = [target["memory_id"]] + [item["memory_id"] for item in constraints]
+    if task_type == "approval":
+        applicable_constraints = constraints[:1]
+        applicable_rule = rules[:1]
+    else:
+        applicable_constraints = []
+        applicable_rule = []
+    target_ids = [target["memory_id"]]
+    target_ids.extend(
+        constraint["memory_id"]
+        for constraint in applicable_constraints
+    )
     grant = None
     if granted_ids:
         grant = memory(
-            f"{sample_id}_grant", "fact",
+            f"{sample_id}_grant",
+            "fact",
             f"{project} 현재 보고서의 {recipient} 외부 발송을 승인했습니다. 승인 번호는 {approved_id} 입니다.",
         )
+        
         target_ids.append(grant["memory_id"])
     events = list(memories)
     essential = set(target_ids)
@@ -404,9 +416,15 @@ def generate_scenario(
             target_time=target_time.isoformat(), target_range=None,
             entities=[project], required_tools=[tool],
         ),
-        target_memory_ids=target_ids, required_state_ids=[target["memory_id"]],
-        required_states=[required], applicable_constraint_ids=[item["memory_id"] for item in constraints],
-        constraint_rules=rules, temporal_version_required=state_update_count > 0,
+        target_memory_ids=target_ids, 
+        required_state_ids=[target["memory_id"]],
+        required_states=[required], 
+        applicable_constraint_ids=[
+            item["memory_id"] 
+            for item in applicable_constraints
+        ],
+        constraint_rules=applicable_rule, 
+        temporal_version_required=state_update_count > 0,
         wrong_version_memory_ids=[item["memory_id"] for item in versions if item is not target],
         expected_tool_calls=[dict(tool_name=tool, action=action, arguments=arguments)],
         forbidden_tool_calls=([dict(tool_name="email", action="send_email")]
@@ -426,7 +444,9 @@ def generate_scenario(
             noise_memory_tokens=sum(m["token_count"] for m in memories if m["memory_id"] not in essential),
             memory_tokens=sum(m["token_count"] for m in memories),
             noise_definition="non_target_snapshot_tokens / all_snapshot_tokens",
-            constraint_count=constraint_count, state_update_count=state_update_count,
+            constraint_count=constraint_count, 
+            applicable_constraint_count = applicable_constraints,
+            state_update_count=state_update_count,
             token_count_mode=token_count_mode(token_counter),
         ),
     )

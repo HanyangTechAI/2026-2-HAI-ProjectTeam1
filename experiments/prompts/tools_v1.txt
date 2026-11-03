@@ -1,0 +1,9 @@
+file.find_file
+file.select_file
+file.delete_file
+email.request_approval
+email.send_email
+calendar.create_event
+calendar.find_event
+task.create_task
+task.update_task

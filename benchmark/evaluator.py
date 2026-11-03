@@ -292,8 +292,9 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     if temporal_required and not required_ids:
         raise ValueError("temporal evaluation needs required_state_ids")
     wrong_version_ids = set(scenario.get("wrong_version_memory_ids", []))
-    temporal_correct = (required_ids <= set(selected) and not
-                        (wrong_version_ids & set(selected))) if temporal_required else None
+    selected_ids = set(selected)
+    temporal_version_correct = correct_states == len(states) and omissions == 0 and stale_states == 0 and errors == 0 if temporal_required else None
+    temporal_context_correct = required_ids <= selected_ids and not wrong_version_ids & selected_ids if temporal_required else None
     budget = scenario.get("context_budget", scenario.get("context_token_budget"))
     usage = run.get("usage") or {}
     input_tokens = usage.get("input_tokens", context.get("input_tokens", run.get("input_tokens")))
@@ -353,7 +354,7 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     selection_diagnostics = _selection_diagnostics(run, selection, context, set(targets), set(selected))
     if selection_diagnostics["budget_selection_failure"] is True:
         failures.append("budget_selection_failure")
-    if temporal_correct is False:
+    if temporal_version_correct is False:
         failures.append("temporal_failure")
     if violated or forbidden_hit:
         failures.append("constraint_failure")
@@ -396,9 +397,11 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         state_omission_count=omissions, state_error_count=errors,
         state_omission_rate=omissions / len(states) if states else None,
         state_error_rate=errors / len(states) if states else None,
-        temporal_version_required=temporal_required, temporal_version_correct=temporal_correct,
+        temporal_version_required=temporal_required, 
+        temporal_version_correct=temporal_version_correct,
+        temporal_context_correct=temporal_context_correct,
         stale_memory_count=len(wrong_version_ids & set(retrieved)),
-        stale_selected_memory_count=len(wrong_version_ids & set(selected)),
+        stale_selected_memory_count=len(wrong_version_ids & selected_ids),
         approval_behavior_correct=all(approval_checks) if approval_checks else None,
         mandatory_memory_overflow=run.get("mandatory_memory_overflow"),
         budget_exceeded=budget_exceeded, invalid_fixed_budget=invalid_fixed_budget,
@@ -414,7 +417,8 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
 SUMMARY_METRICS = (
     "task_success", "constraint_violation_rate", "required_state_accuracy",
     "general_retrieval_miss", "selection_failure", "budget_selection_failure",
-    "stale_state_usage_rate", "temporal_version_correct", "recall_at_k",
+    "stale_state_usage_rate", "temporal_version_correct", "temporal_context_correct",
+    "recall_at_k",
     "state_omission_rate", "state_error_rate",
     "precision_at_k", "mrr", "answer_normalized_exact_match", "answer_f1",
     "applicable_protected_recall", "input_tokens", "output_tokens",
