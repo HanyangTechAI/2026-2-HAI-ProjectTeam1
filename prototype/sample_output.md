@@ -1,6 +1,8 @@
 # Demo sample output
 
-저장소 루트에서 실행한 `python prototype/run_demo.py`의 출력이다. LLM은 호출하지 않는다. planner 자리에는 데모 스크립트가 들어가고, 기억 선택은 이 파일 안에서만 고정한다. `memory/` 구현은 바꾸지 않았다. 아래 수치는 실험 결과가 아니다.
+> 보관 상태: 이 문서는 이전 Agent API에서 생성한 레거시 출력이다. 현재 `prototype/run_demo.py`는 최신 `Agent` 생성자와 호환되지 않아 같은 명령으로 재현할 수 없다. 최신 검증 결과나 연구 성능 결과로 사용하지 않는다.
+
+과거 저장소 루트에서 실행한 `python prototype/run_demo.py`의 출력이다. LLM은 호출하지 않았다. planner 자리에는 데모 스크립트가 들어가고, 기억 선택은 이 파일 안에서만 고정했다. 아래 수치는 실험 결과가 아니다.
 
 ```text
 scripted context

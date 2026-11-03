@@ -1,6 +1,6 @@
 # Experiment Plan
 
-평가 코드 및 설정 사용법: [evaluation_usage.md](evaluation_usage.md).
+평가 입력·출력 계약은 [Evaluator Interface](interfaces.md#22-evaluator-interface), 생성 설정과 Runner 연결은 [생성기 사용법](generator_usage.md)을 따른다.
 `benchmark/evaluator.py`는 전달받은 Scenario/실행 snapshot의 deterministic 평가,
 JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다.
 실험 설정은 `experiments/configs/`에 있으며, 실제 Agent 호출과 데이터 생성은
@@ -458,7 +458,7 @@ Synthetic dataset에서는 다음 변수를 통제·기록한다. 필수 sweep�
 
 ### 8.3 선택적 보조 실험과 Long Context
 
-- `ablation.json`: Protected Memory, State Versioning, Budget Optimization을 각각 제거하여 기여도 분석. 예산 상한은 유지한다.
+- `ablation.json`: Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 각각 제거하여 기여도를 분석한다. 모든 변형에서 예산 상한은 유지한다.
 - `stress.json`: 제약 수 1/3/5 × State 변경 0/2/5 × Noise 0.1/0.5/0.9. 핵심 RQ2의 Budget/Horizon 실험과 구분한다.
 - `reference.json`: 큰 예산 128K에서 전체 History를 제공하는 별도 참고 결과. main과 같은 seed/Task/Horizon을 사용하고 제한 Budget 순위나 paired ΔSuccess에 섞지 않는다.
 - History 길이 sweep, Hybrid, 공개 benchmark, 응답 전용 Task는 선택적 확장이다. 현재 필수 설정에는 포함하지 않는다.
@@ -483,9 +483,11 @@ Long Context는 전체 원본 History와 고정 입력이 동일 Budget 및 모�
 
 main은 History 길이 3수준을 25K 하나로 고정하고 seed를 `[42, 43]`, repeat를 2, sample을 20으로 줄였다. ablation은 Budget 2K/4K, Horizon 100만 사용하며 Full Proposed와 제거 변형 4개, 총 5개 설정을 실행한다. stress는 제약 수 × 업데이트 수 × Noise의 27개 셀을 보조 분석으로 유지하되 seed `[42]`, repeat 2, sample 10으로 줄였다. reference는 main과 같은 25K History와 Horizon 3수준을 사용한다. smoke는 그대로 유지한다.
 
+`pilot.json`은 seed 2026의 단일 셀에서 서로 다른 기본 sample 100개를 생성해 입력 다양성과 생성 안정성을 확인한다. 설정상 네 전략을 적용하면 계획 행 4개, 잠재 Agent 실행 400회지만 현재 용도는 입력 생성·검토이므로 위 7,060회 실행 합계에는 포함하지 않는다.
+
 반복 축소는 실행 부담을 줄이는 계획이며 통계적 검정력을 보장하지 않는다. CI와 적용 sample 수를 보고하고, 넓은 CI나 결과 불안정성이 확인되면 시간·비용 여유에 따라 반복을 늘린다. 중단·실패 실행과 누락된 pair도 보고한다.
 
-`expand_config()`는 sample 생성 전 계획 행만 만든다. 변경 후 계획 행 수는 main 192, smoke 4, stress 216, ablation 40, reference 12이다. 여기에 각 설정의 samples_per_cell을 곱하면 위 실행 수가 된다.
+`expand_config()`는 sample 생성 전 계획 행만 만든다. 변경 후 계획 행 수는 main 192, smoke 4, stress 216, ablation 40, reference 12이며 생성 검토용 pilot은 4이다. 각 실행 설정의 계획 행에 `samples_per_cell`을 곱하면 위 실행 수가 된다.
 
 ---
 
@@ -494,7 +496,7 @@ main은 History 길이 3수준을 25K 하나로 고정하고 seed를 `[42, 43]`,
 다음은 `evaluator.py`가 출력하는 주요 필드의 발췌 예시다. 최초 일반 검색에서는
 과거 버전만 찾았지만, 버전 확장과 별도 보호 검색을 거쳐 필요한 기억이 최종
 Context에 모두 포함되고 행동도 성공한 경우다. 전체 입력 계약은
-[evaluation_usage.md](evaluation_usage.md)를 따른다.
+[Evaluator Interface](interfaces.md#22-evaluator-interface)를 따른다.
 
 ```json
 {
@@ -764,7 +766,7 @@ Snapshot 기반 evaluator, JSONL 결과 저장, sample 단위 집계와 실행 �
 
 `benchmark/generator.py`는 temporal_update/approval 시나리오를 grid별 JSON 또는 ZIP으로 생성한다. History 길이·Horizon·Noise 비율의 요청값과 측정값을 구분한다. Ablation은 Full Proposed와 Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 제거하는 4개 변형으로 구성한다.
 
-Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있다. 실행 환경에는 `google-genai`, `GEMINI_API_KEY`와 측정 모델 설정이 필요하다. CLI는 `GEMINI_TOKEN_MODEL` 또는 `--gemini-token-model`로 모델을 지정하고, 사용자 카운터는 `--token-counter module:function`으로 주입한다. `benchmark/experiment_runtime.py`에는 다국어 SentenceTransformer embedder와 초기 환경 기반 Agent factory가 제공된다. 해당 모델의 의존성과 가중치를 준비하고 실행 인자로 지정해야 한다. 실제 생성 LLM Planner와 모델 응답의 사용량·비용 연동은 본실험 전에 연결해야 한다. 현재 규칙 기반 Planner의 실행을 생성 LLM 성능으로 보고하지 않는다.
+Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있다. 실행 환경에는 `google-genai`, `GEMINI_API_KEY`와 측정 모델 설정이 필요하다. CLI는 `GEMINI_TOKEN_MODEL` 또는 `--gemini-token-model`로 모델을 지정하고, 사용자 카운터는 `--token-counter module:function`으로 주입한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. 실제 생성 LLM Planner와 모델 응답의 사용량·비용 연동은 본실험 전에 연결해야 한다. 현재 규칙 기반 Planner의 실행을 생성 LLM 성능으로 보고하지 않는다.
 
 ## 15. 본실험 실행 조건
 

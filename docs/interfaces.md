@@ -87,14 +87,14 @@ benchmark/runner.py
 - benchmark/evaluator.py의 snapshot 평가와 집계
 - benchmark/generator.py의 설정 grid 기반 temporal_update/approval 생성, 측정 및 셀별 저장
 - tests/test_baseline_context_agent_integration.py, tests/test_pipeline.py, tests/test_pipeline_adapter.py의 경계·파이프라인 테스트
-- tests/test_tokenizer.py의 Gemini CountTokens fake-client 및 캐시 테스트
+- tests/test_tokenizer.py의 Gemini CountTokens fake-client, 메모리·SQLite 캐시, 재시도·격리 테스트
 - tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
 - tests/test_proposed_pipeline.py의 Snapshot Store → Proposed Policy → Agent 현재 State 통합 테스트
 - memory/ablation.py의 SelectorAblationConfig와 다섯 preset, Runner의 Proposed 변형 반복·결과 기록
 - tests/test_ablation.py의 preset 검증, 축별 독립성, Selector 결과와 hard Budget 단위 테스트
 
 미연결 또는 추가 검증 필요
-- Proposed의 과거·기간·Protected·예산 실패와 Ablation Runner 결과 기록 통합 테스트
+- 과거 State와 현재 행동 Constraint를 함께 요구하는 복합 시점 통합 테스트
 - 실제 LLM planner와 embedding/provider adapter
 ```
 
@@ -174,7 +174,9 @@ Context Builder
 
 공용 모델 Tokenizer가 연결되기 전에는 임시 counter를 사용할 수 있지만, 임시 측정값은 모델의 실제 Token Usage로 보고하지 않는다. `provisional_token_count`를 여러 모듈에 중복 정의하지 않고 `context/tokenizer.py`를 단일 진입점으로 사용한다.
 
-`GeminiTokenCounter(model, api_key=None, cache_size=4096)`는 Gemini CountTokens API를 `TokenCounter` 계약으로 감싼다. API key는 생성자 인자 또는 `GEMINI_API_KEY`에서 읽고, 동일 문자열 결과를 프로세스 메모리에 LRU 캐시한다. 빈 문자열은 API 호출 없이 0을 반환한다. `token_count_mode`는 실행 로그에 `provisional`, `custom`, `gemini:<model>` 중 하나를 기록한다.
+`GeminiTokenCounter(model=None, api_key=None, cache_size=4096, persistent_cache_path=None, max_retries=3, retry_base_seconds=0.5)`는 Gemini CountTokens API를 `TokenCounter` 계약으로 감싼다. 모델은 인자 또는 `GEMINI_TOKEN_MODEL`, API key는 인자 또는 `GEMINI_API_KEY`에서 읽는다. 동일 문자열은 프로세스 메모리 LRU와 선택적 SQLite 캐시에 저장하며, 캐시 key는 모델명과 원문 SHA-256이다. 408·429·500·502·503·504, 연결 및 timeout 오류는 지수 backoff로 재시도한다. 빈 문자열은 API 호출 없이 0을 반환한다.
+
+`isolated_cache()`는 실행 전후 메모리 캐시를 비우고 컨텍스트 안에서 SQLite 읽기·쓰기를 우회한 뒤 기존 경로를 복원한다. Runner는 Gemini 비교 실행마다 이 범위를 적용해 전략 순서에 따른 캐시 이점을 제거하며 `experiment.json`에 `token_cache_policy=isolated_per_run`을 기록한다. `stats()`와 `metadata()`는 memory hit/miss, API 호출, persistent hit, retry와 설정을 제공한다. `token_count_mode`는 실행 로그에 `provisional`, `custom`, `gemini:<model>` 중 하나를 기록한다.
 
 `count_tokens`는 입력이 문자열인지, counter 반환값이 음수가 아닌 정수인지 검증한다. 잘못된 counter 결과는 Token Usage로 기록하지 않고 `TypeError` 또는 `ValueError`로 거부한다.
 
@@ -1297,7 +1299,9 @@ def select_memory(
     ...
 ```
 
-`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. Query 분석부터 최종 회계까지의 Proposed Selector 경로는 구현되어 호출할 수 있다. Mandatory 예산 초과 시 Flexible Memory는 선택하지 않고 나머지 resolved 후보를 rejected로 기록한다. 정상 결과는 Mandatory와 Flexible을 ID로 중복 제거하고, 최종 합계가 Memory Budget을 넘으면 내부 불변식 오류로 중단한다. Proposed Policy와 Pipeline Adapter, Benchmark Runner 전략 연결도 구현되어 있으며 현재 State 복원 경로를 통합 테스트한다. 과거·기간·Protected·예산 실패 경로의 통합 검증은 아직 남아 있다.
+`token_counter`가 주입되면 검색 후보, Required State, Protected Memory의 `token_count`를 선택 전에 다시 측정한다. Query 분석부터 최종 회계까지의 Proposed Selector 경로는 구현되어 호출할 수 있다. Mandatory 예산 초과 시 Flexible Memory는 선택하지 않고 나머지 resolved 후보를 rejected로 기록한다. 정상 결과는 Mandatory와 Flexible을 ID로 중복 제거하고, 최종 합계가 Memory Budget을 넘으면 내부 불변식 오류로 중단한다. Proposed Policy와 Pipeline Adapter, Benchmark Runner 전략 연결도 구현되어 있다. 현재·과거 버전, 월·상대 월 해석, Protected/Required-State overflow, formatting overflow와 Ablation 공통 schema를 통합 테스트한다. 과거 State와 현재 행동 Constraint를 한 요청에서 함께 적용하는 복합 시점 검증은 아직 남아 있다.
+
+`make_pipeline_adapter(strategy, **options)`는 `sliding_window`, `vector_top_k`, `utility_per_token`, `proposed`를 공통 `PipelineAdapter`로 연결하는 공개 factory다. Proposed는 `make_proposed_pipeline_adapter`, 나머지는 `make_baseline_pipeline_adapter`로 위임한다.
 
 `SelectorAblationConfig`는 `constraint_preservation`, `temporal_resolution`, `mandatory_state`, `token_aware_packing` 네 boolean 축을 가진다. `mandatory_state=True`는 `temporal_resolution=True`를 요구한다. 제공 preset은 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing`이며 Runner는 변형 결과의 전략명을 `proposed/<preset>`으로 기록하고 설정 dict도 실행 레코드에 보존한다.
 

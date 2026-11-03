@@ -50,4 +50,4 @@
 - **반복 및 불확실성:** 동일 sample과 조건에서 반복 실행하고 평균과 95% 신뢰구간을 함께 보고한다.
 - **실패 분석:** General Retrieval 누락, 최종 Context의 필수 Memory 누락, Temporal Version 오류, Constraint Violation, Stale-State Usage, State Omission 등을 구분하여 기록한다.
 - **효율성 평가:** Input Token Usage, Total LLM Cost, Planning Latency를 보조 지표로 측정하여 성능·비용·신뢰성 간 trade-off를 분석한다.
-- **구성 요소 검증:** Protected Memory, State Versioning, Budget Optimization을 각각 제거하는 Ablation Study를 보조 실험으로 수행하여 제안 방식의 각 구성 요소가 성능에 미치는 영향을 분석한다.
+- **구성 요소 검증:** Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 각각 제거하는 Ablation Study를 보조 실험으로 수행하여 제안 방식의 각 구성 요소가 성능에 미치는 영향을 분석한다. 모든 변형은 동일한 Context Budget 상한을 유지한다.

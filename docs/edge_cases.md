@@ -7,7 +7,7 @@
 - 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md), [interfaces.md](./interfaces.md)
 - 작성 기준: 2026-11-03 현재 구현과 테스트. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
 - EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. EC-02의 정상 삽입 경로와 Store 불변식은 `tests/test_memory.py`, `tests/test_state.py`에서 검증한다. EC-05의 현재 State 선택은 `tests/test_proposed_pipeline.py`가 Proposed Adapter부터 Agent 실행까지 확인한다. 그 밖의 항목은 명세만으로 테스트 통과를 의미하지 않는다.
-- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. Semantic General Retrieval, Version Chain Expansion, Temporal Resolution, Mandatory 합계 초과 반환과 Flexible 단일 항목 건너뛰기는 구현되어 있다. EC-08의 현재 버전 복원 경로는 `tests/test_proposed_pipeline.py`, Store의 전체 Version Chain 조회는 Store 단위 테스트가 검증한다. EC-12의 최종 Context 포맷 초과 경로는 `tests/test_memory_context_integration.py`에서 테스트 helper로 검증한다. 과거·기간 Query, Protected 적용성, Mandatory/Flexible 예산 경로에는 아직 전용 통합 테스트가 없다.
+- EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. Semantic General Retrieval, Version Chain Expansion, Temporal Resolution, Mandatory 합계 초과 반환과 Flexible 단일 항목 건너뛰기는 구현되어 있다. EC-08의 현재 버전은 `tests/test_proposed_pipeline.py`, 과거 버전과 월·상대 월 해석은 `tests/test_pipeline_adapter.py`, Store Version Chain은 Store 단위 테스트가 검증한다. EC-12의 Selector·Runner Mandatory overflow와 최종 formatting overflow도 Pipeline Adapter 및 Context 통합 테스트가 검증한다. 과거 State와 현재 행동 Constraint를 동시에 적용하는 EC-09 복합 경로는 아직 전용 통합 테스트가 없다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.
 
 ## 2. 공통 검증 원칙

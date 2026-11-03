@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector 수준의 Ablation 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기, 공백 기준 임시 Token Counter와 Gemini CountTokens 연동도 제공한다. 과거·기간·Protected·예산 실패를 포괄하는 Proposed 통합 테스트, Ablation Runner 결과 기록 검증과 실제 LLM Planner 연동은 아직 남아 있다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector·Runner 통합 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기와 Gemini CountTokens의 메모리·SQLite 캐시, 재시도, 실행별 캐시 격리도 제공한다. 과거 State와 현재 행동 Constraint를 동시에 요구하는 복합 경로 및 실제 LLM Planner 연동은 아직 남아 있다.
 
 ## 배경과 목표
 
@@ -95,7 +95,7 @@ subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 | Constraint Stress Test | 행동 제약의 수 | 제약 보존과 위반 여부 |
 | Memory Noise | 관련 없는 과거 정보의 비율 | 정보 간섭에 대한 안정성 |
 | Long-Horizon Test | History Length, 중요 정보와 최종 Task 사이의 거리 | 장기 기억 성능 |
-| Ablation Study | Protected Memory, State Versioning, Budget Optimization 각각 제거 | 구성 요소별 기여도 |
+| Ablation Study | Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing 각각 제거 | 구성 요소별 기여도 |
 
 History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 효과도 분석한다.
 
@@ -135,20 +135,20 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 ├── experiments/
 │   ├── configs/         # 실험 설정
 │   └── results/         # 실험 결과
-├── prototype/           # 데모 실행과 예시 출력
+├── prototype/           # 레거시 데모 스크립트와 과거 예시 출력
 ├── tests/               # Memory, State, 시나리오 테스트
 ├── docs/                # 연구 질문 및 설계 문서
 ├── requirements.txt     # Python 의존성 목록
 └── README.md
 ```
 
-결정적 Planner와 mock Tool 데모는 저장소 루트에서 다음으로 실행한다.
+`prototype/run_demo.py`와 [sample_output.md](prototype/sample_output.md)는 이전 Agent API를 기준으로 남아 있는 레거시 자료다. 현재 `Agent` 생성자와 호환되지 않으므로 아래 명령은 최신 실행 경로로 사용하지 않는다.
 
 ```text
-python prototype/run_demo.py
+python prototype/run_demo.py  # 현재 레거시 API 불일치로 실행 불가
 ```
 
-데모는 결정적 fixture로 파일 선택, 승인 요청, 발송 및 예산 중단 정책을 재현한다. 시나리오 `memory_snapshot`과 합성 토큰 수를 사용하는 별도 데모 경로이며 실제 LLM 성능 측정은 아니다. `python prototype/run_demo.py S01`처럼 시나리오 ID를 지정하거나 `--all`, `--list`를 쓸 수 있다.
+현재 실행 가능한 검증 경로는 `python -m unittest discover -s tests -v`와 `python -m benchmark.runner --help`이다. 레거시 데모의 출력은 실제 LLM 성능 측정이 아니며 최신 Pipeline 동작을 증명하지 않는다.
 
 실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token과 `memory/selector.py`의 Proposed를 공통 `SelectionResult`로 변환한다. Proposed Policy는 실행 입력의 Memory Snapshot으로 `SnapshotMemoryStore`를 만들고, 시간 해석 기준인 `current_time`을 요구한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 네 전략을 `PipelineAdapter`로 반복 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector Top-k, Utility-per-Token, Proposed에는 embedder가 필요하며 Proposed 시나리오에는 ISO 8601 `current_time`이 있어야 한다.
 
@@ -175,16 +175,16 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-프로젝트의 표준 설치 의존성으로 Gemini CountTokens 연동용 `google-genai>=2.0.0`을 유지한다. `pip install -r requirements.txt`는 이 패키지를 설치한다. 다만 기본 공백 기준 counter와 fake client 기반 단위 테스트는 Gemini API를 호출하지 않으므로 API key가 필요하지 않다. `unittest`는 표준 라이브러리이므로 별도 테스트 패키지가 필요하지 않다.
+프로젝트의 표준 설치 의존성은 Gemini CountTokens 연동용 `google-genai>=2.0.0`과 실험용 다국어 embedder의 `sentence-transformers>=3.0.0`이다. `pip install -r requirements.txt`가 두 패키지를 설치한다. SentenceTransformer 모델 가중치는 최초 실제 embedder 실행 시 별도로 내려받을 수 있다. fake client와 결정적 test embedder 기반 단위 테스트는 외부 API key나 모델 다운로드가 필요하지 않다. `unittest`는 표준 라이브러리이므로 별도 테스트 패키지가 필요하지 않다.
 
-`google-genai` 외의 provider 의존성은 구현을 주입하는 쪽에서 결정한다.
+실제 생성 LLM provider 의존성은 구현을 주입하는 쪽에서 결정한다.
 
 | 기능 | 현재 계약 | 추가 의존성 |
 | --- | --- | --- |
 | Sliding Window | 내장 구현을 바로 사용 | 없음 |
-| Vector Top-k | `embedder(text) -> Sequence[float]` 주입 | 선택한 embedding SDK 또는 로컬 모델 |
-| Utility-per-Token | Vector Top-k와 같은 embedder 사용 | 선택한 embedding SDK 또는 로컬 모델 |
-| Token 측정 | 기본 `provisional_token_count`, `GeminiTokenCounter` 또는 사용자 `TokenCounter` | `google-genai`는 표준 설치, 실제 Gemini API 호출 시 API key 필요 |
+| Vector Top-k | `embedder(text) -> Sequence[float]` 주입; `benchmark.experiment_runtime:multilingual_embedder` 제공 | 표준 설치의 `sentence-transformers`와 최초 모델 가중치 다운로드 |
+| Utility-per-Token / Proposed | Vector Top-k와 같은 embedder 사용 | Vector Top-k와 동일 |
+| Token 측정 | Runner 기본 `GeminiTokenCounter`, 생성기 기본 `provisional_token_count`, 또는 사용자 `TokenCounter` | `google-genai`는 표준 설치, 실제 Gemini API 호출 시 모델명과 API key 필요 |
 | Agent | 기본 결정적 규칙 `Planner` | 실제 LLM 연결 시 provider SDK |
 | 저장소 | 프로세스 내부 `MemoryStore` | DB 영속화를 구현할 때 DB driver |
 
@@ -195,12 +195,14 @@ $env:GEMINI_API_KEY="..."
 
 python -m benchmark.runner ... \
   --gemini-token-model <model-name> \
-  --gemini-token-cache-size 4096
+  --gemini-token-cache-size 4096 \
+  --gemini-token-cache .cache/gemini_token_cache.sqlite3 \
+  --gemini-token-retries 3
 ```
 
-`GeminiTokenCounter`는 동일 문자열의 CountTokens 결과를 메모리에 캐시한다. `--token-counter module:function`과 `--gemini-token-model`은 동시에 사용할 수 없다. 둘 다 생략하면 `provisional_token_count`를 사용하며, 이 값은 실제 모델 Token Usage로 보고하지 않는다. 실행 결과의 `token_count_mode`에는 `provisional`, `custom`, 또는 `gemini:<model>`이 기록된다.
+`GeminiTokenCounter`는 동일 문자열의 CountTokens 결과를 메모리 LRU와 모델별 SQLite 캐시에 저장하고 408·429·5xx 및 연결 오류를 지수 backoff로 재시도한다. Runner는 전략 간 캐시 선점 효과를 막기 위해 각 실행 전후 메모리 캐시를 비우고 실행 중에는 영속 캐시를 우회한다. 기존 SQLite 캐시는 삭제하지 않는다. `--token-counter module:function`과 `--gemini-token-model`은 동시에 사용할 수 없다. 사용자 counter를 지정하지 않으면 Gemini가 기본이며 모델은 `--gemini-token-model` 또는 `GEMINI_TOKEN_MODEL`, API key는 `GEMINI_API_KEY`에서 읽는다. 공백 기준 임시 counter를 쓰려면 사용자 counter로 명시적으로 주입해야 하며 실제 모델 Token Usage로 보고하지 않는다.
 
-Embedding과 실제 LLM provider는 아직 확정되지 않았다. 연구 실행 전에는 선택한 provider와 정확한 버전을 고정하고, 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 개발 PC에 우연히 설치된 패키지를 프로젝트 의존성으로 간주하지 않는다.
+기본 실험 embedder는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`이며 `benchmark.experiment_runtime:multilingual_embedder`로 주입할 수 있다. 본실험에서는 모델명·가중치 버전과 실행 환경을 고정하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 생성 LLM provider는 아직 확정되지 않았다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 
@@ -208,7 +210,7 @@ Embedding과 실제 LLM provider는 아직 확정되지 않았다. 연구 실행
 python -m unittest discover -s tests -v
 ```
 
-`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter가 Version Chain에서 현재 ACTIVE State를 복원하는 종단 경로를 검증한다. `tests/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/test_pipeline_adapter.py`는 실행별 Agent 격리, Runner 저장·재평가와 중간 실행 후 예산 실패 기록을 검증하며, `tests/test_tokenizer.py`는 Gemini counter의 입력 검증·API 응답 처리·캐시 동작을 fake client로 검증한다.
+`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter의 현재 ACTIVE State 복원을 검증하고, `tests/test_pipeline_adapter.py`는 과거 버전, Protected/Required-State 예산 실패, formatting overflow, 네 전략 공정성, Ablation 공통 schema와 Runner 기록을 검증한다. `tests/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/test_tokenizer.py`는 Gemini counter의 입력 검증, 메모리·SQLite 캐시, 재시도와 격리를 fake client로 검증한다.
 
 ## 기술 스택 후보
 

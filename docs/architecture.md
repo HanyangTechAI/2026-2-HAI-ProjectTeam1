@@ -890,7 +890,7 @@ Selector 결과를 실제 LLM Prompt 형태로 변환한다.
 
 Memory Selection 단계에서 계산한 Token Cost와 실제 Formatting 이후의 Token Cost에는 차이가 발생할 수 있다.
 
-따라서 Context Builder는 완성된 Prompt를 주입된 공용 `TokenCounter`로 다시 측정한다. `context/tokenizer.py`는 counter 입력과 반환값을 검증하고, 임시 공백 기준 counter와 Gemini CountTokens API를 감싼 `GeminiTokenCounter`를 제공한다. Gemini counter는 동일 문자열 결과를 LRU 캐시하며 API key는 인자 또는 `GEMINI_API_KEY`로 받는다. 임시 측정값은 실제 모델 Token Usage로 간주하지 않는다.
+따라서 Context Builder는 완성된 Prompt를 주입된 공용 `TokenCounter`로 다시 측정한다. `context/tokenizer.py`는 counter 입력과 반환값을 검증하고, 임시 공백 기준 counter와 Gemini CountTokens API를 감싼 `GeminiTokenCounter`를 제공한다. Gemini counter는 동일 문자열을 메모리 LRU와 선택적 모델별 SQLite 캐시에 저장하고, 재시도 가능한 API 오류에는 지수 backoff를 적용한다. 모델은 인자 또는 `GEMINI_TOKEN_MODEL`, API key는 인자 또는 `GEMINI_API_KEY`로 받는다. Runner는 공정한 전략 비교를 위해 실행별로 메모리 캐시를 초기화하고 영속 캐시를 우회한다. 임시 측정값은 실제 모델 Token Usage로 간주하지 않는다.
 
 ```text
 Final Context Token Count > B_total
@@ -1313,6 +1313,8 @@ Budget-Aware Memory Selection
 │   │   └── Task / Constraint Evaluation
 │   ├── runner.py
 │   │   └── Baseline·Proposed 실행 / JSONL / 집계 출력
+│   ├── experiment_runtime.py
+│   │   └── 다국어 SentenceTransformer embedder / 환경 기반 Agent factory
 │   │
 │   └── scenarios.json
 │
@@ -1442,7 +1444,7 @@ Version Chain Expansion
 Protected Memory
 Budget-Aware Selection
 Final Context Token Validation
-LLM Tool Agent
+Tool Agent와 결정적 Planner(실제 LLM 교체 지점)
 Automatic Evaluation
 ```
 
