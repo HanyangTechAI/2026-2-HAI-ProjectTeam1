@@ -74,20 +74,20 @@ python -m benchmark.generator --config experiments/configs/pilot.json --archive 
 python -m pip install -r requirements.txt
 $geminiModel = "gemini-3.1-flash-lite"
 if (-not $env:GEMINI_API_KEY) { throw "현재 PowerShell 세션에 GEMINI_API_KEY를 설정하세요." }
-python -m benchmark.generator --config experiments/configs/pilot.json --output benchmark/generated/pilot_gemini --gemini-token-model $geminiModel --gemini-token-cache-size 4096 --gemini-token-cache .cache/pilot_gemini_token_cache.sqlite3 --gemini-token-retries 3 --gemini-token-retry-base-seconds 0.5
+python -m benchmark.generator --config experiments/configs/pilot.json --output benchmark/generated/pilot_gemini_3_1_flash_lite --gemini-token-model $geminiModel --gemini-token-cache-size 4096 --gemini-token-cache .cache/pilot_gemini_live_tokens.sqlite3 --gemini-token-retries 3 --gemini-token-retry-base-seconds 0.5
 ```
 
-CLI는 `.env` 파일을 자동으로 읽지 않는다. `.env`에 key가 있는 경우에도 현재 프로세스 환경변수로 내보내거나 `.env`를 읽는 로컬 실행 wrapper를 사용해야 한다. `GeminiTokenCounter()` 자체의 모델 선택 우선순위는 명시적 인자, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 `gemini-3.1-flash-lite` 순이다. 다만 현재 생성기 CLI는 `--gemini-token-model` 옵션이 있어야 Gemini counter를 선택한다. 환경변수의 모델명이나 `pilot.json`의 `model.name`만 바꾸고 이 옵션을 생략하면 Gemini 측정으로 전환되지 않는다.
+CLI는 `.env` 파일을 자동으로 읽지 않는다. `.env`에 key가 있는 경우에도 현재 프로세스 환경변수로 내보내거나 `.env`를 읽는 로컬 실행 wrapper를 사용해야 한다. `GeminiTokenCounter()` 자체의 모델 선택 우선순위는 명시적 인자, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 `gemini-3.1-flash-lite` 순이다. 위 명령은 모델을 명시하므로 로컬 `.env`나 프로세스의 `GEMINI_TOKEN_MODEL`에 이전 `gemini-3.8-flash`가 남아 있어도 `gemini-3.1-flash-lite`를 사용한다. 다만 현재 생성기 CLI는 `--gemini-token-model` 옵션이 있어야 Gemini counter를 선택한다. 환경변수의 모델명이나 `pilot.json`의 `model.name`만 바꾸고 이 옵션을 생략하면 Gemini 측정으로 전환되지 않는다.
 
-출력 경로를 `pilot_gemini`로 분리해 기존 provisional 생성물을 덮지 않는다. 현재 `.gitignore`는 이 생성 경로와 `.cache/`를 제외하므로 로컬 재생성만으로 Git 커밋 대상이 되지는 않는다. Counter가 달라지면 같은 조건과 ID를 유지해도 padding 길이, Memory 비용과 실제 대화 내용은 달라질 수 있다. 비교할 때는 같은 코드 버전에서 만든 provisional 생성물을 사용한다. 구버전 생성물은 Noise 정의나 적용 제약 규칙도 다를 수 있다.
+3.1 Flash-Lite 출력은 모델명을 포함한 `benchmark/generated/pilot_gemini_3_1_flash_lite/`에 저장하고, 전달용 ZIP은 `benchmark/generated/pilot_gemini_3_1_flash_lite.zip` 이름을 사용한다. 기존 `benchmark/generated/pilot_gemini/`의 셀·manifest·`verification.json`과 `pilot_gemini.zip`은 전환 전 3.8 측정 기록으로 보존한다. 3.1 측정 확인에는 새 경로의 manifest와 검증 보고서를 사용하며 이전 보고서의 모델명만 바꾸어 재사용하지 않는다. 현재 `.gitignore`는 이 생성 경로들과 `.cache/`를 제외하므로 로컬 재생성만으로 Git 커밋 대상이 되지는 않는다. Counter가 달라지면 같은 조건과 ID를 유지해도 padding 길이, Memory 비용과 실제 대화 내용은 달라질 수 있다. 비교할 때는 같은 코드 버전에서 만든 provisional 생성물을 사용한다. 구버전 생성물은 Noise 정의나 적용 제약 규칙도 다를 수 있다.
 
 `--gemini-token-cache-size`는 프로세스 안의 LRU 캐시 크기이며, `--gemini-token-cache`는 모델명과 원문 SHA-256을 기준으로 token 수를 저장하는 SQLite 파일이다. 성공한 API 응답은 캐시에 저장되어 재실행에서 재사용할 수 있다. `--gemini-token-retries 3`은 재시도 가능한 오류에 최초 호출 후 최대 3회 재시도를 허용하고, `--gemini-token-retry-base-seconds 0.5`는 지수 backoff의 기준 간격이다. 인증 오류나 지속되는 호출 한도 오류는 해결되지 않을 수 있으며, 재시도 종료 후에는 오류로 중단한다. 같은 문장을 padding 탐색에서 여러 번 측정하므로 100개 sample당 API 호출이 100회로 제한되는 것은 아니다.
 
 생성 명령이 정상 종료되면 같은 PowerShell 세션에서 저장된 결과를 확인한다.
 
 ```powershell
-$manifest = Get-Content -LiteralPath benchmark/generated/pilot_gemini/manifest.json -Encoding UTF8 -Raw | ConvertFrom-Json
-$cellPath = Join-Path benchmark/generated/pilot_gemini $manifest.cells[0].path
+$manifest = Get-Content -LiteralPath benchmark/generated/pilot_gemini_3_1_flash_lite/manifest.json -Encoding UTF8 -Raw | ConvertFrom-Json
+$cellPath = Join-Path benchmark/generated/pilot_gemini_3_1_flash_lite $manifest.cells[0].path
 $dataset = Get-Content -LiteralPath $cellPath -Encoding UTF8 -Raw | ConvertFrom-Json
 $manifest | Select-Object n_cells, n_scenarios, token_count_mode
 $dataset.scenarios | Group-Object token_count_mode | Select-Object Count, Name
@@ -98,6 +98,31 @@ $dataset.scenarios | ForEach-Object { $_.metadata } | Measure-Object actual_nois
 기대값은 셀 1개, sample 100개, manifest의 `token_count_mode`가 `gemini:gemini-3.1-flash-lite`이고 시나리오 그룹도 `Count=100`, `Name=gemini:gemini-3.1-flash-lite`인 것이다. 각 시나리오의 `metadata.token_count_mode`도 같아야 한다. `actual_history_length_tokens`는 24750~25250, `actual_noise_memory_ratio`는 0.49~0.51 범위이며 요청값 `history_length_tokens=25000`, `noise_memory_ratio=0.5`와 따로 확인한다.
 
 이 표시는 어떤 counter를 사용했는지에 대한 기록이다. 실제 API 연결 근거를 남기려면 실행에서 사용한 counter의 `metadata()` 또는 `stats()`로 API 호출, 메모리 hit, persistent hit, retry 수를 함께 보존한다. `api_calls`에는 실패한 호출 시도도 포함된다. 기존 캐시의 값만 재사용한 실행과 새 API 응답으로 측정한 실행을 구분하며, 필요하면 별도 캐시 경로를 지정한다. 이 가이드의 명령과 기대값 자체는 pilot의 실제 Gemini 측정 성공을 의미하지 않는다.
+
+### Gemini 3.1 Flash-Lite 재실행 결과
+
+모델 전환 후 커밋 `9b7041bc948fd09e703e02c12a43efc282e9fb4d`의 코드와 기존 `experiments/configs/pilot.json`으로 실제 CountTokens 재생성을 완료했다. 요청 모델은 `gemini-3.1-flash-lite`를 명시했고, 전체 생성물의 `token_count_mode`는 `gemini:gemini-3.1-flash-lite`이다. 기존 3.8 결과의 label만 변경한 것이 아니라 새 모델의 API 응답으로 측정했다. 생성 counter의 persistent hit는 0회였다.
+
+| 확인 항목 | 결과 |
+|---|---|
+| sample / 고유 ID | 100개 / 100개 |
+| 유형별 개수 | 현재 조회 25, 과거 조회 25, 승인 요청 25, 승인된 발송 25 |
+| 실제 History token 범위 | 25145~25152, 목표 25000의 1% 이내 |
+| 실제 Noise 비율 범위 | 약 0.499608~0.500391 |
+| 생성 API 호출 기록 | 3984회, persistent hit 0회, retry 0회 |
+| 독립 연결·재측정 호출 기록 | 46회, 캐시 없이 네 유형의 대표 이력과 Memory 재측정 일치 |
+| 설정·정답 검증 | 기존 pilot 설정 및 같은 코드의 provisional 과제 ID·질문·정답 유지 |
+
+새 산출물은 다음과 같다. ZIP에는 셀 JSON, manifest, 검증 보고서를 함께 포함하며 압축 전 파일과 바이트 단위로 일치한다.
+
+```text
+benchmark/generated/pilot_gemini_3_1_flash_lite/cell_01e2ddce9162.json
+benchmark/generated/pilot_gemini_3_1_flash_lite/manifest.json
+benchmark/generated/pilot_gemini_3_1_flash_lite/verification.json
+benchmark/generated/pilot_gemini_3_1_flash_lite.zip
+```
+
+이번 실행에서는 `generator.py`, `context/tokenizer.py`, `runner.py`, `pilot.json`을 수정하지 않았다. 기존 3.8 데이터와 ZIP도 해시가 그대로 유지됐다. Agent 응답 생성이나 Runner 벤치마크는 실행하지 않았다. 사용한 SDK는 `google-genai 2.34.0`이며 API key는 결과물에 저장하지 않았다. 이 3.1 생성 경로도 현재 Git 제외 대상이다.
 
 ### 전환 전 Gemini 3.8 pilot 실행 기록
 
