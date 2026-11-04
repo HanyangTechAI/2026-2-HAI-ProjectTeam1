@@ -21,7 +21,10 @@ from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.evaluator import aggregate_results, evaluate
 from benchmark.runner import STRATEGIES, _run_one, run_scenarios
-from context.tokenizer import GeminiTokenCounter, provisional_token_count, token_count_mode
+from context.tokenizer import (
+    GeminiTokenCounter, TARGET_GEMINI_MODEL, provisional_token_count,
+    token_count_mode,
+)
 from memory.query_analyzer import analyze_query, TemporalIntent
 from memory.ablation import ABLATION_PRESETS
 from memory.schema import MemoryItem, MemoryType
@@ -126,7 +129,7 @@ class PipelineAdapterTests(unittest.TestCase):
             settings.pop("strategies")
         scenario = copy.deepcopy(self.scenario)
         counter = settings["token_counter"]
-        scenario["token_count_mode"] = (f"gemini:{os.environ['GEMINI_TOKEN_MODEL']}"
+        scenario["token_count_mode"] = (f"gemini:{os.getenv('GEMINI_TOKEN_MODEL', TARGET_GEMINI_MODEL)}"
                                         if counter is None else token_count_mode(counter))
         return run_scenarios([scenario], **settings)
 
@@ -244,9 +247,9 @@ class PipelineAdapterTests(unittest.TestCase):
         from unittest.mock import Mock
         client = SimpleNamespace(models=SimpleNamespace(count_tokens=Mock(side_effect=mock_count)))
         google = SimpleNamespace(genai=SimpleNamespace(Client=lambda **kwargs: client))
-        with tempfile.TemporaryDirectory() as output, patch.dict(os.environ, {
-            "GEMINI_API_KEY": "test-key", "GEMINI_TOKEN_MODEL": "test-model",
-        }), patch.dict("sys.modules", {"google": google}):
+        with tempfile.TemporaryDirectory() as output, patch.dict(
+            os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True,
+        ), patch.dict("sys.modules", {"google": google}):
             result = self.run_runner(output, strategies=None, token_counter=None, embedder=embed)
             rows = [json.loads(line) for line in Path(result["runs_path"]).read_text(encoding="utf-8").splitlines()]
             self.assertEqual(result["n_runs"], 4)
@@ -254,8 +257,8 @@ class PipelineAdapterTests(unittest.TestCase):
             for row in rows:
                 run = row["run_result"]
                 self.assertTrue(row["evaluation"]["task_success"])
-                self.assertEqual(run["token_count_mode"], "gemini:test-model")
-                self.assertEqual(run["token_counter_metadata"]["model"], "test-model")
+                self.assertEqual(run["token_count_mode"], f"gemini:{TARGET_GEMINI_MODEL}")
+                self.assertEqual(run["token_counter_metadata"]["model"], TARGET_GEMINI_MODEL)
                 self.assertEqual(run["token_counter_metadata"]["request_shape"], "single_user_text")
                 self.assertNotIn("test-key", json.dumps(row))
 
@@ -669,7 +672,7 @@ class PipelineAdapterTests(unittest.TestCase):
         )
 
         scenario["token_count_mode"] = (
-            "gemini:gemini-3.8-flash"
+            f"gemini:{TARGET_GEMINI_MODEL}"
         )
 
         with tempfile.TemporaryDirectory() as output:
@@ -687,6 +690,39 @@ class PipelineAdapterTests(unittest.TestCase):
                     bootstrap_iterations=100,
                     token_counter=provisional_token_count,
             )
+
+    def test_legacy_gemini_fixture_requires_matching_legacy_counter(self):
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "benchmark" / "generated" / "smoke_gemini" / "cell_99a1ce542765.json"
+        )
+        scenario = json.loads(fixture_path.read_text(encoding="utf-8"))["scenarios"][0]
+        scenario["context_budget"] = 1  # Validate model compatibility before any agent action.
+
+        def mock_count(*, model, contents):
+            return SimpleNamespace(total_tokens=len(contents.split()))
+
+        client = SimpleNamespace(models=SimpleNamespace(count_tokens=mock_count))
+        with patch.dict(os.environ, {}, clear=True):
+            default_counter = GeminiTokenCounter(client=client)
+        with tempfile.TemporaryDirectory() as output:
+            with self.assertRaisesRegex(ValueError, "token counter mismatch"):
+                run_scenarios(
+                    [scenario], agent_factory=self.factory, system_prompt=SYSTEM,
+                    tool_definitions=TOOLS, output_directory=output,
+                    strategies=("sliding_window",), bootstrap_iterations=100,
+                    token_counter=default_counter,
+                )
+
+        legacy_counter = GeminiTokenCounter(model="gemini-3.8-flash", client=client)
+        with tempfile.TemporaryDirectory() as output:
+            result = run_scenarios(
+                [scenario], agent_factory=self.factory, system_prompt=SYSTEM,
+                tool_definitions=TOOLS, output_directory=output,
+                strategies=("sliding_window",), bootstrap_iterations=100,
+                token_counter=legacy_counter,
+            )
+        self.assertEqual(result["n_runs"], 1)
 
 
 if __name__ == "__main__":

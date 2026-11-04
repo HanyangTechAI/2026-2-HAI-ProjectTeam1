@@ -25,7 +25,7 @@ import zipfile
 
 from context.tokenizer import (
     GeminiTokenCounter, TokenCounter, count_tokens, provisional_token_count,
-    token_count_mode,
+    TARGET_GEMINI_MODEL, token_count_mode,
 )
 from memory.schema import MemoryItem
 
@@ -613,7 +613,10 @@ def main() -> None:
     parser.add_argument("--archive", action="store_true", help="Write a deterministic .zip; extract before running")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--token-counter", help="module:function for the shared TokenCounter")
-    group.add_argument("--gemini-token-model", help="Explicitly measure with Gemini CountTokens API")
+    group.add_argument(
+        "--gemini-token-model",
+        help=f"Explicitly measure with Gemini CountTokens API. Project target: {TARGET_GEMINI_MODEL}",
+    )
     parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
     parser.add_argument("--gemini-token-cache", default=".cache/gemini_token_cache.sqlite3")
     parser.add_argument("--gemini-token-retries", type=int, default=3)

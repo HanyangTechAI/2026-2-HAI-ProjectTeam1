@@ -174,7 +174,7 @@ Context Builder
 
 공용 모델 Tokenizer가 연결되기 전에는 임시 counter를 사용할 수 있지만, 임시 측정값은 모델의 실제 Token Usage로 보고하지 않는다. `provisional_token_count`를 여러 모듈에 중복 정의하지 않고 `context/tokenizer.py`를 단일 진입점으로 사용한다.
 
-`GeminiTokenCounter(model=None, api_key=None, cache_size=4096, persistent_cache_path=None, max_retries=3, retry_base_seconds=0.5)`는 Gemini CountTokens API를 `TokenCounter` 계약으로 감싼다. 모델은 인자 또는 `GEMINI_TOKEN_MODEL`, API key는 인자 또는 `GEMINI_API_KEY`에서 읽는다. 동일 문자열은 프로세스 메모리 LRU와 선택적 SQLite 캐시에 저장하며, 캐시 key는 모델명과 원문 SHA-256이다. 408·429·500·502·503·504, 연결 및 timeout 오류는 지수 backoff로 재시도한다. 빈 문자열은 API 호출 없이 0을 반환한다.
+`GeminiTokenCounter(model=None, api_key=None, cache_size=4096, persistent_cache_path=None, max_retries=3, retry_base_seconds=0.5)`는 Gemini CountTokens API를 `TokenCounter` 계약으로 감싼다. 프로젝트의 기본 측정 모델은 `TARGET_GEMINI_MODEL = "gemini-3.1-flash-lite"`이다. 실제 호출 모델은 명시적 인자, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 결정한다. API key는 인자 또는 `GEMINI_API_KEY`에서 읽는다. 동일 문자열은 프로세스 메모리 LRU와 선택적 SQLite 캐시에 저장하며, 캐시 key는 모델명과 원문 SHA-256이다. 408·429·500·502·503·504, 연결 및 timeout 오류는 지수 backoff로 재시도한다. 빈 문자열은 API 호출 없이 0을 반환한다.
 
 `isolated_cache()`는 실행 전후 메모리 캐시를 비우고 컨텍스트 안에서 SQLite 읽기·쓰기를 우회한 뒤 기존 경로를 복원한다. Runner는 Gemini 비교 실행마다 이 범위를 적용해 전략 순서에 따른 캐시 이점을 제거하며 `experiment.json`에 `token_cache_policy=isolated_per_run`을 기록한다. `stats()`와 `metadata()`는 memory hit/miss, API 호출, persistent hit, retry와 설정을 제공한다. `token_count_mode`는 실행 로그에 `provisional`, `custom`, `gemini:<model>` 중 하나를 기록한다.
 

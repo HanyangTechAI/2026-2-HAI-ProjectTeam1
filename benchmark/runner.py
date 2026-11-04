@@ -22,7 +22,10 @@ from typing import Any
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
 
-from context.tokenizer import TokenCounter, count_tokens, provisional_token_count, GeminiTokenCounter, token_count_mode
+from context.tokenizer import (
+    GeminiTokenCounter, TARGET_GEMINI_MODEL, TokenCounter, count_tokens,
+    provisional_token_count, token_count_mode,
+)
 
 from memory.retrieval import Embedder
 from memory.schema import MemoryItem
@@ -364,7 +367,11 @@ def run_scenarios(
         raise ValueError("all scenarios must declare token_count_mode")
     
     if scenario_modes != {mode}:
-        raise ValueError(f"scenario/runtime token counter mismatch: scenario={sorted(scenario_modes)}, runtime={mode}")
+        raise ValueError(
+            "scenario/runtime token counter mismatch: "
+            f"scenario={sorted(scenario_modes)}, runtime={mode}; "
+            "regenerate scenarios with the runtime model instead of relabeling metadata"
+        )
     
     rows = []
     
@@ -504,7 +511,10 @@ def main() -> None:
     parser.add_argument("--embedder", help="module:function taking text and returning a numeric vector")
     tokenizer_group = parser.add_mutually_exclusive_group()
     tokenizer_group.add_argument("--token-counter", help="Custom module:function taking text and returning token count")
-    tokenizer_group.add_argument("--gemini-token-model", "--gemini-model", help="Use Gemini CountTokens API with this model. Example: gemini-3.8-flash")
+    tokenizer_group.add_argument(
+        "--gemini-token-model", "--gemini-model",
+        help=f"Use Gemini CountTokens API with this model. Project target: {TARGET_GEMINI_MODEL}",
+    )
     parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
     parser.add_argument("--system-prompt-file", required=True)
     parser.add_argument("--tool-definitions-file", required=True)

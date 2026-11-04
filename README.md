@@ -192,17 +192,20 @@ Gemini token 측정은 다음처럼 설정한다.
 
 ```text
 $env:GEMINI_API_KEY="..."
+$env:GEMINI_TOKEN_MODEL="gemini-3.1-flash-lite"
 
 python -m benchmark.runner ... \
-  --gemini-token-model <model-name> \
+  --gemini-token-model gemini-3.1-flash-lite \
   --gemini-token-cache-size 4096 \
   --gemini-token-cache .cache/gemini_token_cache.sqlite3 \
   --gemini-token-retries 3
 ```
 
-`GeminiTokenCounter`는 동일 문자열의 CountTokens 결과를 메모리 LRU와 모델별 SQLite 캐시에 저장하고 408·429·5xx 및 연결 오류를 지수 backoff로 재시도한다. Runner는 전략 간 캐시 선점 효과를 막기 위해 각 실행 전후 메모리 캐시를 비우고 실행 중에는 영속 캐시를 우회한다. 기존 SQLite 캐시는 삭제하지 않는다. `--token-counter module:function`과 `--gemini-token-model`은 동시에 사용할 수 없다. 사용자 counter를 지정하지 않으면 Gemini가 기본이며 모델은 `--gemini-token-model` 또는 `GEMINI_TOKEN_MODEL`, API key는 `GEMINI_API_KEY`에서 읽는다. 공백 기준 임시 counter를 쓰려면 사용자 counter로 명시적으로 주입해야 하며 실제 모델 Token Usage로 보고하지 않는다.
+현재 Gemini 측정 기본값은 정식 모델 ID `gemini-3.1-flash-lite`이다. `GeminiTokenCounter`는 동일 문자열의 CountTokens 결과를 메모리 LRU와 모델별 SQLite 캐시에 저장하고 408·429·5xx 및 연결 오류를 지수 backoff로 재시도한다. Runner는 전략 간 캐시 선점 효과를 막기 위해 각 실행 전후 메모리 캐시를 비우고 실행 중에는 영속 캐시를 우회한다. 모델명이 캐시 key에 포함되므로 기존 `gemini-3.8-flash` 캐시는 충돌하지 않으며 삭제할 필요가 없다. `--token-counter module:function`과 `--gemini-token-model`은 동시에 사용할 수 없다. 사용자 counter를 지정하지 않으면 Gemini가 기본이며 모델 선택 우선순위는 `--gemini-token-model` 인자, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순이다. API key는 `GEMINI_API_KEY`에서 읽는다. 공백 기준 임시 counter를 쓰려면 사용자 counter로 명시적으로 주입해야 하며 실제 모델 Token Usage로 보고하지 않는다.
 
-기본 실험 embedder는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`이며 `benchmark.experiment_runtime:multilingual_embedder`로 주입할 수 있다. 본실험에서는 모델명·가중치 버전과 실행 환경을 고정하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 생성 LLM provider는 아직 확정되지 않았다.
+`benchmark/generated/smoke_gemini`와 `benchmark/generated/pilot_gemini.zip`은 `gemini-3.8-flash`로 실측한 기존 재현성 자료이다. 모델별 token 수와 그에 맞춘 padding이 달라질 수 있으므로 metadata의 모델명만 바꾸어 재사용하지 않는다. `GEMINI_API_KEY`가 준비된 환경에서 위 모델로 다시 생성한 뒤 manifest·scenario의 `token_count_mode`, History 길이, Noise 비율과 독립 재측정을 함께 검증해야 한다.
+
+기본 실험 embedder는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`이며 `benchmark.experiment_runtime:multilingual_embedder`로 주입할 수 있다. 본실험에서는 모델명·가중치 버전과 실행 환경을 고정하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 현재 코드의 Gemini 연결은 CountTokens 전용이며, 실제 응답 생성은 아직 결정적 규칙 `Planner`를 사용한다. 향후 생성 LLM adapter를 연결할 때는 `gemini-3.1-flash-lite`와 그 decoding/thinking 설정을 별도로 구현·고정해야 한다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 

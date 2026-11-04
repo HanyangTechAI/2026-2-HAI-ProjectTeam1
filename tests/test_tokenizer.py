@@ -2,9 +2,11 @@ import unittest
 import tempfile
 
 from pathlib import Path
+from unittest.mock import patch
 
 from context.tokenizer import (
     GeminiTokenCounter,
+    TARGET_GEMINI_MODEL,
     count_tokens,
     provisional_token_count,
 )
@@ -34,6 +36,19 @@ class FakeClient:
 
 
 class TokenizerTests(unittest.TestCase):
+    def test_project_target_model(self):
+        self.assertEqual(TARGET_GEMINI_MODEL, "gemini-3.1-flash-lite")
+
+    def test_target_model_is_the_default_without_environment_override(self):
+        with patch.dict("os.environ", {}, clear=True):
+            counter = GeminiTokenCounter(client=FakeClient())
+        self.assertEqual(counter.model, TARGET_GEMINI_MODEL)
+
+    def test_environment_model_overrides_project_default(self):
+        with patch.dict("os.environ", {"GEMINI_TOKEN_MODEL": "environment-model"}, clear=True):
+            counter = GeminiTokenCounter(client=FakeClient())
+        self.assertEqual(counter.model, "environment-model")
+
     def test_isolated_cache_bypasses_persistent_entries_and_restores_after_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             client = FakeClient()

@@ -13,6 +13,7 @@ from contextlib import closing, contextmanager
 
 
 TokenCounter = Callable[[str], int]
+TARGET_GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 
 def provisional_token_count(text: str) -> int:
@@ -39,9 +40,14 @@ class GeminiTokenCounter:
         client: Any | None = None,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
-        model = model if model is not None else os.getenv("GEMINI_TOKEN_MODEL")
+        model = model if model is not None else os.getenv(
+            "GEMINI_TOKEN_MODEL", TARGET_GEMINI_MODEL
+        )
         if not isinstance(model, str) or not model.strip():
-            raise ValueError("model must be a non-empty string; set GEMINI_TOKEN_MODEL or pass model")
+            raise ValueError(
+                "model must be a non-empty string; set GEMINI_TOKEN_MODEL or pass model "
+                f"(project target: {TARGET_GEMINI_MODEL})"
+            )
         
         if type(cache_size) is not int or cache_size < 0:
             raise ValueError("cache_size must be a non-negative integer")

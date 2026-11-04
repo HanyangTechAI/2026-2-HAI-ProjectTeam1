@@ -890,7 +890,7 @@ Selector 결과를 실제 LLM Prompt 형태로 변환한다.
 
 Memory Selection 단계에서 계산한 Token Cost와 실제 Formatting 이후의 Token Cost에는 차이가 발생할 수 있다.
 
-따라서 Context Builder는 완성된 Prompt를 주입된 공용 `TokenCounter`로 다시 측정한다. `context/tokenizer.py`는 counter 입력과 반환값을 검증하고, 임시 공백 기준 counter와 Gemini CountTokens API를 감싼 `GeminiTokenCounter`를 제공한다. Gemini counter는 동일 문자열을 메모리 LRU와 선택적 모델별 SQLite 캐시에 저장하고, 재시도 가능한 API 오류에는 지수 backoff를 적용한다. 모델은 인자 또는 `GEMINI_TOKEN_MODEL`, API key는 인자 또는 `GEMINI_API_KEY`로 받는다. Runner는 공정한 전략 비교를 위해 실행별로 메모리 캐시를 초기화하고 영속 캐시를 우회한다. 임시 측정값은 실제 모델 Token Usage로 간주하지 않는다.
+따라서 Context Builder는 완성된 Prompt를 주입된 공용 `TokenCounter`로 다시 측정한다. `context/tokenizer.py`는 counter 입력과 반환값을 검증하고, 임시 공백 기준 counter와 Gemini CountTokens API를 감싼 `GeminiTokenCounter`를 제공한다. 기본 측정 모델은 `gemini-3.1-flash-lite`이다. Gemini counter는 동일 문자열을 메모리 LRU와 선택적 모델별 SQLite 캐시에 저장하고, 재시도 가능한 API 오류에는 지수 backoff를 적용한다. 모델은 명시적 인자, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 결정하고 API key는 인자 또는 `GEMINI_API_KEY`로 받는다. Runner는 공정한 전략 비교를 위해 실행별로 메모리 캐시를 초기화하고 영속 캐시를 우회한다. 모델이 바뀌면 기존 측정값의 metadata만 바꾸지 않고 시나리오를 다시 생성한다. 임시 측정값은 실제 모델 Token Usage로 간주하지 않는다.
 
 ```text
 Final Context Token Count > B_total

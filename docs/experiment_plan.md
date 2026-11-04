@@ -766,7 +766,7 @@ Snapshot 기반 evaluator, JSONL 결과 저장, sample 단위 집계와 실행 �
 
 `benchmark/generator.py`는 temporal_update/approval 시나리오를 grid별 JSON 또는 ZIP으로 생성한다. History 길이·Horizon·Noise 비율의 요청값과 측정값을 구분한다. Ablation은 Full Proposed와 Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 제거하는 4개 변형으로 구성한다.
 
-Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있다. 실행 환경에는 `google-genai`, `GEMINI_API_KEY`와 측정 모델 설정이 필요하다. CLI는 `GEMINI_TOKEN_MODEL` 또는 `--gemini-token-model`로 모델을 지정하고, 사용자 카운터는 `--token-counter module:function`으로 주입한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. 실제 생성 LLM Planner와 모델 응답의 사용량·비용 연동은 본실험 전에 연결해야 한다. 현재 규칙 기반 Planner의 실행을 생성 LLM 성능으로 보고하지 않는다.
+Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있고 현재 측정 대상은 `gemini-3.1-flash-lite`이다. 실행 환경에는 `google-genai`와 `GEMINI_API_KEY`가 필요하다. Runner는 `--gemini-token-model`, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 모델을 선택한다. 생성기는 `--gemini-token-model`을 명시해야 Gemini counter를 선택하며, 옵션을 생략하면 환경변수와 무관하게 `provisional_token_count`를 사용한다. 사용자 카운터는 `--token-counter module:function`으로 주입한다. 모델 전환 시 기존 Gemini 측정 데이터의 label만 바꾸지 않고 History·Memory·최종 Context를 새 모델로 다시 측정한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. 실제 생성 LLM Planner와 모델 응답의 사용량·비용 연동은 본실험 전에 연결해야 한다. 현재 규칙 기반 Planner의 실행을 생성 LLM 성능으로 보고하지 않는다.
 
 ## 15. 본실험 실행 조건
 
