@@ -29,7 +29,7 @@ EARLIEST_HOUR = re.compile(r"오전\s*(\d{1,2})시\s*이전")
 
 
 class Planner:
-    """규칙으로 행동을 고르는 계획기. LLM planner로 바꿔 끼울 자리다.
+    """규칙으로 행동을 고르는 계획기. 모델 경로는 llm_planner.LLMPlanner다.
 
     recipient_aliases는 과제의 호칭을 주소로 바꾸는 표다.
     예: {"교수님": "professor@example.test"}. 표에 없는 호칭의 주소는 만들지 않는다.

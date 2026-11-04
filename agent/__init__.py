@@ -3,6 +3,7 @@
 from .agent import Agent, AgentAction, AgentRunResult
 from .evaluation import scenario_with_granted_approvals
 from .interaction import Interaction
+from .llm_planner import LLMPlanner, LLMRunConfig
 from .planner import Planner
 
 __all__ = [
@@ -10,6 +11,8 @@ __all__ = [
     "AgentAction",
     "AgentRunResult",
     "Interaction",
+    "LLMPlanner",
+    "LLMRunConfig",
     "Planner",
     "scenario_with_granted_approvals",
 ]

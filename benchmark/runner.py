@@ -21,6 +21,7 @@ from typing import Any
 
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
+from agent.llm_planner import LLMRunConfig, shared_system_instruction
 
 from context.tokenizer import TokenCounter, count_tokens, provisional_token_count, GeminiTokenCounter, token_count_mode
 
@@ -117,6 +118,7 @@ def _run_one(
     max_steps: int, 
     goal_checker: GoalChecker | None,
     proposed_ablation: SelectorAblationConfig | None,
+    llm_config: LLMRunConfig | None,
 ) -> dict[str, Any]:
     start = perf_counter()
     # Store에 재삽입하지 않고 기존 버전 관계를 유지한 채 스냅샷을 복원한다.
@@ -223,7 +225,15 @@ def _run_one(
         token_counter_metadata=({key: value for key, value in token_counter.metadata().items()
                                  if key != "stats"}
                                 if isinstance(token_counter, GeminiTokenCounter) else None),
-        strategy_options=dict(top_k=top_k, utility_weights=list(utility_weights), max_steps=max_steps),
+        strategy_options=dict(
+            top_k=top_k,
+            utility_weights=list(utility_weights),
+            max_steps=max_steps,
+            **({} if llm_config is None else {
+                "model": llm_config.model,
+                "temperature": llm_config.temperature,
+            }),
+        ),
         retrieved_memories=[
             replace(memory, token_count=count_tokens(memory.content, token_counter)).to_dict()
             for mid in selection.retrieved_memory_ids
@@ -282,6 +292,7 @@ def run_scenarios(
     max_steps: int = 8,
     goal_checker: GoalChecker | None = None,
     proposed_ablations: Sequence[str] = ("full",),
+    llm_config: LLMRunConfig | None = None,
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
@@ -333,6 +344,14 @@ def run_scenarios(
         raise ValueError("bootstrap_iterations must be an integer >= 100")
     if (agent_factory is None) == (environment_agent_factory is None):
         raise ValueError("specify exactly one of agent_factory or environment_agent_factory")
+    if llm_config is not None and not isinstance(llm_config, LLMRunConfig):
+        raise TypeError("llm_config must be an LLMRunConfig")
+    if llm_config is not None:
+        # 전략 루프 전에 한 번만 묶어서 모델, temperature, 시스템 지시문이 갈라지지 않게 한다.
+        if agent_factory is not None:
+            agent_factory = _with_shared_planner(agent_factory, llm_config)
+        else:
+            environment_agent_factory = _with_shared_planner(environment_agent_factory, llm_config)
     factory = agent_factory if agent_factory is not None else environment_agent_factory
     if token_counter is None:
         token_counter = GeminiTokenCounter()
@@ -401,6 +420,7 @@ def run_scenarios(
                                 max_steps=max_steps,
                                 goal_checker=goal_checker,
                                 proposed_ablation=ablation,
+                                llm_config=llm_config,
                             )
                         )
     
@@ -435,6 +455,8 @@ def run_scenarios(
         "tokenizer": tokenizer_metadata,
         "token_cache_policy": "isolated_per_run" if isinstance(token_counter, GeminiTokenCounter) else None,
         "scenario_ids": ids,
+        "system_prompt": system_prompt,
+        "llm": None if llm_config is None else llm_config.to_dict(),
     }
     
     experiment_text = json.dumps(
@@ -460,6 +482,17 @@ def run_scenarios(
         experiment_path=str(experiment_path),
         tokenizer=tokenizer_metadata,
     )
+
+
+def _with_shared_planner(factory: Callable, config: LLMRunConfig) -> Callable:
+    """모든 전략이 같은 LLMRunConfig로 Planner를 다시 달게 한다."""
+    def wrapped(*args: Any, **kwargs: Any) -> Agent:
+        agent = factory(*args, **kwargs)
+        if not isinstance(agent, Agent):
+            raise TypeError("agent factory must return an Agent instance")
+        agent.planner = config.planner()
+        return agent
+    return wrapped
 
 
 def _import_callable(spec: str) -> Callable:
@@ -506,6 +539,9 @@ def main() -> None:
     tokenizer_group.add_argument("--token-counter", help="Custom module:function taking text and returning token count")
     tokenizer_group.add_argument("--gemini-token-model", "--gemini-model", help="Use Gemini CountTokens API with this model. Example: gemini-3.8-flash")
     parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
+    parser.add_argument("--config", help="Experiment config JSON. Its model block is shared by every strategy.")
+    parser.add_argument("--llm-model", help="Override the shared model name and enable the LLM planner.")
+    parser.add_argument("--temperature", type=float, help="Override the shared temperature. Every strategy uses this value.")
     parser.add_argument("--system-prompt-file", required=True)
     parser.add_argument("--tool-definitions-file", required=True)
     parser.add_argument("--output", default="experiments/results/baselines")
@@ -545,12 +581,36 @@ def main() -> None:
         token_counter = _import_callable(args.token_counter)
     else:
         token_counter = provisional_token_count
+    system_prompt = Path(args.system_prompt_file).read_text(encoding="utf-8")
+    config_model: dict[str, Any] = {}
+    if args.config:
+        loaded = json.loads(Path(args.config).read_text(encoding="utf-8"))
+        raw_model = loaded.get("model") or {}
+        if not isinstance(raw_model, dict):
+            parser.error("config model must be an object")
+        config_model = raw_model
+        prompt_file = config_model.get("system_prompt_file")
+        if isinstance(prompt_file, str) and prompt_file:
+            declared = Path(prompt_file).read_text(encoding="utf-8")
+            if declared != system_prompt:
+                parser.error("system prompt file does not match config model.system_prompt_file")
+    model_name = args.llm_model or config_model.get("name")
+    temperature = config_model.get("temperature", 0) if args.temperature is None else args.temperature
+    max_output_tokens = config_model.get("max_output_tokens", 1024)
+    llm_config = None
+    if model_name:
+        llm_config = LLMRunConfig(
+            model=str(model_name),
+            temperature=0 if temperature is None else temperature,
+            system_instruction=shared_system_instruction(system_prompt),
+            max_output_tokens=max_output_tokens,
+        )
     result = run_scenarios(
         scenarios,
         agent_factory=_import_callable(args.agent_factory) if args.agent_factory else None,
         environment_agent_factory=(_import_callable(args.environment_agent_factory)
                                    if args.environment_agent_factory else None),
-        system_prompt=Path(args.system_prompt_file).read_text(encoding="utf-8"),
+        system_prompt=system_prompt,
         tool_definitions=Path(args.tool_definitions_file).read_text(encoding="utf-8"),
         output_directory=args.output, strategies=args.strategies,
         embedder=_import_callable(args.embedder) if args.embedder else None,
@@ -558,6 +618,7 @@ def main() -> None:
         top_k=args.top_k, repeats=args.repeats, utility_weights=tuple(args.utility_weights),
         bootstrap_iterations=args.bootstrap_iterations, seed=args.seed, max_steps=args.max_steps,
         proposed_ablations=args.proposed_ablations,
+        llm_config=llm_config,
     )
     if isinstance(token_counter, GeminiTokenCounter):
         result["tokenizer"] = {
