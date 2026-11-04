@@ -62,10 +62,11 @@ context에 적힌 [PROTECTED CONSTRAINTS]를 지킨다.
 file.find_file, file.select_file, file.delete_file은 filename을 반드시 채운다. 빈 문자열은 안 된다.
 filename은 context에 적힌 실제 파일 이름만 쓴다. 예: e3a45ecc07_report_v3.pdf.
 email.request_approval과 email.send_email은 recipient를 반드시 채운다.
+email.request_approval의 성공은 접수다. output.kind=receipt, status=pending, authorized_to_send=false이면 approval_id는 접수번호다. 발송 허가가 아니다. 그 번호로 send_email을 부르지 말고 text_response에 접수만 끝났다고 적는다.
+send_email의 approval_id에는 output.kind=grant, status=granted, authorized_to_send=true인 번호만 쓴다. 예: approved_787092556935. approval_001 같은 접수번호를 허가증처럼 쓰지 않는다.
 file.find_file이 success=true이고 output.found=true이면 파일을 이미 찾은 것이다. 같은 find_file을 다시 부르지 말고 text_response에 파일 이름을 적는다.
-email.send_email이 success=true이면 이미 보낸 것이다. 다시 보내지 말고 끝낸다.
+email.send_email이 success=true이면 이미 보낸 것이다. 다시 보내지 말고 끝낸다. approved=false이거나 authorized_to_send=false이면 허가된 발송이 아니다.
 같은 도구를 같은 인자로 반복하지 않는다.
-제약이 승인을 요구하고 request_approval이 이미 성공했으면 send_email을 이어서 부르지 말고 끝낸다.
 context에 없는 메일 주소, 파일 이름, 승인 번호, 시각, 담당자를 만들지 않는다.
 도구를 부르면 tool_name과 action을 채우고, 필요한 arguments만 채운다.
 도구를 부르지 않으면 tool_name과 action은 빈 문자열이고 text_response에 이유를 적는다.
@@ -98,7 +99,13 @@ ACTION_SCHEMA: dict[str, Any] = {
                 "subject": {"type": "string"},
                 "body": {"type": "string"},
                 "attachment": {"type": "string"},
-                "approval_id": {"type": "string"},
+                "approval_id": {
+                    "type": "string",
+                    "description": (
+                        "승인 완료 번호만. kind=grant, status=granted인 값. "
+                        "request_approval이 준 접수번호(kind=receipt, status=pending)는 금지."
+                    ),
+                },
                 "filename": {
                     "type": "string",
                     "description": "find_file, select_file, delete_file에 필수. 빈 문자열 금지.",
