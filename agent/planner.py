@@ -69,7 +69,9 @@ class Planner:
             if granted is None:
                 pending = view.last_ok("email", "request_approval")
                 if pending is not None:
-                    return _say(f"승인을 기다리고 있습니다: {pending.get('approval_id')}")
+                    return _say(
+                        f"승인을 기다리고 있습니다: {pending.get('approval_id')}는 접수번호이고 발송 허가가 아닙니다."
+                    )
                 return _call("email", "request_approval", arguments)
             arguments["approval_id"] = granted
         return _call("email", "send_email", arguments)
