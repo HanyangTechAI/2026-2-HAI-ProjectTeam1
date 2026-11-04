@@ -133,21 +133,21 @@ def _mandatory_memory_overflow(outcome: PipelineRunResult) -> bool | None:
 
 
 def _run_one(
-    scenario: Mapping[str, Any], 
-    strategy: str, 
-    repeat_id: int, 
+    scenario: Mapping[str, Any],
+    strategy: str,
+    repeat_id: int,
     *,
     agent_factory: AgentFactory | None,
     environment_agent_factory: EnvironmentAgentFactory | None,
     embedder: Embedder | None,
-    system_prompt: str, 
-    tool_definitions: str, 
+    system_prompt: str,
+    tool_definitions: str,
     token_counter: TokenCounter,
-    token_count_mode: str, 
+    token_count_mode: str,
     top_k: int,
     metric_k: int,
     utility_weights: tuple[float, float, float],
-    max_steps: int, 
+    max_steps: int,
     goal_checker: GoalChecker | None,
     proposed_ablation: SelectorAblationConfig | None,
     llm_config: LLMRunConfig | None,
@@ -163,13 +163,13 @@ def _run_one(
             return environment_agent_factory(_environment_snapshot(scenario))
     else:
         runtime_agent_factory = agent_factory
-        
+
     if strategy == "proposed":
         if embedder is None:
             raise ValueError("proposed strategy requires embedder")
-        
+
         ablation = proposed_ablation or FULL_ABLATION
-        
+
         adapter = make_pipeline_adapter(
             strategy,
             system_prompt=system_prompt,
@@ -183,9 +183,9 @@ def _run_one(
             max_steps=max_steps,
             goal_checker=goal_checker,
         )
-        
+
         strategy_label = "proposed" if ablation.name == "full" else f"proposed/{ablation.name}"
-        
+
     else:
         adapter = make_pipeline_adapter(
             strategy,
@@ -199,9 +199,9 @@ def _run_one(
             max_steps=max_steps,
             goal_checker=goal_checker,
         )
-        
+
         strategy_label = strategy
-        
+
     # policy는 adapter 생성 시 지정하고, 나머지 실행 입력은 Orchestrator.run으로 전달한다.
     outcome = adapter(
         query=scenario["query"],
@@ -211,7 +211,7 @@ def _run_one(
         current_turn=scenario["current_turn"],
         current_time=_scenario_current_time(scenario),
     )
-    
+
     if not isinstance(outcome, PipelineRunResult):
         raise TypeError("pipeline adapter must return PipelineRunResult")
     if not outcome.steps:
@@ -232,23 +232,23 @@ def _run_one(
                 executed_steps,
                 key=lambda step: step.context_result.total_input_tokens,
             )
-            
+
             input_tokens = peak_step.context_result.total_input_tokens
-            
+
             fixed_input_tokens = peak_step.fixed_tokens
         else:
             input_tokens = 0
             fixed_input_tokens = final_step.fixed_tokens
-            
+
     elif selection.status != PipelineStatus.OK:
         # 선택 중단 시 조립되지 않은 Context의 입력량은 미측정이다.
         input_tokens = None
         fixed_input_tokens = final_step.fixed_tokens
-        
+
     else:
         input_tokens = context.total_input_tokens
         fixed_input_tokens = final_step.fixed_tokens
-        
+
     run = _json_record(outcome)
     run.update(
         selection_result=_json_record(selection),
@@ -318,7 +318,7 @@ def run_scenarios(
     strategies: Sequence[str] = STRATEGIES,
     embedder: Embedder | None = None,
     token_counter: TokenCounter | None = provisional_token_count,
-    top_k: int = 20,
+    top_k: int = 5,
     metric_k: int | None = None,
     repeats: int = 1,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
@@ -356,26 +356,26 @@ def run_scenarios(
         strategy not in STRATEGIES for strategy in strategies
     ):
         raise ValueError(f"strategies must be distinct names from {STRATEGIES}")
-    
+
     embedding_strategies = {"vector_top_k", "utility_per_token", "proposed"}
-    
+
     if any(strategy in embedding_strategies for strategy in strategies) and embedder is None:
         raise ValueError("vector_top_k, utility_per_token, and proposed require embedder")
-    
+
     enabled = [
-        scenario 
+        scenario
         for scenario in scenarios
         if scenario.get("benchmark_enabled", True) and scenario.get("validation_scope", "integration") == "integration"
     ]
-    
+
     if not enabled:
         raise ValueError("no enabled integration scenarios selected")
-    
+
     if "proposed" in strategies:
         for scenario in enabled:
             if scenario.get("current_time") is None:
                 raise ValueError("proposed strategy requires scenario.current_time")
-    
+
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
     if metric_k is None:
@@ -413,38 +413,38 @@ def run_scenarios(
             )
     if not callable(factory) or not callable(token_counter):
         raise TypeError("agent factory and token_counter must be callable")
-    
+
     ids = [scenario.get("scenario_id", scenario.get("sample_id")) for scenario in enabled]
     if any(not isinstance(sid, str) or not sid for sid in ids) or len(set(ids)) != len(ids):
         raise ValueError("scenarios require unique non-empty scenario_id/sample_id")
-    
+
     proposed_ablations = tuple(proposed_ablations)
-    
+
     if not proposed_ablations or len(set(proposed_ablations)) != len(proposed_ablations):
         raise ValueError("proposed_ablations must be non-empty and unique")
-    
+
     unknown_ablations = set(proposed_ablations) - set(ABLATION_PRESETS)
-    
+
     if unknown_ablations:
         raise ValueError(f"unknown proposed ablations: {sorted(unknown_ablations)}")
-    
+
     mode = token_count_mode(token_counter)
-    
+
     scenario_modes = {
         scenario.get("token_count_mode")
         for scenario in enabled
     }
-    
+
     if None in scenario_modes:
         raise ValueError("all scenarios must declare token_count_mode")
-    
+
     if scenario_modes != {mode}:
         raise ValueError(
             "scenario/runtime token counter mismatch: "
             f"scenario={sorted(scenario_modes)}, runtime={mode}; "
             "regenerate scenarios with the runtime model instead of relabeling metadata"
         )
-    
+
     rows = []
     total_runs = len(enabled) * repeats * sum(
         len(proposed_ablations) if strategy == "proposed" else 1 for strategy in strategies
@@ -460,7 +460,7 @@ def run_scenarios(
                 )
             else:
                 variants = (None,)
-                
+
             for ablation in variants:
                 for repeat_id in range(repeats):
                     label = strategy if ablation is None or ablation.name == "full" else f"proposed/{ablation.name}"
@@ -501,7 +501,7 @@ def run_scenarios(
                         raise
                     if show_progress:
                         _report_progress(len(rows), total_runs, progress_started, "finished " + current)
-    
+
     if show_progress:
         _report_progress(len(rows), total_runs, progress_started, "aggregating and saving")
     summary = aggregate_results(
@@ -516,14 +516,14 @@ def run_scenarios(
     output.mkdir(parents=True, exist_ok=True)
     (output / "runs.jsonl").write_text(runs_text, encoding="utf-8")
     (output / "summary.json").write_text(summary_text, encoding="utf-8")
-    
+
     if isinstance(token_counter, GeminiTokenCounter):
         tokenizer_metadata = token_counter.metadata()
     else:
         tokenizer_metadata = {
             "type": token_count_mode(token_counter)
         }
-        
+
     experiment_metadata = {
         "strategies": list(strategies),
         "proposed_ablations": list(proposed_ablations),
@@ -546,30 +546,30 @@ def run_scenarios(
         "config": None if config_metadata is None else _json_record(config_metadata),
         "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
     }
-    
+
     experiment_text = json.dumps(
         experiment_metadata,
         ensure_ascii=False,
         indent=2,
         allow_nan=False,
     ) + "\n"
-    
+
     experiment_path = output / "experiment.json"
-    
+
     experiment_path.write_text(
         experiment_text,
         encoding="utf-8",
     )
-    
+
     if show_progress:
         _report_progress(len(rows), total_runs, progress_started, f"saved {output}")
         if sys.stderr.isatty():
             print(file=sys.stderr, flush=True)
     return dict(
-        n_runs=len(rows), 
-        n_scenarios=len(enabled), 
+        n_runs=len(rows),
+        n_scenarios=len(enabled),
         summary=summary,
-        runs_path=str(output / "runs.jsonl"), 
+        runs_path=str(output / "runs.jsonl"),
         summary_path=str(output / "summary.json"),
         experiment_path=str(experiment_path),
         tokenizer=tokenizer_metadata,
@@ -599,19 +599,19 @@ def _import_callable(spec: str) -> Callable:
 
 def _scenario_current_time(scenario: Mapping[str, Any]) -> datetime | None:
     raw = scenario.get("current_time")
-    
+
     if raw is None:
         return None
-    
+
     if isinstance(raw, datetime):
         return raw
-    
+
     if isinstance(raw, str):
         try:
             return datetime.fromisoformat(raw.replace("Z", "+00:00"))
         except ValueError as exc:
             raise ValueError("scenario.current_time must be a valid ISO 8601 timestamp") from exc
-        
+
     raise TypeError("scenario.current_time must be datetime, ISO string, or None")
 
 
@@ -657,7 +657,7 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         "provider": "google",
         "name": FROZEN_MODEL,
         "temperature": 0,
-        "max_output_tokens": 4096,
+        "max_output_tokens": 512,
         "thinking_level": "LOW",
         "system_prompt_file": FROZEN_SYSTEM_PROMPT_FILE,
         "tool_definitions_file": FROZEN_TOOL_DEFINITIONS_FILE,
@@ -674,7 +674,7 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         raise ValueError("config model.thinking_level must be LOW, MEDIUM, or HIGH")
 
     expected_runtime = {
-        "candidate_top_k": 20,
+        "candidate_top_k": 5,
         "max_steps": 8,
         "utility_weights": [0.6, 0.3, 0.1],
         "embedder": FROZEN_EMBEDDER,
@@ -851,7 +851,7 @@ def main() -> None:
         "experiments/results/baselines", has_config=has_config, overrides=overrides,
     )
     top_k = _resolved_value(
-        "candidate_top_k", args.top_k, runtime_config.get("candidate_top_k"), 20,
+        "candidate_top_k", args.top_k, runtime_config.get("candidate_top_k"), 5,
         has_config=has_config, overrides=overrides,
     )
     metric_k = _resolved_value(
@@ -907,7 +907,7 @@ def main() -> None:
     )
     max_output_tokens = _resolved_value(
         "model.max_output_tokens", args.max_output_tokens,
-        model_config.get("max_output_tokens"), 1024,
+        model_config.get("max_output_tokens"), 512,
         has_config=has_config, overrides=overrides,
     )
     thinking_level = _resolved_value(

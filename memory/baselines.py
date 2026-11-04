@@ -128,7 +128,7 @@ def vector_top_k(
     session_id: str,
     total_budget: int,
     fixed_tokens: int,
-    top_k: int = 20,
+    top_k: int = 5,
     current_turn: int | None = None,
     token_counter: TokenCounter | None = None,
 ) -> SelectionResult:
@@ -158,7 +158,7 @@ def utility_per_token(
     total_budget: int,
     fixed_tokens: int,
     current_turn: int,
-    top_k: int = 20,
+    top_k: int = 5,
     weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
     token_counter: TokenCounter | None = None,
 ) -> SelectionResult:

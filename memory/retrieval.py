@@ -98,7 +98,7 @@ def semantic_retrieve(
     memories: Sequence[MemoryItem],
     *,
     embedder: Embedder,
-    top_k: int = 20,
+    top_k: int = 5,
 ) -> list[RetrievalHit]:
     if not isinstance(query, str):
         raise TypeError("query must be a string")

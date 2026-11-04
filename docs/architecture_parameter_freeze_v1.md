@@ -63,7 +63,7 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 |---|---|
 | LLM provider/model | Google / `gemini-3.1-flash-lite` |
 | Temperature | `0` |
-| Max output tokens | `4096` |
+| Max output tokens | `512` |
 | Thinking level | `LOW` |
 | LLM retry | 최대 `2`, base `0.5s`, exponential backoff |
 | LLM timeout | `60000ms` |
@@ -71,7 +71,7 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 | Tool definitions | `experiments/prompts/tools_v1.txt` |
 | Embedder callable | `benchmark.experiment_runtime:multilingual_embedder` |
 | Embedding model | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` |
-| Candidate Top-k | `20` |
+| Candidate Top-k | `5` |
 | Max agent steps | `8` |
 | Utility weights | relevance `0.6`, importance `0.3`, recency `0.1` |
 | Token counter | Gemini CountTokens / `gemini-3.1-flash-lite` |

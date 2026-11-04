@@ -61,7 +61,7 @@ def token_f1(prediction: str, reference: str) -> float:
     return 2 * overlap / (len(predicted) + len(expected))
 
 
-def retrieval_metrics(retrieved: list[str], targets: list[str], k: int = 20) -> dict:
+def retrieval_metrics(retrieved: list[str], targets: list[str], k: int = 5) -> dict:
     if type(k) is not int or k <= 0:
         raise ValueError("k must be a positive integer")
     # Duplicate IDs must not improve precision, recall, or rank.
@@ -197,7 +197,7 @@ def _selection_diagnostics(run: dict, selection: dict, context: dict,
 
 
 def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
-             k: int = 20, repeat_id: int = 0) -> EvaluationResult:
+             k: int = 5, repeat_id: int = 0) -> EvaluationResult:
     """Evaluate mappings or dataclass snapshots without accessing a MemoryStore.
 
     Required states use scenario.required_states with task-specific tool argument

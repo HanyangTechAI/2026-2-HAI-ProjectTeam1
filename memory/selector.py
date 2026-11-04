@@ -524,7 +524,7 @@ def select_memory(
     *,
     embedder: Embedder,
     token_counter: TokenCounter | None = None,
-    top_k: int = 20,
+    top_k: int = 5,
     utility_weights: tuple[float, float, float] = DEFAULT_UTILITY_WEIGHTS,
     ablation: SelectorAblationConfig = FULL_ABLATION,
 ) -> SelectionResult:

@@ -666,8 +666,8 @@ class PipelineAdapterTests(unittest.TestCase):
         self.assertEqual(len(row["run_result"]["tool_calls"]), 1)
         self.assertFalse(row["run_result"]["goal_completed"])
         self.assertFalse(row["evaluation"]["task_success"])
-        
-        
+
+
     def test_progress_counts_ablation_repeats_and_keeps_stdout_clean(self):
         stderr, stdout = io.StringIO(), io.StringIO()
         with tempfile.TemporaryDirectory() as output, redirect_stderr(stderr), redirect_stdout(stdout):
