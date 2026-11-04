@@ -142,6 +142,8 @@ class LLMPlanner:
         max_output_tokens: int = 4096,
         thinking_level: str = "LOW",
         max_retries: int = 2,
+        retry_base_seconds: float = 0.5,
+        timeout_ms: int = CLIENT_TIMEOUT_MS,
         sleeper: Any | None = None,
     ) -> None:
         if not isinstance(model, str) or not model.strip():
@@ -156,6 +158,12 @@ class LLMPlanner:
             raise ValueError("thinking_level must be LOW, MEDIUM, or HIGH")
         if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
             raise ValueError("max_retries must be a non-negative integer")
+        if (isinstance(retry_base_seconds, bool)
+                or not isinstance(retry_base_seconds, (int, float))
+                or retry_base_seconds < 0):
+            raise ValueError("retry_base_seconds must be non-negative")
+        if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or timeout_ms < 1:
+            raise ValueError("timeout_ms must be a positive integer")
         if sleeper is not None and not callable(sleeper):
             raise TypeError("sleeper must be callable")
         self.model = model.strip()
@@ -164,6 +172,8 @@ class LLMPlanner:
         self.max_output_tokens = max_output_tokens
         self.thinking_level = thinking_level
         self.max_retries = max_retries
+        self.retry_base_seconds = float(retry_base_seconds)
+        self.timeout_ms = timeout_ms
         self._sleeper = sleeper or _sleep
         self._client = client
         self._api_key = api_key
@@ -183,7 +193,7 @@ class LLMPlanner:
                 return agent_action_from_model_output(_payload_from_response(response))
             except Exception as exc:
                 if attempt < self.max_retries and _transient(exc):
-                    self._sleeper(0.5 * (2 ** attempt))
+                    self._sleeper(self.retry_base_seconds * (2 ** attempt))
                     continue
                 return _text(f"모델 호출에 실패했습니다: {type(exc).__name__}")
         return _text("모델 호출에 실패했습니다.")
@@ -203,7 +213,7 @@ class LLMPlanner:
             raise ValueError("Gemini API key is required. Pass api_key=... or set GEMINI_API_KEY.")
         self._client = genai.Client(
             api_key=api_key,
-            http_options=types.HttpOptions(timeout=CLIENT_TIMEOUT_MS),
+            http_options=types.HttpOptions(timeout=self.timeout_ms),
         )
         return self._client
 
@@ -244,6 +254,9 @@ class LLMRunConfig:
     system_instruction: str = SYSTEM_INSTRUCTION
     max_output_tokens: int = 4096
     thinking_level: str = "LOW"
+    max_retries: int = 2
+    retry_base_seconds: float = 0.5
+    timeout_ms: int = CLIENT_TIMEOUT_MS
 
     def __post_init__(self) -> None:
         checked = LLMPlanner(
@@ -252,6 +265,9 @@ class LLMRunConfig:
             system_instruction=self.system_instruction,
             max_output_tokens=self.max_output_tokens,
             thinking_level=self.thinking_level,
+            max_retries=self.max_retries,
+            retry_base_seconds=self.retry_base_seconds,
+            timeout_ms=self.timeout_ms,
             client=object(),
         )
         object.__setattr__(self, "model", checked.model)
@@ -266,6 +282,9 @@ class LLMRunConfig:
             system_instruction=self.system_instruction,
             max_output_tokens=self.max_output_tokens,
             thinking_level=self.thinking_level,
+            max_retries=self.max_retries,
+            retry_base_seconds=self.retry_base_seconds,
+            timeout_ms=self.timeout_ms,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -276,6 +295,9 @@ class LLMRunConfig:
             "system_instruction": self.system_instruction,
             "max_output_tokens": self.max_output_tokens,
             "thinking_level": self.thinking_level,
+            "max_retries": self.max_retries,
+            "retry_base_seconds": self.retry_base_seconds,
+            "timeout_ms": self.timeout_ms,
         }
 
 

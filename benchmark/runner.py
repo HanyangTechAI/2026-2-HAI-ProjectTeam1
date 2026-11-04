@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from contextlib import nullcontext
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass, replace
@@ -21,7 +22,7 @@ from typing import Any
 
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
-from agent.llm_planner import LLMRunConfig, shared_system_instruction
+from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
 
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, TokenCounter, count_tokens,
@@ -41,6 +42,18 @@ from .evaluator import aggregate_results, evaluate
 
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
+
+FREEZE_VERSION = "1.0"
+FROZEN_MODEL = "gemini-3.1-flash-lite"
+FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
+FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
+FROZEN_EMBEDDER = "benchmark.experiment_runtime:multilingual_embedder"
+FROZEN_PROMPT_SHA256 = {
+    FROZEN_SYSTEM_PROMPT_FILE: "7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0",
+    FROZEN_TOOL_DEFINITIONS_FILE: "d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812",
+}
+EXECUTABLE_STATUS = "executable"
+NON_EXECUTABLE_STATUSES = frozenset({"generation_only", "deferred"})
 
 
 def _environment_snapshot(scenario: Mapping[str, Any]) -> dict[str, Any]:
@@ -117,6 +130,7 @@ def _run_one(
     token_counter: TokenCounter,
     token_count_mode: str, 
     top_k: int,
+    metric_k: int,
     utility_weights: tuple[float, float, float],
     max_steps: int, 
     goal_checker: GoalChecker | None,
@@ -230,6 +244,8 @@ def _run_one(
                                 if isinstance(token_counter, GeminiTokenCounter) else None),
         strategy_options=dict(
             top_k=top_k,
+            candidate_top_k=top_k,
+            metric_k=metric_k,
             utility_weights=list(utility_weights),
             max_steps=max_steps,
             **({} if llm_config is None else {
@@ -268,7 +284,7 @@ def _run_one(
     # 대기 중인 승인 요청을 유효한 승인으로 평가하지 않도록 기존 보조 함수를 사용한다.
     evaluation_scenario = scenario_with_granted_approvals(scenario, outcome.tool_results)
     evaluation = evaluate(
-        evaluation_scenario, run, strategy=strategy_label, repeat_id=repeat_id, k=top_k,
+        evaluation_scenario, run, strategy=strategy_label, repeat_id=repeat_id, k=metric_k,
     )
     return dict(
         scenario=evaluation_scenario, strategy=strategy_label, repeat_id=repeat_id,
@@ -288,6 +304,7 @@ def run_scenarios(
     embedder: Embedder | None = None,
     token_counter: TokenCounter | None = provisional_token_count,
     top_k: int = 20,
+    metric_k: int | None = None,
     repeats: int = 1,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
     bootstrap_iterations: int = 2000,
@@ -296,6 +313,8 @@ def run_scenarios(
     goal_checker: GoalChecker | None = None,
     proposed_ablations: Sequence[str] = ("full",),
     llm_config: LLMRunConfig | None = None,
+    config_metadata: Mapping[str, Any] | None = None,
+    cli_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
@@ -341,6 +360,10 @@ def run_scenarios(
     
     if type(top_k) is not int or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
+    if metric_k is None:
+        metric_k = top_k
+    if type(metric_k) is not int or metric_k <= 0:
+        raise ValueError("metric_k must be a positive integer")
     if type(repeats) is not int or repeats <= 0:
         raise ValueError("repeats must be a positive integer")
     if type(bootstrap_iterations) is not int or bootstrap_iterations < 100:
@@ -358,6 +381,18 @@ def run_scenarios(
     factory = agent_factory if agent_factory is not None else environment_agent_factory
     if token_counter is None:
         token_counter = GeminiTokenCounter()
+    if llm_config is not None and isinstance(token_counter, GeminiTokenCounter):
+        if llm_config.model != token_counter.model:
+            raise ValueError("LLM model and Gemini token counter model must match")
+        configure_request = getattr(token_counter, "configure_request", None)
+        generation_config = getattr(llm_config, "generation_config", None)
+        if callable(configure_request):
+            request_config = (generation_config() if callable(generation_config)
+                              else llm_config.planner().generation_config())
+            configure_request(
+                system_instruction=llm_config.system_instruction,
+                generation_config=request_config,
+            )
     if not callable(factory) or not callable(token_counter):
         raise TypeError("agent factory and token_counter must be callable")
     
@@ -423,6 +458,7 @@ def run_scenarios(
                                 token_count_mode=mode,
                                 token_counter=token_counter,
                                 top_k=top_k,
+                                metric_k=metric_k,
                                 utility_weights=utility_weights,
                                 max_steps=max_steps,
                                 goal_checker=goal_checker,
@@ -453,17 +489,25 @@ def run_scenarios(
         
     experiment_metadata = {
         "strategies": list(strategies),
+        "proposed_ablations": list(proposed_ablations),
         "n_scenarios": len(enabled),
         "repeats": repeats,
         "top_k": top_k,
+        "candidate_top_k": top_k,
+        "metric_k": metric_k,
         "utility_weights": list(utility_weights),
         "max_steps": max_steps,
+        "bootstrap_iterations": bootstrap_iterations,
+        "bootstrap_seed": seed,
         "token_count_mode": mode,
         "tokenizer": tokenizer_metadata,
         "token_cache_policy": "isolated_per_run" if isinstance(token_counter, GeminiTokenCounter) else None,
         "scenario_ids": ids,
         "system_prompt": system_prompt,
+        "tool_definitions": tool_definitions,
         "llm": None if llm_config is None else llm_config.to_dict(),
+        "config": None if config_metadata is None else _json_record(config_metadata),
+        "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
     }
     
     experiment_text = json.dumps(
@@ -530,12 +574,168 @@ def _scenario_current_time(scenario: Mapping[str, Any]) -> datetime | None:
     raise TypeError("scenario.current_time must be datetime, ISO string, or None")
 
 
+def _mapping(value: Any, name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"config {name} must be an object")
+    return value
+
+
+def _load_runner_config(path: str | Path) -> dict[str, Any]:
+    """Load and validate the versioned, executable parameter freeze."""
+    loaded = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError("config must be a JSON object")
+
+    freeze = _mapping(loaded.get("freeze"), "freeze")
+    if freeze.get("kind") != "architecture_parameter_freeze":
+        raise ValueError("config freeze.kind must be 'architecture_parameter_freeze'")
+    if freeze.get("version") != FREEZE_VERSION:
+        raise ValueError(f"config freeze.version must be {FREEZE_VERSION!r}")
+    scope = loaded.get("scope")
+    if not isinstance(scope, str) or not scope.strip():
+        raise ValueError("config scope must be a non-empty string")
+    if loaded.get("name") != scope:
+        raise ValueError("config scope must match config name")
+    status = loaded.get("status")
+    if status not in {EXECUTABLE_STATUS, *NON_EXECUTABLE_STATUSES}:
+        raise ValueError("config status must be executable, generation_only, or deferred")
+    expected_executable = status == EXECUTABLE_STATUS
+    if loaded.get("executable") is not expected_executable:
+        raise ValueError("config executable flag does not match status")
+    if not expected_executable:
+        reason = loaded.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("non-executable config must declare a reason")
+
+    model = _mapping(loaded.get("model"), "model")
+    runtime = _mapping(loaded.get("runtime"), "runtime")
+    token_counter = _mapping(runtime.get("token_counter"), "runtime.token_counter")
+    evaluation = _mapping(loaded.get("evaluation"), "evaluation")
+
+    expected_model = {
+        "provider": "google",
+        "name": FROZEN_MODEL,
+        "temperature": 0,
+        "max_output_tokens": 4096,
+        "thinking_level": "LOW",
+        "system_prompt_file": FROZEN_SYSTEM_PROMPT_FILE,
+        "tool_definitions_file": FROZEN_TOOL_DEFINITIONS_FILE,
+        "max_retries": 2,
+        "retry_base_seconds": 0.5,
+        "timeout_ms": 60000,
+    }
+    for key, expected in expected_model.items():
+        if model.get(key) != expected:
+            raise ValueError(f"config model.{key} must be frozen to {expected!r}")
+    if model["provider"] != "google":
+        raise ValueError("config model.provider must be google")
+    if model["thinking_level"] not in {"LOW", "MEDIUM", "HIGH"}:
+        raise ValueError("config model.thinking_level must be LOW, MEDIUM, or HIGH")
+
+    expected_runtime = {
+        "candidate_top_k": 20,
+        "max_steps": 8,
+        "utility_weights": [0.6, 0.3, 0.1],
+        "embedder": FROZEN_EMBEDDER,
+    }
+    for key, expected in expected_runtime.items():
+        if runtime.get(key) != expected:
+            raise ValueError(f"config runtime.{key} must be frozen to {expected!r}")
+    expected_counter = {
+        "provider": "google",
+        "model": FROZEN_MODEL,
+        "cache_size": 4096,
+        "persistent_cache_path": ".cache/gemini_token_cache.sqlite3",
+        "max_retries": 3,
+        "retry_base_seconds": 0.5,
+    }
+    for key, expected in expected_counter.items():
+        if token_counter.get(key) != expected:
+            raise ValueError(
+                f"config runtime.token_counter.{key} must be frozen to {expected!r}"
+            )
+    if model["name"] != token_counter["model"]:
+        raise ValueError("config model and token counter models must match")
+    if type(evaluation.get("retrieval_k")) is not int or evaluation["retrieval_k"] < 1:
+        raise ValueError("config evaluation.retrieval_k must be a positive integer")
+    if expected_executable:
+        _config_strategy_plan(loaded.get("strategies"))
+    for prompt_path, expected_hash in FROZEN_PROMPT_SHA256.items():
+        path = Path(prompt_path)
+        if not path.is_file():
+            raise ValueError(f"frozen prompt file does not exist: {prompt_path}")
+        actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual_hash != expected_hash:
+            raise ValueError(
+                f"frozen prompt changed: {prompt_path}; bump freeze.version before execution"
+            )
+    return loaded
+
+
+def _require_executable_config(config: Mapping[str, Any]) -> None:
+    status = config.get("status")
+    if status != EXECUTABLE_STATUS or config.get("executable") is not True:
+        reason = config.get("reason", "no execution reason declared")
+        raise ValueError(f"config status {status!r} is not executable: {reason}")
+
+
+def _config_strategy_plan(labels: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Map serialized ablation labels onto the runner's base strategy API."""
+    if not isinstance(labels, list) or not labels or any(
+        not isinstance(label, str) or not label for label in labels
+    ):
+        raise ValueError("config strategies must be a non-empty list of strings")
+    if len(set(labels)) != len(labels):
+        raise ValueError("config strategies must be unique")
+
+    strategies: list[str] = []
+    ablations: list[str] = []
+    for label in labels:
+        if label in STRATEGIES:
+            if label not in strategies:
+                strategies.append(label)
+            if label == "proposed" and "full" not in ablations:
+                ablations.append("full")
+            continue
+        prefix = "proposed/"
+        if label.startswith(prefix):
+            ablation = label[len(prefix):]
+            if ablation not in ABLATION_PRESETS:
+                raise ValueError(f"unsupported config strategy: {label}")
+            if "proposed" not in strategies:
+                strategies.append("proposed")
+            if ablation not in ablations:
+                ablations.append(ablation)
+            continue
+        raise ValueError(f"unsupported config strategy: {label}")
+    return tuple(strategies), tuple(ablations or ["full"])
+
+
+def _resolved_value(
+    key: str,
+    cli_value: Any,
+    configured_value: Any,
+    fallback: Any,
+    *,
+    has_config: bool,
+    overrides: dict[str, Any],
+) -> Any:
+    if cli_value is not None:
+        if has_config:
+            overrides[key] = {
+                "configured": _json_record(configured_value),
+                "effective": _json_record(cli_value),
+            }
+        return cli_value
+    return configured_value if has_config else fallback
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenarios", default="benchmark/scenarios.json")
     parser.add_argument("--scenario-ids", nargs="+")
-    parser.add_argument("--strategies", nargs="+", choices=STRATEGIES, default=STRATEGIES)
-    factory_group = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument("--strategies", nargs="+", choices=STRATEGIES)
+    factory_group = parser.add_mutually_exclusive_group()
     factory_group.add_argument("--agent-factory", help="module:function returning a fresh Agent instance")
     factory_group.add_argument(
         "--environment-agent-factory",
@@ -548,24 +748,178 @@ def main() -> None:
         "--gemini-token-model", "--gemini-model",
         help=f"Use Gemini CountTokens API with this model. Project target: {TARGET_GEMINI_MODEL}",
     )
-    parser.add_argument("--gemini-token-cache-size", type=int, default=4096)
-    parser.add_argument("--config", help="Experiment config JSON. Its model block is shared by every strategy.")
+    parser.add_argument("--gemini-token-cache-size", type=int)
+    parser.add_argument("--config", help="Canonical versioned experiment parameter freeze JSON")
     parser.add_argument("--llm-model", help="Override the shared model name and enable the LLM planner.")
     parser.add_argument("--temperature", type=float, help="Override the shared temperature. Every strategy uses this value.")
-    parser.add_argument("--system-prompt-file", required=True)
-    parser.add_argument("--tool-definitions-file", required=True)
-    parser.add_argument("--output", default="experiments/results/baselines")
-    parser.add_argument("--top-k", type=int, default=20)
-    parser.add_argument("--repeats", type=int, default=1)
-    parser.add_argument("--max-steps", type=int, default=8)
-    parser.add_argument("--utility-weights", type=float, nargs=3, default=(0.6, 0.3, 0.1))
-    parser.add_argument("--bootstrap-iterations", type=int, default=2000)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--gemini-token-cache", default=(".cache/gemini_token_cache.sqlite3"))
-    parser.add_argument("--gemini-token-retries", type=int, default=3)
-    parser.add_argument("--gemini-token-retry-base-seconds", type=float, default=0.5)
-    parser.add_argument("--proposed-ablations", nargs="+", choices=tuple(ABLATION_PRESETS.keys()), default=["full"])
+    parser.add_argument("--max-output-tokens", type=int)
+    parser.add_argument("--thinking-level", choices=("LOW", "MEDIUM", "HIGH"))
+    parser.add_argument("--llm-max-retries", type=int)
+    parser.add_argument("--llm-retry-base-seconds", type=float)
+    parser.add_argument("--llm-timeout-ms", type=int)
+    parser.add_argument("--system-prompt-file")
+    parser.add_argument("--tool-definitions-file")
+    parser.add_argument("--output")
+    parser.add_argument("--top-k", type=int, help="Candidate retrieval K")
+    parser.add_argument("--metric-k", type=int, help="Evaluation Recall@K/MRR@K cutoff")
+    parser.add_argument("--repeats", type=int)
+    parser.add_argument("--max-steps", type=int)
+    parser.add_argument("--utility-weights", type=float, nargs=3)
+    parser.add_argument("--bootstrap-iterations", type=int)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--gemini-token-cache")
+    parser.add_argument("--gemini-token-retries", type=int)
+    parser.add_argument("--gemini-token-retry-base-seconds", type=float)
+    parser.add_argument("--proposed-ablations", nargs="+", choices=tuple(ABLATION_PRESETS.keys()))
     args = parser.parse_args()
+
+    config: dict[str, Any] | None = None
+    if args.config:
+        try:
+            config = _load_runner_config(args.config)
+            _require_executable_config(config)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            parser.error(str(exc))
+
+    if not args.agent_factory and not args.environment_agent_factory:
+        parser.error("one of --agent-factory or --environment-agent-factory is required")
+
+    has_config = config is not None
+    model_config = _mapping(config["model"], "model") if config else {}
+    runtime_config = _mapping(config["runtime"], "runtime") if config else {}
+    token_config = (_mapping(runtime_config["token_counter"], "runtime.token_counter")
+                    if config else {})
+    evaluation_config = _mapping(config["evaluation"], "evaluation") if config else {}
+    overrides: dict[str, Any] = {}
+
+    if config:
+        configured_strategies, configured_ablations = _config_strategy_plan(config["strategies"])
+    else:
+        configured_strategies, configured_ablations = STRATEGIES, ("full",)
+    strategies = tuple(_resolved_value(
+        "strategies", args.strategies, configured_strategies, STRATEGIES,
+        has_config=has_config, overrides=overrides,
+    ))
+    proposed_ablations = tuple(_resolved_value(
+        "proposed_ablations", args.proposed_ablations, configured_ablations, ("full",),
+        has_config=has_config, overrides=overrides,
+    ))
+    output_directory = _resolved_value(
+        "output_directory", args.output, config.get("output_directory") if config else None,
+        "experiments/results/baselines", has_config=has_config, overrides=overrides,
+    )
+    top_k = _resolved_value(
+        "candidate_top_k", args.top_k, runtime_config.get("candidate_top_k"), 20,
+        has_config=has_config, overrides=overrides,
+    )
+    metric_k = _resolved_value(
+        "metric_k", args.metric_k, evaluation_config.get("retrieval_k"), top_k,
+        has_config=has_config, overrides=overrides,
+    )
+    repeats = _resolved_value(
+        "repeats", args.repeats, config.get("repeats") if config else None, 1,
+        has_config=has_config, overrides=overrides,
+    )
+    max_steps = _resolved_value(
+        "max_steps", args.max_steps, runtime_config.get("max_steps"), 8,
+        has_config=has_config, overrides=overrides,
+    )
+    utility_weights = tuple(_resolved_value(
+        "utility_weights", args.utility_weights, runtime_config.get("utility_weights"),
+        (0.6, 0.3, 0.1), has_config=has_config, overrides=overrides,
+    ))
+    bootstrap_iterations = _resolved_value(
+        "bootstrap_iterations", args.bootstrap_iterations,
+        evaluation_config.get("bootstrap_iterations"), 2000,
+        has_config=has_config, overrides=overrides,
+    )
+    seed = _resolved_value(
+        "bootstrap_seed", args.seed, evaluation_config.get("bootstrap_seed"), 42,
+        has_config=has_config, overrides=overrides,
+    )
+    system_prompt_file = _resolved_value(
+        "system_prompt_file", args.system_prompt_file, model_config.get("system_prompt_file"),
+        None, has_config=has_config, overrides=overrides,
+    )
+    tool_definitions_file = _resolved_value(
+        "tool_definitions_file", args.tool_definitions_file,
+        model_config.get("tool_definitions_file"), None,
+        has_config=has_config, overrides=overrides,
+    )
+    embedder_spec = _resolved_value(
+        "embedder", args.embedder, runtime_config.get("embedder"), None,
+        has_config=has_config, overrides=overrides,
+    )
+    if not system_prompt_file or not tool_definitions_file:
+        parser.error(
+            "--system-prompt-file and --tool-definitions-file are required without config declarations"
+        )
+
+    model_name = _resolved_value(
+        "model.name", args.llm_model, model_config.get("name"), None,
+        has_config=has_config, overrides=overrides,
+    )
+    temperature = _resolved_value(
+        "model.temperature", args.temperature, model_config.get("temperature"), 0,
+        has_config=has_config, overrides=overrides,
+    )
+    max_output_tokens = _resolved_value(
+        "model.max_output_tokens", args.max_output_tokens,
+        model_config.get("max_output_tokens"), 1024,
+        has_config=has_config, overrides=overrides,
+    )
+    thinking_level = _resolved_value(
+        "model.thinking_level", args.thinking_level, model_config.get("thinking_level"), "LOW",
+        has_config=has_config, overrides=overrides,
+    )
+    llm_max_retries = _resolved_value(
+        "model.max_retries", args.llm_max_retries, model_config.get("max_retries"), 2,
+        has_config=has_config, overrides=overrides,
+    )
+    llm_retry_base_seconds = _resolved_value(
+        "model.retry_base_seconds", args.llm_retry_base_seconds,
+        model_config.get("retry_base_seconds"), 0.5,
+        has_config=has_config, overrides=overrides,
+    )
+    llm_timeout_ms = _resolved_value(
+        "model.timeout_ms", args.llm_timeout_ms, model_config.get("timeout_ms"), 60000,
+        has_config=has_config, overrides=overrides,
+    )
+
+    token_model = _resolved_value(
+        "token_counter.model", args.gemini_token_model, token_config.get("model"), None,
+        has_config=has_config, overrides=overrides,
+    )
+    token_cache_size = _resolved_value(
+        "token_counter.cache_size", args.gemini_token_cache_size,
+        token_config.get("cache_size"), 4096,
+        has_config=has_config, overrides=overrides,
+    )
+    token_cache_path = _resolved_value(
+        "token_counter.persistent_cache_path", args.gemini_token_cache,
+        token_config.get("persistent_cache_path"), ".cache/gemini_token_cache.sqlite3",
+        has_config=has_config, overrides=overrides,
+    )
+    token_retries = _resolved_value(
+        "token_counter.max_retries", args.gemini_token_retries,
+        token_config.get("max_retries"), 3,
+        has_config=has_config, overrides=overrides,
+    )
+    token_retry_base_seconds = _resolved_value(
+        "token_counter.retry_base_seconds", args.gemini_token_retry_base_seconds,
+        token_config.get("retry_base_seconds"), 0.5,
+        has_config=has_config, overrides=overrides,
+    )
+    if args.token_counter and config:
+        overrides["token_counter"] = {
+            "configured": _json_record(token_config),
+            "effective": args.token_counter,
+        }
+
+    effective_token_model = token_model or TARGET_GEMINI_MODEL
+    if model_name and not args.token_counter and str(model_name) != effective_token_model:
+        parser.error("LLM model and Gemini token counter model must match")
+
     payload = json.loads(Path(args.scenarios).read_text(encoding="utf-8"))
     scenarios = payload["scenarios"] if isinstance(payload, dict) else payload
     if args.scenario_ids:
@@ -579,56 +933,51 @@ def main() -> None:
                or scenario.get("validation_scope", "integration") != "integration"
                for scenario in scenarios):
             parser.error("requested IDs must be enabled integration scenarios")
-    if args.gemini_token_model or not args.token_counter:
-        token_counter = GeminiTokenCounter(
-            model=args.gemini_token_model,
-            cache_size=args.gemini_token_cache_size,
-            persistent_cache_path=args.gemini_token_cache,
-            max_retries=args.gemini_token_retries,
-            retry_base_seconds=args.gemini_token_retry_base_seconds,
-        )
-    elif args.token_counter:
+    if args.token_counter:
         token_counter = _import_callable(args.token_counter)
     else:
-        token_counter = provisional_token_count
-    system_prompt = Path(args.system_prompt_file).read_text(encoding="utf-8")
-    config_model: dict[str, Any] = {}
-    if args.config:
-        loaded = json.loads(Path(args.config).read_text(encoding="utf-8"))
-        raw_model = loaded.get("model") or {}
-        if not isinstance(raw_model, dict):
-            parser.error("config model must be an object")
-        config_model = raw_model
-        prompt_file = config_model.get("system_prompt_file")
-        if isinstance(prompt_file, str) and prompt_file:
-            declared = Path(prompt_file).read_text(encoding="utf-8")
-            if declared != system_prompt:
-                parser.error("system prompt file does not match config model.system_prompt_file")
-    model_name = args.llm_model or config_model.get("name")
-    temperature = config_model.get("temperature", 0) if args.temperature is None else args.temperature
-    max_output_tokens = config_model.get("max_output_tokens", 1024)
+        token_counter = GeminiTokenCounter(
+            model=token_model,
+            cache_size=token_cache_size,
+            persistent_cache_path=token_cache_path,
+            max_retries=token_retries,
+            retry_base_seconds=token_retry_base_seconds,
+        )
+    system_prompt = Path(system_prompt_file).read_text(encoding="utf-8")
     llm_config = None
     if model_name:
         llm_config = LLMRunConfig(
             model=str(model_name),
             temperature=0 if temperature is None else temperature,
-            system_instruction=shared_system_instruction(system_prompt),
+            system_instruction=SYSTEM_INSTRUCTION,
             max_output_tokens=max_output_tokens,
+            thinking_level=thinking_level,
+            max_retries=llm_max_retries,
+            retry_base_seconds=llm_retry_base_seconds,
+            timeout_ms=llm_timeout_ms,
         )
+    config_metadata = None if config is None else {
+        "path": str(Path(args.config)),
+        "freeze": config["freeze"],
+        "scope": config["scope"],
+        "status": config["status"],
+    }
     result = run_scenarios(
         scenarios,
         agent_factory=_import_callable(args.agent_factory) if args.agent_factory else None,
         environment_agent_factory=(_import_callable(args.environment_agent_factory)
                                    if args.environment_agent_factory else None),
         system_prompt=system_prompt,
-        tool_definitions=Path(args.tool_definitions_file).read_text(encoding="utf-8"),
-        output_directory=args.output, strategies=args.strategies,
-        embedder=_import_callable(args.embedder) if args.embedder else None,
+        tool_definitions=Path(tool_definitions_file).read_text(encoding="utf-8"),
+        output_directory=output_directory, strategies=strategies,
+        embedder=_import_callable(embedder_spec) if embedder_spec else None,
         token_counter=token_counter,
-        top_k=args.top_k, repeats=args.repeats, utility_weights=tuple(args.utility_weights),
-        bootstrap_iterations=args.bootstrap_iterations, seed=args.seed, max_steps=args.max_steps,
-        proposed_ablations=args.proposed_ablations,
+        top_k=top_k, metric_k=metric_k, repeats=repeats, utility_weights=utility_weights,
+        bootstrap_iterations=bootstrap_iterations, seed=seed, max_steps=max_steps,
+        proposed_ablations=proposed_ablations,
         llm_config=llm_config,
+        config_metadata=config_metadata,
+        cli_overrides=overrides,
     )
     if isinstance(token_counter, GeminiTokenCounter):
         result["tokenizer"] = {

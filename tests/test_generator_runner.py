@@ -110,6 +110,18 @@ class GeneratorRunnerTests(unittest.TestCase):
         self.assertTrue(rows[0]["evaluation"]["task_success"])
         self.assertTrue(rows[0]["run_result"]["tool_results"][0]["output"]["found"])
 
+    def test_candidate_and_metric_k_are_independent(self):
+        scenario = self.scenario()
+        rows = self.run_rows(
+            [scenario], environment_agent_factory=environment_agent,
+            top_k=20, metric_k=5,
+        )
+        row = rows[0]
+        self.assertEqual(row["run_result"]["strategy_options"]["top_k"], 20)
+        self.assertEqual(row["run_result"]["strategy_options"]["candidate_top_k"], 20)
+        self.assertEqual(row["run_result"]["strategy_options"]["metric_k"], 5)
+        self.assertEqual(row["evaluation"]["retrieval_k"], 5)
+
     def test_exactly_one_factory_is_required(self):
         for factories in ({}, {"agent_factory": Agent,
                                 "environment_agent_factory": environment_agent}):

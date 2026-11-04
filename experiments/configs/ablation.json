@@ -1,7 +1,36 @@
 {
+  "freeze": {"version": "1.0", "kind": "architecture_parameter_freeze"},
+  "scope": "ablation",
+  "status": "executable",
+  "executable": true,
   "name": "ablation",
   "description": "Optional supporting ablation for RQ1/RQ2 using the proposed selector ablation presets.",
-  "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
+  "model": {
+    "provider": "google",
+    "name": "gemini-3.1-flash-lite",
+    "temperature": 0,
+    "max_output_tokens": 4096,
+    "thinking_level": "LOW",
+    "system_prompt_file": "experiments/prompts/system_v1.txt",
+    "tool_definitions_file": "experiments/prompts/tools_v1.txt",
+    "max_retries": 2,
+    "retry_base_seconds": 0.5,
+    "timeout_ms": 60000
+  },
+  "runtime": {
+    "candidate_top_k": 20,
+    "max_steps": 8,
+    "utility_weights": [0.6, 0.3, 0.1],
+    "embedder": "benchmark.experiment_runtime:multilingual_embedder",
+    "token_counter": {
+      "provider": "google",
+      "model": "gemini-3.1-flash-lite",
+      "cache_size": 4096,
+      "persistent_cache_path": ".cache/gemini_token_cache.sqlite3",
+      "max_retries": 3,
+      "retry_base_seconds": 0.5
+    }
+  },
   "dataset": {"source": "synthetic", "samples_per_cell": 20, "task_types": ["temporal_update", "approval"]},
   "strategies": ["proposed", "proposed/no_constraint_preservation", "proposed/no_temporal", "proposed/no_state_mandatory", "proposed/no_budget_aware_packing"],
   "strategy_options": {

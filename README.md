@@ -240,5 +240,6 @@ python -m unittest discover -s tests -v
 
 ## 관련 문서
 
+- [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/Constraint-Preserving%20Budget-Aware%20Memory.docx)
 - [연구 질문 및 평가 방향](docs/research_questions.md)
