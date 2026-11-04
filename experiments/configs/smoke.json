@@ -1,7 +1,7 @@
 {
   "name": "smoke",
   "description": "Small integration grid. Model must be selected before live execution.",
-  "model": {"provider": null, "name": null, "temperature": 0, "max_output_tokens": 512},
+  "model": {"provider": "google", "name": "gemini-3.1-flash-lite", "temperature": 0, "max_output_tokens": 4096, "system_prompt_file": "experiments/prompts/system_v1.txt"},
   "dataset": {"source": "synthetic", "samples_per_cell": 5, "task_types": ["temporal_update", "approval"]},
   "strategies": ["proposed", "sliding_window", "vector_top_k", "utility_per_token"],
   "seeds": [42],
