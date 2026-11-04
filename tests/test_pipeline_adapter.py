@@ -5,6 +5,8 @@
 """
 
 import copy
+from contextlib import redirect_stderr, redirect_stdout
+import io
 from datetime import datetime, timedelta, timezone
 from dataclasses import asdict, fields, replace
 import json
@@ -666,6 +668,49 @@ class PipelineAdapterTests(unittest.TestCase):
         self.assertFalse(row["evaluation"]["task_success"])
         
         
+    def test_progress_counts_ablation_repeats_and_keeps_stdout_clean(self):
+        stderr, stdout = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as output, redirect_stderr(stderr), redirect_stdout(stdout):
+            result = self.run_runner(
+                output, strategies=STRATEGIES, embedder=embed, repeats=2,
+                proposed_ablations=tuple(ABLATION_PRESETS), show_progress=True,
+            )
+        self.assertEqual(result["n_runs"], 16)
+        self.assertEqual(stdout.getvalue(), "")
+        lines = stderr.getvalue().splitlines()
+        self.assertIn("0/16 (0.0%)", lines[0])
+        self.assertIn("16/16 (100.0%)", lines[-1])
+        self.assertIn("saved", lines[-1])
+        self.assertIn("proposed/no_temporal", stderr.getvalue())
+        self.assertIn("repeat 2/2", stderr.getvalue())
+        self.assertIn("ETA~", stderr.getvalue())
+        silent = io.StringIO()
+        with tempfile.TemporaryDirectory() as output, redirect_stderr(silent):
+            self.run_runner(output, show_progress=False)
+        self.assertEqual(silent.getvalue(), "")
+
+    def test_progress_failure_preserves_completed_count_and_existing_results(self):
+        calls = 0
+
+        def fail_second(*args, **options):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("failed execution")
+            return _run_one(*args, **options)
+
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as output:
+            prior = Path(output) / "runs.jsonl"
+            prior.write_text("previous result", encoding="utf-8")
+            with patch("benchmark.runner._run_one", side_effect=fail_second), redirect_stderr(stderr):
+                with self.assertRaisesRegex(RuntimeError, "failed execution"):
+                    self.run_runner(output, strategies=STRATEGIES, embedder=embed, show_progress=True)
+            self.assertEqual(prior.read_text(encoding="utf-8"), "previous result")
+        self.assertIn("1/4 (25.0%)", stderr.getvalue().splitlines()[-1])
+        self.assertIn("interrupted", stderr.getvalue().splitlines()[-1])
+        self.assertNotIn("100.0%", stderr.getvalue())
+
     def test_runner_rejects_tokenizer_mode_mismatch(self):
         scenario = copy.deepcopy(
             self.scenario

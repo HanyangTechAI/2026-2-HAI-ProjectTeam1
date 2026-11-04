@@ -12,10 +12,11 @@ import hashlib
 from contextlib import nullcontext
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 import importlib
 import json
+import sys
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -97,6 +98,20 @@ def _json_record(value: Any) -> Any:
     if isinstance(value, (tuple, list)):
         return [_json_record(item) for item in value]
     return value
+
+
+def _report_progress(completed: int, total: int, started: float, message: str) -> None:
+    """진행 표시는 stderr로 보내 결과 JSON stdout과 분리한다."""
+    elapsed = max(0.0, perf_counter() - started)
+    eta = (str(timedelta(seconds=int(elapsed * (total - completed) / completed)))
+           if completed else "--:--:--")
+    filled = 20 * completed // total
+    bar = "#" * filled + "-" * (20 - filled)
+    line = (f"[{bar}] {completed}/{total} ({100 * completed / total:.1f}%) "
+            f"elapsed={timedelta(seconds=int(elapsed))} ETA~{eta} | {message}")
+    terminal = sys.stderr.isatty()
+    print(("\r" if terminal else "") + line + ("\033[K" if terminal else ""),
+          file=sys.stderr, end="" if terminal else "\n", flush=True)
 
 
 def _mandatory_memory_overflow(outcome: PipelineRunResult) -> bool | None:
@@ -315,6 +330,7 @@ def run_scenarios(
     llm_config: LLMRunConfig | None = None,
     config_metadata: Mapping[str, Any] | None = None,
     cli_overrides: Mapping[str, Any] | None = None,
+    show_progress: bool = False,
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
@@ -329,6 +345,8 @@ def run_scenarios(
     다단계 선택·Context 조립·
     행동 실행은 Orchestrator에 맡기고 단계별 기록과 누적 입력량을 결과에 보존한다.
     """
+    if type(show_progress) is not bool:
+        raise TypeError("show_progress must be a boolean")
     if type(max_steps) is not int or max_steps < 1:
         raise ValueError("max_steps must be a positive integer")
     if goal_checker is not None and not callable(goal_checker):
@@ -428,7 +446,11 @@ def run_scenarios(
         )
     
     rows = []
-    
+    total_runs = len(enabled) * repeats * sum(
+        len(proposed_ablations) if strategy == "proposed" else 1 for strategy in strategies
+    )
+    progress_started = perf_counter()
+
     for scenario in enabled:
         for strategy in strategies:
             if strategy == "proposed":
@@ -441,32 +463,47 @@ def run_scenarios(
                 
             for ablation in variants:
                 for repeat_id in range(repeats):
-                    # 영속 캐시도 실행 간 공유하지 않는다. 원본 DB는 보존한다.
-                    cache_scope = (token_counter.isolated_cache()
-                                   if isinstance(token_counter, GeminiTokenCounter) else nullcontext())
-                    with cache_scope:
-                        rows.append(
-                            _run_one(
-                                scenario,
-                                strategy,
-                                repeat_id,
-                                agent_factory=agent_factory,
-                                environment_agent_factory=environment_agent_factory,
-                                embedder=embedder,
-                                system_prompt=system_prompt,
-                                tool_definitions=tool_definitions,
-                                token_count_mode=mode,
-                                token_counter=token_counter,
-                                top_k=top_k,
-                                metric_k=metric_k,
-                                utility_weights=utility_weights,
-                                max_steps=max_steps,
-                                goal_checker=goal_checker,
-                                proposed_ablation=ablation,
-                                llm_config=llm_config,
+                    label = strategy if ablation is None or ablation.name == "full" else f"proposed/{ablation.name}"
+                    current = f"{scenario.get('scenario_id', scenario.get('sample_id'))} | {label} | repeat {repeat_id + 1}/{repeats}"
+                    if show_progress:
+                        _report_progress(len(rows), total_runs, progress_started, "running " + current)
+                    try:
+                        # 영속 캐시도 실행 간 공유하지 않는다. 원본 DB는 보존한다.
+                        cache_scope = (token_counter.isolated_cache()
+                                       if isinstance(token_counter, GeminiTokenCounter) else nullcontext())
+                        with cache_scope:
+                            rows.append(
+                                _run_one(
+                                    scenario,
+                                    strategy,
+                                    repeat_id,
+                                    agent_factory=agent_factory,
+                                    environment_agent_factory=environment_agent_factory,
+                                    embedder=embedder,
+                                    system_prompt=system_prompt,
+                                    tool_definitions=tool_definitions,
+                                    token_count_mode=mode,
+                                    token_counter=token_counter,
+                                    top_k=top_k,
+                                    metric_k=metric_k,
+                                    utility_weights=utility_weights,
+                                    max_steps=max_steps,
+                                    goal_checker=goal_checker,
+                                    proposed_ablation=ablation,
+                                    llm_config=llm_config,
+                                )
                             )
-                        )
+                    except (Exception, KeyboardInterrupt):
+                        if show_progress:
+                            _report_progress(len(rows), total_runs, progress_started, "interrupted " + current)
+                            if sys.stderr.isatty():
+                                print(file=sys.stderr, flush=True)
+                        raise
+                    if show_progress:
+                        _report_progress(len(rows), total_runs, progress_started, "finished " + current)
     
+    if show_progress:
+        _report_progress(len(rows), total_runs, progress_started, "aggregating and saving")
     summary = aggregate_results(
         [row["evaluation"] for row in rows],
         bootstrap_iterations=bootstrap_iterations, seed=seed,
@@ -524,6 +561,10 @@ def run_scenarios(
         encoding="utf-8",
     )
     
+    if show_progress:
+        _report_progress(len(rows), total_runs, progress_started, f"saved {output}")
+        if sys.stderr.isatty():
+            print(file=sys.stderr, flush=True)
     return dict(
         n_runs=len(rows), 
         n_scenarios=len(enabled), 
@@ -734,6 +775,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenarios", default="benchmark/scenarios.json")
     parser.add_argument("--scenario-ids", nargs="+")
+    parser.add_argument("--no-progress", action="store_true", help="Disable progress on stderr")
     parser.add_argument("--strategies", nargs="+", choices=STRATEGIES)
     factory_group = parser.add_mutually_exclusive_group()
     factory_group.add_argument("--agent-factory", help="module:function returning a fresh Agent instance")
@@ -978,6 +1020,7 @@ def main() -> None:
         llm_config=llm_config,
         config_metadata=config_metadata,
         cli_overrides=overrides,
+        show_progress=not args.no_progress,
     )
     if isinstance(token_counter, GeminiTokenCounter):
         result["tokenizer"] = {
