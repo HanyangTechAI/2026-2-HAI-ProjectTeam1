@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import fcntl
+import os
 from contextlib import nullcontext
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass, replace
@@ -100,11 +102,11 @@ def _json_record(value: Any) -> Any:
     return value
 
 
-def _report_progress(completed: int, total: int, started: float, message: str) -> None:
+def _report_progress(completed: int, total: int, started: float, message: str, *, initial_completed: int = 0) -> None:
     """진행 표시는 stderr로 보내 결과 JSON stdout과 분리한다."""
     elapsed = max(0.0, perf_counter() - started)
-    eta = (str(timedelta(seconds=int(elapsed * (total - completed) / completed)))
-           if completed else "--:--:--")
+    eta = (str(timedelta(seconds=int(elapsed * (total - completed) / (completed - initial_completed))))
+           if completed > initial_completed else "--:--:--")
     filled = 20 * completed // total
     bar = "#" * filled + "-" * (20 - filled)
     line = (f"[{bar}] {completed}/{total} ({100 * completed / total:.1f}%) "
@@ -112,6 +114,174 @@ def _report_progress(completed: int, total: int, started: float, message: str) -
     terminal = sys.stderr.isatty()
     print(("\r" if terminal else "") + line + ("\033[K" if terminal else ""),
           file=sys.stderr, end="" if terminal else "\n", flush=True)
+
+
+
+def _atomic_json(path: Path, value: Any) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2, allow_nan=False)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    temporary.replace(path)
+
+
+def _read_saved_rows(path: Path) -> tuple[list[dict], int]:
+    """Only newline-terminated records are committed; a torn last write is ignored."""
+    rows = []
+    committed_bytes = 0
+    if path.exists():
+        with path.open("rb") as stream:
+            for line in stream:
+                if not line.endswith(b"\n"):
+                    break
+                rows.append(json.loads(line))  # Corrupt committed records must fail loudly.
+                committed_bytes += len(line)
+    return rows, committed_bytes
+
+
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, int]:
+    evaluation = row["evaluation"]
+    return evaluation["sample_id"], row["strategy"], row["repeat_id"]
+
+
+def _partial_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    groups = {}
+    for row in rows:
+        evaluation = row["evaluation"]
+        group = groups.setdefault(row["strategy"], dict(completed=0, task_successes=0,
+                                                       constraint_violating_runs=0,
+                                                       constraint_evaluated=0,
+                                                       final_parse_fallbacks=0, failure_counts={}, metrics={}))
+        for failure in evaluation.get("failure_types", []):
+            group["failure_counts"][failure] = group["failure_counts"].get(failure, 0) + 1
+        for name in ("required_state_accuracy", "temporal_version_correct",
+                     "constraint_violation_rate", "input_tokens", "total_latency_ms"):
+            value = evaluation.get(name)
+            if isinstance(value, (int, float)):
+                metric = group["metrics"].setdefault(name, {"sum": 0, "n": 0})
+                metric["sum"] += value
+                metric["n"] += 1
+        group["completed"] += 1
+        group["task_successes"] += int(evaluation["task_success"])
+        violation = evaluation.get("constraint_violation_rate")
+        if violation is not None:
+            group["constraint_evaluated"] += 1
+            group["constraint_violating_runs"] += int(bool(violation))
+        group["final_parse_fallbacks"] += int(
+            row["run_result"].get("response") == "모델 응답을 행동으로 읽지 못했습니다.")
+    for group in groups.values():
+        for metric in group["metrics"].values():
+            metric["mean"] = metric.pop("sum") / metric["n"]
+        group["task_success_rate"] = group["task_successes"] / group["completed"]
+    return groups
+
+
+def checkpoint_status(directory: str | Path) -> dict[str, Any]:
+    """Read committed results without constructing a model, tokenizer or embedder."""
+    output = Path(directory)
+    progress = json.loads((output / "progress.json").read_text(encoding="utf-8"))
+    rows, _ = _read_saved_rows(output / "runs.jsonl")
+    with (output / ".runner.lock").open("r") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            active = False
+        except BlockingIOError:
+            active = True
+    if progress["state"] == "running" and not active:
+        progress["state"] = "interrupted"
+    progress.update(runner_active=active, completed=len(rows),
+                    percent=100 * len(rows) / progress["total"],
+                    last_result_at=datetime.fromtimestamp((output / "runs.jsonl").stat().st_mtime).astimezone().isoformat(),
+                    by_strategy=_partial_metrics(rows),
+                    provisional=progress["state"] != "completed",
+                    note="Completed samples only; runner_active checks the writer lock, not API responsiveness.")
+    return progress
+
+
+class _RunCheckpoint:
+    def __init__(self, output: Path, metadata: dict, identity: dict,
+                 expected: set[tuple], resume: bool, interval: int):
+        self.output, self.metadata = output, metadata
+        self.identity, self.expected = identity, expected
+        self.resume, self.interval = resume, interval
+        self.rows = []
+        self.current = None
+        self.state = "running"
+
+    def __enter__(self):
+        self.output.mkdir(parents=True, exist_ok=True)
+        self.lock = (self.output / ".runner.lock").open("a")
+        try:
+            try:
+                fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise ValueError("another runner is using this output directory") from None
+            metadata_path = self.output / "experiment.json"
+            runs_path = self.output / "runs.jsonl"
+            if self.resume:
+                saved = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if saved.get("resume_identity") != self.identity:
+                    raise ValueError("resume rejected: dataset, code or runtime settings changed")
+                self.rows, committed_bytes = _read_saved_rows(runs_path)
+                keys = [_row_key(row) for row in self.rows]
+                if len(set(keys)) != len(keys) or not set(keys) <= self.expected:
+                    raise ValueError("invalid or duplicate saved run keys")
+                runs_path.touch(exist_ok=True)
+                with runs_path.open("r+b") as stream:
+                    stream.truncate(committed_bytes)
+                # A previous final summary must not look current during resumed execution.
+                (self.output / "summary.json").unlink(missing_ok=True)
+            else:
+                if any((self.output / name).exists() for name in
+                       ("runs.jsonl", "experiment.json", "summary.json", "progress.json")):
+                    raise ValueError("output already contains results; use --resume or a new directory")
+                self.metadata["resume_identity"] = self.identity
+                _atomic_json(metadata_path, self.metadata)
+                runs_path.touch()
+            self.stream = runs_path.open("a", encoding="utf-8")
+            self.completed = {_row_key(row) for row in self.rows}
+            self.publish()
+            return self
+        except BaseException:
+            if hasattr(self, "stream"):
+                self.stream.close()
+            self.lock.close()
+            raise
+
+    def publish(self):
+        _atomic_json(self.output / "progress.json", dict(
+            state=self.state, completed=len(self.rows), total=len(self.expected),
+            updated_at=datetime.now().astimezone().isoformat(), current_at_checkpoint=self.current,
+            provisional=self.state != "completed", by_strategy=_partial_metrics(self.rows),
+            diagnostics_note="final_parse_fallbacks is a text-match diagnostic, not a typed planner error metric",
+        ))
+
+    def append(self, row):
+        record = json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n"
+        self.stream.write(record)
+        self.stream.flush()
+        os.fsync(self.stream.fileno())
+        self.rows.append(row)
+        self.completed.add(_row_key(row))
+        if len(self.rows) % self.interval == 0:
+            self.publish()
+
+    def __exit__(self, kind, error, traceback):
+        try:
+            if kind is not None:
+                self.state = "interrupted"
+            self.publish()
+        finally:
+            self.stream.close()
+            self.lock.close()
+
+
+def _callable_identity(function: Any) -> str | None:
+    if function is None:
+        return None
+    return f"{getattr(function, '__module__', type(function).__module__)}:{getattr(function, '__qualname__', type(function).__qualname__)}"
 
 
 def _mandatory_memory_overflow(outcome: PipelineRunResult) -> bool | None:
@@ -331,12 +501,14 @@ def run_scenarios(
     config_metadata: Mapping[str, Any] | None = None,
     cli_overrides: Mapping[str, Any] | None = None,
     show_progress: bool = False,
+    resume: bool = False,
+    checkpoint_interval: int = 100,
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
     오프라인 평가기 입력과 개별 평가를 runs.jsonl에 저장하고, 기존 평가기의
-    집계 목록을 summary.json에 저장한다. 모든 실행이 정상 종료된 뒤 같은 이름의
-    출력 파일을 덮어쓴다. 오류를 성공 결과로 바꾸지 않고 예외로 전달한다.
+    집계 목록을 summary.json에 저장한다. 개별 결과는 즉시 저장하며 resume으로
+    완료된 실행을 건너뛴다. 기존 출력은 명시적인 resume 없이 덮어쓰지 않는다. 오류를 성공 결과로 바꾸지 않고 예외로 전달한다.
     미지원 시나리오와 모듈 전용 시나리오는 TSR 표본에 포함하지 않는다.
     기본 공백 기준 TokenCounter는 임시 측정이며 실제 모델 토큰 사용량이 아니다.
     agent_factory 또는 environment_agent_factory 중 하나만 지정한다. 후자는
@@ -345,6 +517,15 @@ def run_scenarios(
     다단계 선택·Context 조립·
     행동 실행은 Orchestrator에 맡기고 단계별 기록과 누적 입력량을 결과에 보존한다.
     """
+    if type(resume) is not bool:
+        raise TypeError("resume must be a boolean")
+    if type(checkpoint_interval) is not int or checkpoint_interval < 1:
+        raise ValueError("checkpoint_interval must be a positive integer")
+    factory_identity = dict(agent=_callable_identity(agent_factory),
+                            environment=_callable_identity(environment_agent_factory),
+                            embedder=_callable_identity(embedder),
+                            token_counter=_callable_identity(token_counter),
+                            goal_checker=_callable_identity(goal_checker))
     if type(show_progress) is not bool:
         raise TypeError("show_progress must be a boolean")
     if type(max_steps) is not int or max_steps < 1:
@@ -445,78 +626,6 @@ def run_scenarios(
             "regenerate scenarios with the runtime model instead of relabeling metadata"
         )
 
-    rows = []
-    total_runs = len(enabled) * repeats * sum(
-        len(proposed_ablations) if strategy == "proposed" else 1 for strategy in strategies
-    )
-    progress_started = perf_counter()
-
-    for scenario in enabled:
-        for strategy in strategies:
-            if strategy == "proposed":
-                variants = tuple(
-                    get_ablation_config(name)
-                    for name in proposed_ablations
-                )
-            else:
-                variants = (None,)
-
-            for ablation in variants:
-                for repeat_id in range(repeats):
-                    label = strategy if ablation is None or ablation.name == "full" else f"proposed/{ablation.name}"
-                    current = f"{scenario.get('scenario_id', scenario.get('sample_id'))} | {label} | repeat {repeat_id + 1}/{repeats}"
-                    if show_progress:
-                        _report_progress(len(rows), total_runs, progress_started, "running " + current)
-                    try:
-                        # 영속 캐시도 실행 간 공유하지 않는다. 원본 DB는 보존한다.
-                        cache_scope = (token_counter.isolated_cache()
-                                       if isinstance(token_counter, GeminiTokenCounter) else nullcontext())
-                        with cache_scope:
-                            rows.append(
-                                _run_one(
-                                    scenario,
-                                    strategy,
-                                    repeat_id,
-                                    agent_factory=agent_factory,
-                                    environment_agent_factory=environment_agent_factory,
-                                    embedder=embedder,
-                                    system_prompt=system_prompt,
-                                    tool_definitions=tool_definitions,
-                                    token_count_mode=mode,
-                                    token_counter=token_counter,
-                                    top_k=top_k,
-                                    metric_k=metric_k,
-                                    utility_weights=utility_weights,
-                                    max_steps=max_steps,
-                                    goal_checker=goal_checker,
-                                    proposed_ablation=ablation,
-                                    llm_config=llm_config,
-                                )
-                            )
-                    except (Exception, KeyboardInterrupt):
-                        if show_progress:
-                            _report_progress(len(rows), total_runs, progress_started, "interrupted " + current)
-                            if sys.stderr.isatty():
-                                print(file=sys.stderr, flush=True)
-                        raise
-                    if show_progress:
-                        _report_progress(len(rows), total_runs, progress_started, "finished " + current)
-
-    if show_progress:
-        _report_progress(len(rows), total_runs, progress_started, "aggregating and saving")
-    summary = aggregate_results(
-        [row["evaluation"] for row in rows],
-        bootstrap_iterations=bootstrap_iterations, seed=seed,
-    )
-    # 기존 결과 파일을 덮어쓰기 전에 모든 결과의 직렬화를 완료한다.
-    runs_text = "".join(json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n"
-                        for row in rows)
-    summary_text = json.dumps(summary, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
-    output = Path(output_directory)
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "runs.jsonl").write_text(runs_text, encoding="utf-8")
-    (output / "summary.json").write_text(summary_text, encoding="utf-8")
-
     if isinstance(token_counter, GeminiTokenCounter):
         tokenizer_metadata = token_counter.metadata()
     else:
@@ -547,33 +656,120 @@ def run_scenarios(
         "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
     }
 
-    experiment_text = json.dumps(
-        experiment_metadata,
-        ensure_ascii=False,
-        indent=2,
-        allow_nan=False,
-    ) + "\n"
-
-    experiment_path = output / "experiment.json"
-
-    experiment_path.write_text(
-        experiment_text,
-        encoding="utf-8",
+    output = Path(output_directory)
+    identity_settings = dict(experiment_metadata, factories=factory_identity)
+    identity_settings["tokenizer"] = {key: value for key, value in tokenizer_metadata.items()
+                                      if key != "stats"}  # Preserve configuration, exclude counters.
+    identity_settings.pop("cli_overrides", None)
+    identity_settings.pop("config", None)
+    code_root = Path(__file__).resolve().parent.parent
+    code_hash = hashlib.sha256()
+    for package in ("agent", "benchmark", "context", "memory", "pipeline"):
+        for source in sorted((code_root / package).rglob("*.py")):
+            code_hash.update(str(source.relative_to(code_root)).encode())
+            code_hash.update(source.read_bytes())
+    identity = dict(
+        settings=hashlib.sha256(json.dumps(identity_settings, ensure_ascii=False, sort_keys=True,
+                                          allow_nan=False).encode()).hexdigest(),
+        scenarios=hashlib.sha256(json.dumps(_json_record(enabled), ensure_ascii=False,
+                                           sort_keys=True, allow_nan=False).encode()).hexdigest(),
+        code=code_hash.hexdigest(),
     )
+    expected = {(sid, strategy if strategy != "proposed" or ablation == "full"
+                 else f"proposed/{ablation}", repeat)
+                for sid in ids for strategy in strategies
+                for ablation in (proposed_ablations if strategy == "proposed" else (None,))
+                for repeat in range(repeats)}
+    with _RunCheckpoint(output, experiment_metadata, identity, expected,
+                        resume, checkpoint_interval) as checkpoint:
+        rows = checkpoint.rows
+        total_runs = len(enabled) * repeats * sum(
+            len(proposed_ablations) if strategy == "proposed" else 1 for strategy in strategies
+        )
+        initial_completed = len(rows)
+        progress_started = perf_counter()
 
-    if show_progress:
-        _report_progress(len(rows), total_runs, progress_started, f"saved {output}")
-        if sys.stderr.isatty():
-            print(file=sys.stderr, flush=True)
-    return dict(
-        n_runs=len(rows),
-        n_scenarios=len(enabled),
-        summary=summary,
-        runs_path=str(output / "runs.jsonl"),
-        summary_path=str(output / "summary.json"),
-        experiment_path=str(experiment_path),
-        tokenizer=tokenizer_metadata,
-    )
+        for scenario in enabled:
+            for strategy in strategies:
+                if strategy == "proposed":
+                    variants = tuple(
+                        get_ablation_config(name)
+                        for name in proposed_ablations
+                    )
+                else:
+                    variants = (None,)
+
+                for ablation in variants:
+                    for repeat_id in range(repeats):
+                        label = strategy if ablation is None or ablation.name == "full" else f"proposed/{ablation.name}"
+                        if (scenario.get("scenario_id", scenario.get("sample_id")), label, repeat_id) in checkpoint.completed:
+                            continue
+                        current = f"{scenario.get('scenario_id', scenario.get('sample_id'))} | {label} | repeat {repeat_id + 1}/{repeats}"
+                        checkpoint.current = current
+                        if show_progress:
+                            _report_progress(len(rows), total_runs, progress_started, "running " + current, initial_completed=initial_completed)
+                        try:
+                            # 영속 캐시도 실행 간 공유하지 않는다. 원본 DB는 보존한다.
+                            cache_scope = (token_counter.isolated_cache()
+                                           if isinstance(token_counter, GeminiTokenCounter) else nullcontext())
+                            with cache_scope:
+                                checkpoint.append(
+                                    _run_one(
+                                        scenario,
+                                        strategy,
+                                        repeat_id,
+                                        agent_factory=agent_factory,
+                                        environment_agent_factory=environment_agent_factory,
+                                        embedder=embedder,
+                                        system_prompt=system_prompt,
+                                        tool_definitions=tool_definitions,
+                                        token_count_mode=mode,
+                                        token_counter=token_counter,
+                                        top_k=top_k,
+                                        metric_k=metric_k,
+                                        utility_weights=utility_weights,
+                                        max_steps=max_steps,
+                                        goal_checker=goal_checker,
+                                        proposed_ablation=ablation,
+                                        llm_config=llm_config,
+                                    )
+                                )
+                        except (Exception, KeyboardInterrupt):
+                            if show_progress:
+                                _report_progress(len(rows), total_runs, progress_started, "interrupted " + current, initial_completed=initial_completed)
+                                if sys.stderr.isatty():
+                                    print(file=sys.stderr, flush=True)
+                            raise
+                        if show_progress:
+                            _report_progress(len(rows), total_runs, progress_started, "finished " + current, initial_completed=initial_completed)
+
+        if show_progress:
+            _report_progress(len(rows), total_runs, progress_started, "aggregating and saving", initial_completed=initial_completed)
+        summary = aggregate_results(
+            [row["evaluation"] for row in rows],
+            bootstrap_iterations=bootstrap_iterations, seed=seed,
+        )
+        _atomic_json(output / "summary.json", summary)
+        experiment_metadata["resume_identity"] = identity
+        if isinstance(token_counter, GeminiTokenCounter):
+            experiment_metadata["tokenizer"] = token_counter.metadata()
+        experiment_metadata["tokenizer_stats_scope"] = "current_invocation"
+        _atomic_json(output / "experiment.json", experiment_metadata)
+        checkpoint.state = "completed"
+        checkpoint.current = None
+        if show_progress:
+            _report_progress(len(rows), total_runs, progress_started, f"saved {output}", initial_completed=initial_completed)
+            if sys.stderr.isatty():
+                print(file=sys.stderr, flush=True)
+        return dict(
+            n_runs=len(rows),
+            n_scenarios=len(enabled),
+            summary=summary,
+            runs_path=str(output / "runs.jsonl"),
+            summary_path=str(output / "summary.json"),
+            experiment_path=str(output / "experiment.json"),
+            tokenizer=tokenizer_metadata,
+        )
 
 
 def _with_shared_planner(factory: Callable, config: LLMRunConfig) -> Callable:
@@ -775,6 +971,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenarios", default="benchmark/scenarios.json")
     parser.add_argument("--scenario-ids", nargs="+")
+    parser.add_argument("--resume", action="store_true", help="Resume matching saved runs")
+    parser.add_argument("--status", action="store_true", help="Read saved progress only; requires --output")
+    parser.add_argument("--checkpoint-interval", type=int, default=100, help="Refresh progress.json every N completed runs (results saved individually)")
     parser.add_argument("--no-progress", action="store_true", help="Disable progress on stderr")
     parser.add_argument("--strategies", nargs="+", choices=STRATEGIES)
     factory_group = parser.add_mutually_exclusive_group()
@@ -814,6 +1013,11 @@ def main() -> None:
     parser.add_argument("--gemini-token-retry-base-seconds", type=float)
     parser.add_argument("--proposed-ablations", nargs="+", choices=tuple(ABLATION_PRESETS.keys()))
     args = parser.parse_args()
+    if args.status:
+        if not args.output:
+            parser.error("--status requires --output")
+        print(json.dumps(checkpoint_status(args.output), ensure_ascii=False, indent=2))
+        return
 
     config: dict[str, Any] | None = None
     if args.config:
@@ -1021,6 +1225,7 @@ def main() -> None:
         config_metadata=config_metadata,
         cli_overrides=overrides,
         show_progress=not args.no_progress,
+        resume=args.resume, checkpoint_interval=args.checkpoint_interval,
     )
     if isinstance(token_counter, GeminiTokenCounter):
         result["tokenizer"] = {
