@@ -1,6 +1,6 @@
 """Machine-enforced architecture/parameter freeze behavior."""
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from types import SimpleNamespace
 import copy
 import io
@@ -14,6 +14,8 @@ from unittest.mock import patch
 from agent.agent import Agent
 from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
 from benchmark.runner import (
+    FROZEN_EMBEDDER,
+    FROZEN_EMBEDDING_MODEL,
     _config_strategy_plan,
     _load_runner_config,
     _require_executable_config,
@@ -48,6 +50,10 @@ class FreezeConfigTests(unittest.TestCase):
                 self.assertEqual(config["runtime"]["token_counter"]["model"],
                                  config["model"]["name"])
                 self.assertEqual(config["runtime"]["candidate_top_k"], 5)
+                self.assertEqual(config["runtime"]["embedder"], FROZEN_EMBEDDER)
+                self.assertEqual(
+                    config["runtime"]["embedding_model"], FROZEN_EMBEDDING_MODEL,
+                )
 
     def test_non_executable_scopes_are_rejected_before_execution(self):
         for name, status in (("pilot", "generation_only"), ("reference", "deferred")):
@@ -78,6 +84,20 @@ class FreezeConfigTests(unittest.TestCase):
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "model.provider"):
                 _load_runner_config(path)
+
+    def test_cli_cannot_override_frozen_embedder(self):
+        arguments = [
+            "runner", "--config", str(CONFIGS / "main.json"),
+            "--agent-factory", "agent.agent:Agent",
+            "--embedder", "custom.module:embed",
+        ]
+        stderr = io.StringIO()
+        with patch.object(sys, "argv", arguments), redirect_stderr(stderr), self.assertRaises(
+            SystemExit,
+        ) as raised:
+            main()
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("cannot override the frozen experiment embedder", stderr.getvalue())
 
     def test_programmatic_llm_and_gemini_counter_models_must_match(self):
         counter = GeminiTokenCounter(model="different-model", client=object())
@@ -160,6 +180,10 @@ class FreezeConfigTests(unittest.TestCase):
         self.assertEqual(captured["seed"], 42)
         self.assertEqual(captured["output_directory"], str(output))
         self.assertEqual(captured["config_metadata"]["status"], "executable")
+        self.assertEqual(captured["config_metadata"]["embedder"], {
+            "callable": FROZEN_EMBEDDER,
+            "model": FROZEN_EMBEDDING_MODEL,
+        })
         self.assertEqual(captured["cli_overrides"]["candidate_top_k"]["effective"], 7)
         self.assertEqual(captured["cli_overrides"]["metric_k"]["effective"], 3)
         self.assertEqual(captured["cli_overrides"]["repeats"]["effective"], 1)

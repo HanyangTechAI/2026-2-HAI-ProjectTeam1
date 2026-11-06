@@ -39,6 +39,7 @@ from pipeline.orchestrator import GoalChecker, PipelineRunResult
 from pipeline.pipeline_adapter import AgentFactory, make_pipeline_adapter
 
 from .evaluator import aggregate_results, evaluate
+from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_MODEL
 
 
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
@@ -48,7 +49,8 @@ FREEZE_VERSION = "1.0"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
-FROZEN_EMBEDDER = "benchmark.experiment_runtime:multilingual_embedder"
+FROZEN_EMBEDDER = EXPERIMENT_EMBEDDER_SPEC
+FROZEN_EMBEDDING_MODEL = EXPERIMENT_EMBEDDING_MODEL
 FROZEN_PROMPT_SHA256 = {
     FROZEN_SYSTEM_PROMPT_FILE: "7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0",
     FROZEN_TOOL_DEFINITIONS_FILE: "d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812",
@@ -678,6 +680,7 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         "max_steps": 8,
         "utility_weights": [0.6, 0.3, 0.1],
         "embedder": FROZEN_EMBEDDER,
+        "embedding_model": FROZEN_EMBEDDING_MODEL,
     }
     for key, expected in expected_runtime.items():
         if runtime.get(key) != expected:
@@ -833,6 +836,13 @@ def main() -> None:
                     if config else {})
     evaluation_config = _mapping(config["evaluation"], "evaluation") if config else {}
     overrides: dict[str, Any] = {}
+
+    if (config and args.embedder is not None
+            and args.embedder != runtime_config["embedder"]):
+        parser.error(
+            "--embedder cannot override the frozen experiment embedder; "
+            "omit --config for an ad-hoc run"
+        )
 
     if config:
         configured_strategies, configured_ablations = _config_strategy_plan(config["strategies"])
@@ -1003,6 +1013,10 @@ def main() -> None:
         "freeze": config["freeze"],
         "scope": config["scope"],
         "status": config["status"],
+        "embedder": {
+            "callable": embedder_spec,
+            "model": runtime_config["embedding_model"],
+        },
     }
     result = run_scenarios(
         scenarios,

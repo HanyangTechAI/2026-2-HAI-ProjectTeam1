@@ -23,6 +23,7 @@
     "max_steps": 8,
     "utility_weights": [0.6, 0.3, 0.1],
     "embedder": "benchmark.experiment_runtime:multilingual_embedder",
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
     "token_counter": {
       "provider": "google",
       "model": "gemini-3.1-flash-lite",
