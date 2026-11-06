@@ -23,7 +23,8 @@ from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.evaluator import aggregate_results, evaluate
 from benchmark.runner import (
-    FROZEN_PLANNER_BEHAVIOR_SHA256, STRATEGIES, _run_one, run_scenarios,
+    FROZEN_ALGORITHM_SHA256, FROZEN_PLANNER_BEHAVIOR_SHA256,
+    STRATEGIES, _run_one, run_scenarios,
 )
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, provisional_token_count,
@@ -219,6 +220,7 @@ class PipelineAdapterTests(unittest.TestCase):
             self.assertEqual(len({id(agent) for agent in self.agents}), 8)
             self.assertEqual(len(summary), 4)
             self.assertEqual({row["strategy"] for row in rows}, set(STRATEGIES))
+            self.assertEqual(experiment["algorithm_hash"], FROZEN_ALGORITHM_SHA256)
             self.assertEqual(
                 experiment["planner_rules_hash"],
                 FROZEN_PLANNER_BEHAVIOR_SHA256["SYSTEM_INSTRUCTION"],

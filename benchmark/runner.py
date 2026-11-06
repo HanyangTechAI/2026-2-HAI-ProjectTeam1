@@ -49,8 +49,10 @@ FREEZE_VERSION = "1.0.1"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
+FROZEN_ALGORITHM_SPEC_FILE = "docs/algorithm.md"
 FROZEN_EMBEDDER = EXPERIMENT_EMBEDDER_SPEC
 FROZEN_EMBEDDING_MODEL = EXPERIMENT_EMBEDDING_MODEL
+FROZEN_ALGORITHM_SHA256 = "e0fe8ba41023b6b00926564e85dfd49abe5463528a0b3a9964b64983b5c7034a"
 FROZEN_PROMPT_SHA256 = {
     FROZEN_SYSTEM_PROMPT_FILE: "7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0",
     FROZEN_TOOL_DEFINITIONS_FILE: "d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812",
@@ -61,6 +63,16 @@ FROZEN_PLANNER_BEHAVIOR_SHA256 = {
 }
 EXECUTABLE_STATUS = "executable"
 NON_EXECUTABLE_STATUSES = frozenset({"generation_only", "deferred"})
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _algorithm_spec_sha256() -> str:
+    path = PROJECT_ROOT / FROZEN_ALGORITHM_SPEC_FILE
+    if not path.is_file():
+        raise ValueError(
+            f"frozen algorithm specification does not exist: {FROZEN_ALGORITHM_SPEC_FILE}"
+        )
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _planner_behavior_sha256() -> dict[str, str]:
@@ -565,6 +577,7 @@ def run_scenarios(
         "scenario_ids": ids,
         "system_prompt": system_prompt,
         "tool_definitions": tool_definitions,
+        "algorithm_hash": _algorithm_spec_sha256(),
         "planner_rules_hash": planner_behavior_hashes["SYSTEM_INSTRUCTION"],
         "action_schema_hash": planner_behavior_hashes["ACTION_SCHEMA"],
         "llm": None if llm_config is None else llm_config.to_dict(),
@@ -736,6 +749,12 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
             raise ValueError(
                 f"frozen prompt changed: {prompt_path}; bump freeze.version before execution"
             )
+    actual_algorithm_hash = _algorithm_spec_sha256()
+    if actual_algorithm_hash != FROZEN_ALGORITHM_SHA256:
+        raise ValueError(
+            "frozen algorithm specification changed: "
+            f"{FROZEN_ALGORITHM_SPEC_FILE}; bump freeze.version before execution"
+        )
     planner_behavior_hashes = _planner_behavior_sha256()
     for name, expected_hash in FROZEN_PLANNER_BEHAVIOR_SHA256.items():
         actual_hash = planner_behavior_hashes[name]

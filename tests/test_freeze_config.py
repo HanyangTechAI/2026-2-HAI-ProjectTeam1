@@ -15,6 +15,7 @@ from agent.agent import Agent
 from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
 from benchmark.runner import (
     FREEZE_VERSION,
+    FROZEN_ALGORITHM_SHA256,
     FROZEN_EMBEDDER,
     FROZEN_EMBEDDING_MODEL,
     _config_strategy_plan,
@@ -96,6 +97,14 @@ class FreezeConfigTests(unittest.TestCase):
             "benchmark.runner.ACTION_SCHEMA", {"type": "object"},
         ), self.assertRaisesRegex(ValueError, "ACTION_SCHEMA"):
             _load_runner_config(CONFIGS / "main.json")
+
+    def test_modified_algorithm_specification_is_rejected(self):
+        with patch(
+            "benchmark.runner.FROZEN_ALGORITHM_SHA256", "0" * 64,
+        ), self.assertRaisesRegex(ValueError, "algorithm specification changed"):
+            _load_runner_config(CONFIGS / "main.json")
+
+        self.assertEqual(len(FROZEN_ALGORITHM_SHA256), 64)
 
     def test_cli_cannot_override_frozen_embedder(self):
         arguments = [

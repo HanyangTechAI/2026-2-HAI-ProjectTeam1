@@ -89,6 +89,7 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 | LLM timeout | `60000ms` |
 | System prompt | `experiments/prompts/system_v1.txt` |
 | Tool definitions | `experiments/prompts/tools_v1.txt` |
+| Algorithm specification | `docs/algorithm.md` |
 | Planner system instruction | `agent.llm_planner:SYSTEM_INSTRUCTION` |
 | Planner action schema | `agent.llm_planner:ACTION_SCHEMA` |
 | Embedder callable | `benchmark.experiment_runtime:multilingual_embedder` |
@@ -105,10 +106,11 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 | Embedding normalization | `normalize_embeddings=True` |
 | Similarity metric | cosine similarity |
 
-Prompt 및 Planner behavior checksum도 freeze에 포함한다.
+Algorithm specification, Prompt 및 Planner behavior checksum도 freeze에 포함한다.
 
 | 파일 | SHA-256 |
 |---|---|
+| `docs/algorithm.md` | `e0fe8ba41023b6b00926564e85dfd49abe5463528a0b3a9964b64983b5c7034a` |
 | `system_v1.txt` | `7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0` |
 | `tools_v1.txt` | `d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812` |
 | `agent.llm_planner:SYSTEM_INSTRUCTION` | `aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f` |
@@ -117,9 +119,11 @@ Prompt 및 Planner behavior checksum도 freeze에 포함한다.
 `SYSTEM_INSTRUCTION`은 UTF-8 문자열 바이트를 직접 해시한다. `ACTION_SCHEMA`는
 `json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))`로
 정규화한 UTF-8 JSON 바이트를 해시한다. 실행 시 두 값은 `experiment.json`의
-`planner_rules_hash`와 `action_schema_hash`에 각각 기록한다.
+`planner_rules_hash`와 `action_schema_hash`에 각각 기록한다. `docs/algorithm.md`는 파일의
+원본 바이트를 해시하며 실행 시 `experiment.json`의 `algorithm_hash`에 기록한다.
 
-Runner는 version, 공통 모델/runtime 값, prompt 및 Planner behavior checksum을 검증한다.
+Runner는 version, 공통 모델/runtime 값, algorithm specification, prompt 및 Planner
+behavior checksum을 검증한다.
 Config를 쓰지 않은 ad-hoc 실행 또는 명시적 CLI override는 가능하지만, freeze 본실험
 결과로 자동 간주하지 않으며 `experiment.json`에 effective value와 override를 기록한다.
 
