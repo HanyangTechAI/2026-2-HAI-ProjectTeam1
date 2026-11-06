@@ -1,9 +1,29 @@
-# Architecture / Parameter Freeze v1.0
+# Architecture / Parameter Freeze v1.0.1
 
 - 상태: **FROZEN**
-- 기준일: 2026-11-04 (Asia/Seoul)
+- 기준일: 2026-11-06 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0"`
+- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.1"`
+- 기준 구현 commit: `b10dc9c3c26b59e082e5a49953debb98d25be346`
+
+## Patch note — v1.0.1
+
+v1.0.1은 연구 아키텍처 또는 주요 실험 파라미터의 변경이 아니라,
+Pilot에서 발견된 approval semantics 오류를 수정한 patch freeze이다.
+
+기존 구현은 `email.request_approval`이 반환한 receipt/pending approval ID를
+실제 발송 허가(grant)로 오인할 수 있었다.
+
+v1.0.1에서는 다음 의미를 명시적으로 구분한다.
+
+- receipt: 승인 요청 접수 상태이며 발송 권한이 없음
+- grant: 실제 승인 완료 상태이며 발송 가능
+
+이 수정은 Agent action correctness에 영향을 주므로 기존 v1.0 결과와
+동일 결과군으로 합치지 않는다.
+
+Embedding model, retrieval algorithm, utility weights, token budget,
+LLM model 및 실험 grid는 v1.0과 동일하다.
 
 이 문서는 본실험 전에 변경할 수 있는 요소와 고정된 요소를 분리한다. 아래 항목을
 바꾸는 실행은 V1.0 결과와 같은 실험으로 합치지 않는다. 필요한 경우 freeze version을
@@ -69,6 +89,8 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 | LLM timeout | `60000ms` |
 | System prompt | `experiments/prompts/system_v1.txt` |
 | Tool definitions | `experiments/prompts/tools_v1.txt` |
+| Planner system instruction | `agent.llm_planner:SYSTEM_INSTRUCTION` |
+| Planner action schema | `agent.llm_planner:ACTION_SCHEMA` |
 | Embedder callable | `benchmark.experiment_runtime:multilingual_embedder` |
 | Embedding model | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` |
 | Candidate Top-k | `5` |
@@ -80,17 +102,26 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 | Budget scope | `total_input` |
 | Mandatory overflow | `stop_and_log` |
 | Bootstrap | `2000` iterations, seed `42` |
+| Embedding normalization | `normalize_embeddings=True` |
+| Similarity metric | cosine similarity |
 
-Prompt checksum도 freeze에 포함한다.
+Prompt 및 Planner behavior checksum도 freeze에 포함한다.
 
 | 파일 | SHA-256 |
 |---|---|
 | `system_v1.txt` | `7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0` |
 | `tools_v1.txt` | `d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812` |
+| `agent.llm_planner:SYSTEM_INSTRUCTION` | `aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f` |
+| `agent.llm_planner:ACTION_SCHEMA` | `634277e47b8b38427623d5d9116289d90d04868a43f4753ed7ab779a750370b9` |
 
-Runner는 version, 공통 모델/runtime 값, prompt checksum을 검증한다. Config를 쓰지 않은
-ad-hoc 실행 또는 명시적 CLI override는 가능하지만, freeze 본실험 결과로 자동 간주하지
-않으며 `experiment.json`에 effective value와 override를 기록한다.
+`SYSTEM_INSTRUCTION`은 UTF-8 문자열 바이트를 직접 해시한다. `ACTION_SCHEMA`는
+`json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))`로
+정규화한 UTF-8 JSON 바이트를 해시한다. 실행 시 두 값은 `experiment.json`의
+`planner_rules_hash`와 `action_schema_hash`에 각각 기록한다.
+
+Runner는 version, 공통 모델/runtime 값, prompt 및 Planner behavior checksum을 검증한다.
+Config를 쓰지 않은 ad-hoc 실행 또는 명시적 CLI override는 가능하지만, freeze 본실험
+결과로 자동 간주하지 않으며 `experiment.json`에 effective value와 override를 기록한다.
 
 ## 3. Frozen experiment scopes
 
@@ -164,6 +195,10 @@ Required-State Accuracy, Stale-State Usage, Temporal Version Accuracy, general r
 - 영속 vector DB / production DB 교체
 - 공개 benchmark 확장
 - 생성 모델, embedding model, prompt 또는 tokenizer 교체
+- BM25 retrieval
+- Entity-based retrieval
+- Semantic + BM25 hybrid retrieval
+- Semantic + BM25 + Entity multi-signal retrieval
 
 ## 6. Execution readiness gates
 

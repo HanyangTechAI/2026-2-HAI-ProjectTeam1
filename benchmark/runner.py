@@ -23,7 +23,7 @@ from typing import Any
 
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
-from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
+from agent.llm_planner import ACTION_SCHEMA, LLMRunConfig, SYSTEM_INSTRUCTION
 
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, TokenCounter, count_tokens,
@@ -45,7 +45,7 @@ from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0"
+FREEZE_VERSION = "1.0.1"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
@@ -55,8 +55,28 @@ FROZEN_PROMPT_SHA256 = {
     FROZEN_SYSTEM_PROMPT_FILE: "7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0",
     FROZEN_TOOL_DEFINITIONS_FILE: "d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812",
 }
+FROZEN_PLANNER_BEHAVIOR_SHA256 = {
+    "SYSTEM_INSTRUCTION": "aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f",
+    "ACTION_SCHEMA": "634277e47b8b38427623d5d9116289d90d04868a43f4753ed7ab779a750370b9",
+}
 EXECUTABLE_STATUS = "executable"
 NON_EXECUTABLE_STATUSES = frozenset({"generation_only", "deferred"})
+
+
+def _planner_behavior_sha256() -> dict[str, str]:
+    action_schema = json.dumps(
+        ACTION_SCHEMA,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return {
+        "SYSTEM_INSTRUCTION": hashlib.sha256(
+            SYSTEM_INSTRUCTION.encode("utf-8")
+        ).hexdigest(),
+        "ACTION_SCHEMA": hashlib.sha256(action_schema).hexdigest(),
+    }
 
 
 def _environment_snapshot(scenario: Mapping[str, Any]) -> dict[str, Any]:
@@ -526,6 +546,7 @@ def run_scenarios(
             "type": token_count_mode(token_counter)
         }
 
+    planner_behavior_hashes = _planner_behavior_sha256()
     experiment_metadata = {
         "strategies": list(strategies),
         "proposed_ablations": list(proposed_ablations),
@@ -544,6 +565,8 @@ def run_scenarios(
         "scenario_ids": ids,
         "system_prompt": system_prompt,
         "tool_definitions": tool_definitions,
+        "planner_rules_hash": planner_behavior_hashes["SYSTEM_INSTRUCTION"],
+        "action_schema_hash": planner_behavior_hashes["ACTION_SCHEMA"],
         "llm": None if llm_config is None else llm_config.to_dict(),
         "config": None if config_metadata is None else _json_record(config_metadata),
         "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
@@ -712,6 +735,14 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         if actual_hash != expected_hash:
             raise ValueError(
                 f"frozen prompt changed: {prompt_path}; bump freeze.version before execution"
+            )
+    planner_behavior_hashes = _planner_behavior_sha256()
+    for name, expected_hash in FROZEN_PLANNER_BEHAVIOR_SHA256.items():
+        actual_hash = planner_behavior_hashes[name]
+        if actual_hash != expected_hash:
+            raise ValueError(
+                "frozen planner behavior changed: "
+                f"agent.llm_planner:{name}; bump freeze.version before execution"
             )
     return loaded
 

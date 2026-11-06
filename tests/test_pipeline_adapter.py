@@ -22,7 +22,9 @@ from agent.agent import Agent, AgentAction
 from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.evaluator import aggregate_results, evaluate
-from benchmark.runner import STRATEGIES, _run_one, run_scenarios
+from benchmark.runner import (
+    FROZEN_PLANNER_BEHAVIOR_SHA256, STRATEGIES, _run_one, run_scenarios,
+)
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, provisional_token_count,
     token_count_mode,
@@ -209,11 +211,22 @@ class PipelineAdapterTests(unittest.TestCase):
             )
             rows = [json.loads(line) for line in Path(result["runs_path"]).read_text(encoding="utf-8").splitlines()]
             summary = json.loads(Path(result["summary_path"]).read_text(encoding="utf-8"))
+            experiment = json.loads(
+                (Path(output) / "experiment.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(result["n_runs"], 8)
             self.assertEqual(len(self.agents), 8)
             self.assertEqual(len({id(agent) for agent in self.agents}), 8)
             self.assertEqual(len(summary), 4)
             self.assertEqual({row["strategy"] for row in rows}, set(STRATEGIES))
+            self.assertEqual(
+                experiment["planner_rules_hash"],
+                FROZEN_PLANNER_BEHAVIOR_SHA256["SYSTEM_INSTRUCTION"],
+            )
+            self.assertEqual(
+                experiment["action_schema_hash"],
+                FROZEN_PLANNER_BEHAVIOR_SHA256["ACTION_SCHEMA"],
+            )
             for row in rows:
                 run = row["run_result"]
                 self.assertTrue(row["evaluation"]["task_success"])

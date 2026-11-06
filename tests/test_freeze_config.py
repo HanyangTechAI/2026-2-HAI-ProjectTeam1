@@ -14,6 +14,7 @@ from unittest.mock import patch
 from agent.agent import Agent
 from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
 from benchmark.runner import (
+    FREEZE_VERSION,
     FROZEN_EMBEDDER,
     FROZEN_EMBEDDING_MODEL,
     _config_strategy_plan,
@@ -42,7 +43,7 @@ class FreezeConfigTests(unittest.TestCase):
         for name, (status, executable) in expected.items():
             with self.subTest(config=name):
                 config = _load_runner_config(CONFIGS / f"{name}.json")
-                self.assertEqual(config["freeze"]["version"], "1.0")
+                self.assertEqual(config["freeze"]["version"], FREEZE_VERSION)
                 self.assertEqual(config["scope"], name)
                 self.assertEqual(config["status"], status)
                 self.assertIs(config["executable"], executable)
@@ -84,6 +85,17 @@ class FreezeConfigTests(unittest.TestCase):
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "model.provider"):
                 _load_runner_config(path)
+
+    def test_modified_planner_behavior_is_rejected(self):
+        with patch(
+            "benchmark.runner.SYSTEM_INSTRUCTION", SYSTEM_INSTRUCTION + "\nchanged",
+        ), self.assertRaisesRegex(ValueError, "SYSTEM_INSTRUCTION"):
+            _load_runner_config(CONFIGS / "main.json")
+
+        with patch(
+            "benchmark.runner.ACTION_SCHEMA", {"type": "object"},
+        ), self.assertRaisesRegex(ValueError, "ACTION_SCHEMA"):
+            _load_runner_config(CONFIGS / "main.json")
 
     def test_cli_cannot_override_frozen_embedder(self):
         arguments = [
