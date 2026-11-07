@@ -356,7 +356,7 @@ class Orchestrator:
                     raise TypeError("planner.telemetry() must return a mapping or object with to_dict()")
                 
                 planning_latency_ms = llm_usage.get("planning_latency_ms")
-                total_llm_cost = llm_usage.get("estmated_cost_usd")
+                total_llm_cost = llm_usage.get("estimated_cost_usd")
             
             return PipelineRunResult(
                 status=status,
