@@ -7,6 +7,7 @@
 import copy
 from contextlib import redirect_stderr, redirect_stdout
 import io
+import sys
 from datetime import datetime, timedelta, timezone
 from dataclasses import asdict, fields, replace
 import json
@@ -24,7 +25,7 @@ from agent.tools.file import FileTool
 from benchmark.evaluator import aggregate_results, evaluate
 from benchmark.runner import (
     FROZEN_ALGORITHM_SHA256, FROZEN_PLANNER_BEHAVIOR_SHA256,
-    STRATEGIES, _run_one, run_scenarios,
+    STRATEGIES, _run_one, checkpoint_status, main, run_scenarios,
 )
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, provisional_token_count,
@@ -462,7 +463,7 @@ class PipelineAdapterTests(unittest.TestCase):
             "benchmark.runner._run_one", side_effect=audited_run,
         ), patch.object(counter, "clear_cache", wraps=counter.clear_cache) as clear:
             for order in (STRATEGIES, tuple(reversed(STRATEGIES))):
-                result = self.run_runner(output, strategies=order, embedder=embed,
+                result = self.run_runner(Path(output) / order[0], strategies=order, embedder=embed,
                                          token_counter=counter, repeats=2)
                 rows = [json.loads(line) for line in Path(result["runs_path"]).read_text(encoding="utf-8").splitlines()]
                 normalized = {}
@@ -717,14 +718,84 @@ class PipelineAdapterTests(unittest.TestCase):
         stderr = io.StringIO()
         with tempfile.TemporaryDirectory() as output:
             prior = Path(output) / "runs.jsonl"
-            prior.write_text("previous result", encoding="utf-8")
             with patch("benchmark.runner._run_one", side_effect=fail_second), redirect_stderr(stderr):
                 with self.assertRaisesRegex(RuntimeError, "failed execution"):
                     self.run_runner(output, strategies=STRATEGIES, embedder=embed, show_progress=True)
-            self.assertEqual(prior.read_text(encoding="utf-8"), "previous result")
+            self.assertEqual(len(prior.read_text(encoding="utf-8").splitlines()), 1)
+            status = checkpoint_status(output)
+            self.assertEqual(status["state"], "interrupted")
+            self.assertEqual(status["completed"], 1)
+            self.assertFalse(status["runner_active"])
+            with prior.open("ab") as stream:
+                stream.write(b'{"torn_record":')
+            with patch("benchmark.runner._run_one", wraps=_run_one) as resumed:
+                result = self.run_runner(output, strategies=STRATEGIES, embedder=embed, resume=True)
+            self.assertEqual(resumed.call_count, 3)
+            rows = [json.loads(line) for line in prior.read_text().splitlines()]
+            self.assertEqual(len(rows), 4)
+            self.assertEqual(len({(r["strategy"], r["repeat_id"]) for r in rows}), 4)
+            self.assertEqual(result["summary"], aggregate_results(
+                [r["evaluation"] for r in rows], bootstrap_iterations=100, seed=42))
+            self.assertEqual(checkpoint_status(output)["state"], "completed")
         self.assertIn("1/4 (25.0%)", stderr.getvalue().splitlines()[-1])
         self.assertIn("interrupted", stderr.getvalue().splitlines()[-1])
         self.assertNotIn("100.0%", stderr.getvalue())
+
+    def test_checkpoint_rejects_overwrite_changed_settings_and_corrupt_records(self):
+        with tempfile.TemporaryDirectory() as output:
+            self.run_runner(output)
+            saved = (Path(output) / "runs.jsonl").read_bytes()
+            with self.assertRaisesRegex(ValueError, "already contains"):
+                self.run_runner(output)
+            with self.assertRaisesRegex(ValueError, "settings changed"):
+                self.run_runner(output, resume=True, top_k=3)
+            self.assertEqual((Path(output) / "runs.jsonl").read_bytes(), saved)
+            with (Path(output) / "runs.jsonl").open("ab") as stream:
+                stream.write(b'invalid JSON\n')
+            with self.assertRaises(json.JSONDecodeError):
+                self.run_runner(output, resume=True)
+
+    def test_keyboard_interrupt_resume_preserves_variant_and_repeat_keys(self):
+        count = 0
+        def interrupt(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count == 4:
+                raise KeyboardInterrupt()
+            return _run_one(*args, **kwargs)
+        options = dict(strategies=("proposed",), embedder=embed, repeats=2,
+                       proposed_ablations=tuple(ABLATION_PRESETS)[:2], checkpoint_interval=2)
+        with tempfile.TemporaryDirectory() as output:
+            with patch("benchmark.runner._run_one", side_effect=interrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    self.run_runner(output, **options)
+            self.assertEqual(checkpoint_status(output)["completed"], 3)
+            with patch("benchmark.runner._run_one", wraps=_run_one) as remaining:
+                result = self.run_runner(output, resume=True, **options)
+            self.assertEqual(remaining.call_count, 1)
+            self.assertEqual(result["n_runs"], 4)
+            with patch("benchmark.runner._run_one", side_effect=AssertionError("already saved")):
+                self.run_runner(output, resume=True, **options)
+
+    def test_live_status_reads_before_interval_without_model_or_duplicate_writer(self):
+        calls = 0
+        def inspect_run(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                status = checkpoint_status(output)
+                self.assertEqual(status["completed"], 1)
+                self.assertTrue(status["runner_active"])
+                self.assertEqual(status["by_strategy"]["sliding_window"]["task_success_rate"], 1)
+                with self.assertRaisesRegex(ValueError, "another runner"):
+                    self.run_runner(output, repeats=2, resume=True)
+                stdout = io.StringIO()
+                with patch.object(sys, "argv", ["runner", "--status", "--output", output]), redirect_stdout(stdout):
+                    main()
+                self.assertEqual(json.loads(stdout.getvalue())["completed"], 1)
+            return _run_one(*args, **kwargs)
+        with tempfile.TemporaryDirectory() as output, patch("benchmark.runner._run_one", side_effect=inspect_run):
+            self.run_runner(output, repeats=2, checkpoint_interval=100)
 
     def test_runner_rejects_tokenizer_mode_mismatch(self):
         scenario = copy.deepcopy(
