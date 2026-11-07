@@ -2,8 +2,8 @@
 
 GEMINI_API_KEY가 없으면 건너뛴다. 전체 단위 테스트에 실제 모델 호출을 섞지 않기 위해서다.
 툴 정의 파일 경로는 smoke.json에 없으므로 experiments/prompts/tools_v1.txt를 쓴다.
-시나리오 그리드는 benchmark/generated/smoke_gemini를 쓴다. 생성 LLM은 gemini-3.1-flash-lite이고,
-토큰 측정은 CountTokens를 부르지 않도록 provisional로 맞춘다.
+시나리오 그리드는 benchmark/generated/smoke_gemini_3_1_flash_lite를 쓴다.
+생성과 CountTokens에 같은 모델을 사용하며 다른 모델로 측정한 데이터는 거부한다.
 
 실행: python -m unittest tests.test_smoke
 """
@@ -18,11 +18,11 @@ import unittest
 from agent.llm_planner import LLMRunConfig, shared_system_instruction
 from benchmark.evaluator import load_config
 from benchmark.runner import run_scenarios
-from context.tokenizer import provisional_token_count
+from context.tokenizer import GeminiTokenCounter
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "experiments" / "configs" / "smoke.json"
-DATA_DIR = ROOT / "benchmark" / "generated" / "smoke_gemini"
+DATA_DIR = ROOT / "benchmark" / "generated" / "smoke_gemini_3_1_flash_lite"
 TOOLS_PATH = ROOT / "experiments" / "prompts" / "tools_v1.txt"
 KNOWN_TOOLS = frozenset({"email", "file", "calendar", "task"})
 
@@ -47,7 +47,7 @@ class SmokeConfigTests(unittest.TestCase):
             tool_definitions=TOOLS_PATH.read_text(encoding="utf-8"),
             output_directory=output,
             strategies=tuple(config["strategies"]),
-            token_counter=provisional_token_count,
+            token_counter=GeminiTokenCounter(model=model_name),
             top_k=config["evaluation"]["retrieval_k"],
             repeats=config["repeats"],
             bootstrap_iterations=config["evaluation"]["bootstrap_iterations"],
@@ -115,12 +115,12 @@ def _scenarios(config: dict) -> list[dict]:
     expected = config["dataset"]["samples_per_cell"] * len(manifest["cells"])
     if len(scenarios) != expected:
         raise AssertionError(f"시나리오 수가 smoke.json과 다릅니다: {len(scenarios)} != {expected}")
-    rewritten = []
-    for scenario in scenarios:
-        item = dict(scenario)
-        item["token_count_mode"] = "provisional"
-        rewritten.append(item)
-    return rewritten
+    expected_mode = f"gemini:{config['model']['name']}"
+    if manifest.get("token_count_mode") != expected_mode or any(
+        scenario.get("token_count_mode") != expected_mode for scenario in scenarios
+    ):
+        raise AssertionError("생성 모델과 같은 CountTokens 모델로 시나리오를 재생성해야 합니다.")
+    return scenarios
 
 
 if __name__ == "__main__":

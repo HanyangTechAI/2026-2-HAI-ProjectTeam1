@@ -2,6 +2,7 @@
 
 from contextlib import redirect_stderr, redirect_stdout
 import copy
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -11,11 +12,12 @@ import unittest
 from unittest.mock import patch
 
 from agent.agent import Agent
+from agent.llm_planner import LLMRunConfig
 from agent.tools.email import EmailTool
 from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.generator import generate_scenario
-from benchmark.runner import main, run_scenarios
+from benchmark.runner import _git_revision, _prompt_checksums, main, run_scenarios
 from context.tokenizer import provisional_token_count
 
 
@@ -36,6 +38,58 @@ def environment_agent(environment):
 
 
 class GeneratorRunnerTests(unittest.TestCase):
+    def test_result_provenance_is_saved_and_preserved_on_resume(self):
+        scenarios = [self.scenario(seed=43), self.scenario(seed=42)]
+        without_seed = self.scenario(seed=44)
+        without_seed["metadata"].pop("seed")
+        scenarios.append(without_seed)
+        revision = {"git_commit": "a" * 40, "git_dirty": True}
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "benchmark.runner._git_revision", return_value=revision,
+        ):
+            options = dict(
+                output_directory=directory, system_prompt="한글 prompt\n",
+                tool_definitions="file.find_file\n", strategies=("sliding_window",),
+                environment_agent_factory=environment_agent, bootstrap_iterations=100, seed=7,
+            )
+            result = run_scenarios(scenarios, **options)
+            experiment = json.loads(Path(result["experiment_path"]).read_text(encoding="utf-8"))
+            runs_path = Path(result["runs_path"])
+            saved = runs_path.read_bytes()
+            rows = [json.loads(line) for line in saved.splitlines()]
+            for record in (result, experiment, *rows):
+                self.assertEqual(record["git_commit"], revision["git_commit"])
+                self.assertTrue(record["git_dirty"])
+                self.assertEqual(record["bootstrap_seed"], 7)
+                self.assertEqual(record["dataset_seeds"], [42, 43])
+                for name in ("system_prompt", "tool_definitions"):
+                    self.assertEqual(record["prompt_checksums"][name],
+                                     hashlib.sha256(options[name].encode("utf-8")).hexdigest())
+                self.assertIsNone(record["prompt_checksums"]["system_instruction"])
+            self.assertEqual([row["dataset_seed"] for row in rows], [43, 42, None])
+            resumed = run_scenarios(scenarios, resume=True, **options)
+            self.assertEqual(resumed["prompt_checksums"], result["prompt_checksums"])
+            self.assertEqual(runs_path.read_bytes(), saved)
+            with self.assertRaisesRegex(ValueError, "resume rejected"):
+                run_scenarios(scenarios, resume=True,
+                              **dict(options, system_prompt="changed"))
+
+    def test_prompt_checksums_include_actual_llm_instruction(self):
+        config = LLMRunConfig(system_instruction="실제 모델 지시문\n")
+        hashes = _prompt_checksums("system", "tools", config)
+        self.assertEqual(hashes["system_instruction"],
+                         hashlib.sha256(config.system_instruction.encode("utf-8")).hexdigest())
+        self.assertNotEqual(hashes["system_instruction"], hashes["system_prompt"])
+        self.assertNotEqual(hashes, _prompt_checksums("system\n", "tools", config))
+        self.assertNotEqual(hashes, _prompt_checksums("system", "tools\n", config))
+
+    def test_git_revision_is_read_from_checkout_and_handles_missing_git(self):
+        revision = _git_revision()
+        self.assertRegex(revision["git_commit"], r"^[0-9a-f]{40,64}$")
+        self.assertIsInstance(revision["git_dirty"], bool)
+        with patch("benchmark.runner.subprocess.run", side_effect=FileNotFoundError):
+            self.assertEqual(_git_revision(), {"git_commit": None, "git_dirty": None})
+
     def scenario(self, **parameters):
         return generate_scenario(context_budget=8192, **parameters)
 
