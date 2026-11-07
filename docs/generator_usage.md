@@ -199,7 +199,7 @@ Runner에 전달할 때는 `manifest.json`에 기록된 **단일 셀 JSON**을 `
 python -m benchmark.runner --help
 ```
 
-현재 Runner는 단일 셀 JSON에 대해 Sliding Window, Vector Top-k, Utility-per-Token, Proposed와 repeat를 실행한다. Proposed는 외부 embedder와 각 Scenario의 ISO 8601 `current_time`을 요구하며 생성 데이터에는 이 값이 포함된다. `--proposed-ablations full no_constraint_preservation no_temporal no_state_mandatory no_budget_aware_packing`처럼 preset을 선택하면 동일 Scenario에서 각 변형을 실행한다. 여러 셀을 순회하는 전체 grid 실행, 실제 LLM Planner와 `reference.json`의 Long Context 실행은 별도 작업이다.
+현재 Runner는 단일 셀 JSON에 대해 Sliding Window, Vector Top-k, Utility-per-Token, Proposed와 repeat를 실행한다. Proposed는 외부 embedder와 각 Scenario의 ISO 8601 `current_time`을 요구하며 생성 데이터에는 이 값이 포함된다. `--proposed-ablations full no_constraint_preservation no_temporal no_state_mandatory no_budget_aware_packing`처럼 preset을 선택하면 동일 Scenario에서 각 변형을 실행한다. 실제 Gemini LLM Planner는 freeze config의 model 설정 또는 `--llm-model`로 활성화할 수 있다. 여러 셀을 순회하는 전체 grid 실행과 `reference.json`의 Long Context 실행은 별도 작업이다.
 
 생성한 시나리오의 파일 목록과 사전 승인 ID를 mock Tool에 넣으려면 `--environment-agent-factory module:function`을 사용한다. 이 함수는 실행마다 해당 시나리오의 `environment` 사본만 받아 새 Agent를 반환한다. 정답, 검색 fixture와 기대 호출은 받지 않는다. 기존 인자 없는 `--agent-factory`와 동시에 지정하지 않는다.
 
@@ -237,7 +237,7 @@ def make_agent(environment):
     )
 ```
 
-명시적인 `goal_checker`가 없으면 Agent의 `goal_completed`는 기본적으로 false이다. 위 예시는 Tool 작업의 종료 조건을 정의하며, 정확한 파일·적용 제약·State 사용은 이후 Evaluator가 별도로 검사한다. System Prompt와 Tool 정의 파일 등 다른 필수 Runner 인자도 지정해야 한다. 기본 결정적 Planner는 연결 검증용이며 실제 LLM의 시간 해석 능력을 측정하지 않는다.
+명시적인 `goal_checker`가 없으면 Agent의 `goal_completed`는 기본적으로 false이다. 위 예시는 Tool 작업의 종료 조건을 정의하며, 정확한 파일·적용 제약·State 사용은 이후 Evaluator가 별도로 검사한다. System Prompt와 Tool 정의 파일 등 다른 필수 Runner 인자도 지정해야 한다. LLM 설정을 생략했을 때 사용하는 기본 결정적 Planner는 연결 검증용이며 실제 LLM의 시간 해석 능력을 측정하지 않는다.
 
 생성기 및 기존 fixture의 계약 검증은 다음 명령으로 실행한다.
 

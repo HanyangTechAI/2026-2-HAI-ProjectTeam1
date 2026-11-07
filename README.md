@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Agent, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector·Runner 통합 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기와 Gemini CountTokens의 메모리·SQLite 캐시, 재시도, 실행별 캐시 격리도 제공한다. 과거 State와 현재 행동 Constraint를 동시에 요구하는 복합 경로 및 실제 LLM Planner 연동은 아직 남아 있다.
+> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Gemini LLM Planner, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector·Runner 통합 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기와 Gemini CountTokens의 메모리·SQLite 캐시, 재시도, 실행별 캐시 격리도 제공한다. LLM 실행에서는 출력 토큰·비용·planning latency를 누적 기록한다. 과거 State와 현재 행동 Constraint를 동시에 요구하는 복합 경로의 전용 통합 검증은 아직 남아 있다.
 
 ## 배경과 목표
 
@@ -191,7 +191,7 @@ python -m pip install -r requirements.txt
 | Vector Top-k | `embedder(text) -> Sequence[float]` 주입; `benchmark.experiment_runtime:multilingual_embedder` 제공 | 표준 설치의 `sentence-transformers`와 최초 모델 가중치 다운로드 |
 | Utility-per-Token / Proposed | Vector Top-k와 같은 embedder 사용 | Vector Top-k와 동일 |
 | Token 측정 | Runner 기본 `GeminiTokenCounter`, 생성기 기본 `provisional_token_count`, 또는 사용자 `TokenCounter` | `google-genai`는 표준 설치, 실제 Gemini API 호출 시 모델명과 API key 필요 |
-| Agent | 기본 결정적 규칙 `Planner` | 실제 LLM 연결 시 provider SDK |
+| Agent | 기본 결정적 규칙 `Planner`; config 또는 `--llm-model` 지정 시 Gemini `LLMPlanner` | 실제 LLM 실행에 `google-genai`와 API key 필요 |
 | 저장소 | 프로세스 내부 `MemoryStore` | DB 영속화를 구현할 때 DB driver |
 
 Gemini token 측정은 다음처럼 설정한다.
@@ -211,7 +211,7 @@ python -m benchmark.runner ... \
 
 `benchmark/generated/smoke_gemini`와 `benchmark/generated/pilot_gemini.zip`은 `gemini-3.8-flash`로 실측한 기존 재현성 자료이다. 모델별 token 수와 그에 맞춘 padding이 달라질 수 있으므로 metadata의 모델명만 바꾸어 재사용하지 않는다. `GEMINI_API_KEY`가 준비된 환경에서 위 모델로 다시 생성한 뒤 manifest·scenario의 `token_count_mode`, History 길이, Noise 비율과 독립 재측정을 함께 검증해야 한다.
 
-V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 현재 코드의 Gemini 연결은 CountTokens 전용이며, 실제 응답 생성은 아직 결정적 규칙 `Planner`를 사용한다. 향후 생성 LLM adapter를 연결할 때는 `gemini-3.1-flash-lite`와 그 decoding/thinking 설정을 별도로 구현·고정해야 한다.
+V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 응답 생성은 config 또는 `--llm-model`로 `gemini-3.1-flash-lite` LLM Planner를 활성화하며, 생성 모델과 CountTokens 모델이 다르면 API 호출 전에 중단한다. freeze config는 temperature 0, 최대 출력 512 token, thinking level `LOW`를 고정한다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 

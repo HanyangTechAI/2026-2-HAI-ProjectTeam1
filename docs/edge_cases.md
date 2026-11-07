@@ -5,7 +5,7 @@
 본 문서는 Constraint-Preserving Budget-Aware Memory 시스템에서 발생할 수 있는 예외 상황과 검증 기준을 정의한다. Memory 저장·검색·시간 해석·예산 할당 과정의 오류가 Agent 행동에 미치는 영향을 확인하는 데 사용한다.
 
 - 기준 문서: [architecture.md](./architecture.md), [algorithm.md](./algorithm.md), [interfaces.md](./interfaces.md)
-- 작성 기준: 2026-11-03 현재 구현과 테스트. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
+- 작성 기준: 2026-11-08 현재 구현과 테스트. 예산 실패 정책은 2026-10-08에 기준 문서와 동기화했다.
 - EC-01~EC-07은 `algorithm.md` 19절의 정책을 구체화한 테스트 명세이다. EC-02의 정상 삽입 경로와 Store 불변식은 `tests/test_memory.py`, `tests/test_state.py`에서 검증한다. EC-05의 현재 State 선택은 `tests/test_proposed_pipeline.py`가 Proposed Adapter부터 Agent 실행까지 확인한다. 그 밖의 항목은 명세만으로 테스트 통과를 의미하지 않는다.
 - EC-08~EC-12는 추가 논의 결과를 반영한 확정 정책이다. Semantic General Retrieval, Version Chain Expansion, Temporal Resolution, Mandatory 합계 초과 반환과 Flexible 단일 항목 건너뛰기는 구현되어 있다. EC-08의 현재 버전은 `tests/test_proposed_pipeline.py`, 과거 버전과 월·상대 월 해석은 `tests/test_pipeline_adapter.py`, Store Version Chain은 Store 단위 테스트가 검증한다. EC-12의 Selector·Runner Mandatory overflow와 최종 formatting overflow도 Pipeline Adapter 및 Context 통합 테스트가 검증한다. 과거 State와 현재 행동 Constraint를 동시에 적용하는 EC-09 복합 경로는 아직 전용 통합 테스트가 없다.
 - 아래 토큰 수는 선택 알고리즘 검증용 고정 입력이다. 통합 테스트에서는 실제 사용 모델의 Tokenizer로 완성된 Context를 측정한다.

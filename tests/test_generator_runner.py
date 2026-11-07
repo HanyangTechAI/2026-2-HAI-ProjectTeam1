@@ -17,7 +17,7 @@ from agent.tools.email import EmailTool
 from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.generator import generate_scenario
-from benchmark.runner import _git_revision, _prompt_checksums, main, run_scenarios
+from benchmark.runner import _git_revision, _prompt_checksums, main, run_scenarios, _runtime_environment_metadata
 from context.tokenizer import provisional_token_count
 
 
@@ -39,13 +39,42 @@ def environment_agent(environment):
 
 class GeneratorRunnerTests(unittest.TestCase):
     def test_result_provenance_is_saved_and_preserved_on_resume(self):
+        runtime_environment = {
+            "python": {
+                "version": "3.12.0",
+                "implementation": "CPython",
+                "executable": "python",
+            },
+            "platform": {
+                "system": "Windows",
+                "release": "test",
+                "machine": "AMD64",
+            },
+            "packages": {
+                "google-genai": "2.34.0",
+                "sentence-transformers": "5.1.0",
+                "transformers": "5.0.0",
+                "huggingface-hub": "1.0.0",
+                "torch": "2.8.0",
+            },
+            "embedding": None,
+        }
+        
         scenarios = [self.scenario(seed=43), self.scenario(seed=42)]
         without_seed = self.scenario(seed=44)
         without_seed["metadata"].pop("seed")
         scenarios.append(without_seed)
         revision = {"git_commit": "a" * 40, "git_dirty": True}
-        with tempfile.TemporaryDirectory() as directory, patch(
-            "benchmark.runner._git_revision", return_value=revision,
+        with (
+            tempfile.TemporaryDirectory() as directory, 
+            patch(
+                "benchmark.runner._git_revision", 
+                return_value=revision,
+            ),
+            patch(
+                "benchmark.runner._runtime_environment_metadata",
+                return_value=runtime_environment,
+            ),
         ):
             options = dict(
                 output_directory=directory, system_prompt="한글 prompt\n",
@@ -62,6 +91,10 @@ class GeneratorRunnerTests(unittest.TestCase):
                 self.assertTrue(record["git_dirty"])
                 self.assertEqual(record["bootstrap_seed"], 7)
                 self.assertEqual(record["dataset_seeds"], [42, 43])
+                self.assertEqual(
+                    record["runtime_environment"],
+                    runtime_environment,
+                )
                 for name in ("system_prompt", "tool_definitions"):
                     self.assertEqual(record["prompt_checksums"][name],
                                      hashlib.sha256(options[name].encode("utf-8")).hexdigest())
@@ -73,6 +106,40 @@ class GeneratorRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "resume rejected"):
                 run_scenarios(scenarios, resume=True,
                               **dict(options, system_prompt="changed"))
+
+
+
+    def test_runtime_environment_metadata_records_versions(self):
+        metadata = _runtime_environment_metadata(
+            None
+        )
+
+        self.assertIn(
+            "python",
+            metadata,
+        )
+        self.assertIn(
+            "version",
+            metadata["python"],
+        )
+
+        self.assertIn(
+            "packages",
+            metadata,
+        )
+
+        for package in (
+            "google-genai",
+            "sentence-transformers",
+            "transformers",
+            "huggingface-hub",
+            "torch",
+        ):
+            self.assertIn(
+                package,
+                metadata["packages"],
+            )
+
 
     def test_prompt_checksums_include_actual_llm_instruction(self):
         config = LLMRunConfig(system_instruction="실제 모델 지시문\n")

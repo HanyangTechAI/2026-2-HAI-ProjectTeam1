@@ -142,6 +142,9 @@ class PlannerTelemetry:
     usage_metadata_calls: int
     
     prompt_tokens: int | None
+    prompt_tokens_per_call: tuple[int | None, ...]
+    max_prompt_tokens: int | None
+    
     cached_prompt_tokens: int | None
     tool_use_prompt_tokens: int | None
     
@@ -160,6 +163,9 @@ class PlannerTelemetry:
             "usage_metadata_calls": self.usage_metadata_calls,
             
             "prompt_tokens": self.prompt_tokens,
+            "prompt_tokens_per_call": list(self.prompt_tokens_per_call),
+            "max_prompt_tokens": self.max_prompt_tokens,
+            
             "cached_prompt_tokens": self.cached_prompt_tokens,
             "tool_use_prompt_tokens": self.tool_use_prompt_tokens,
             
@@ -245,6 +251,8 @@ class LLMPlanner:
         self._usage_metadata_calls = 0
         
         self._prompt_tokens = 0
+        self._prompt_tokens_per_call: list[int | None] = []
+        
         self._cached_prompt_tokens = 0
         self._tool_use_prompt_tokens = 0
         
@@ -326,7 +334,17 @@ class LLMPlanner:
         
         self._usage_metadata_calls += 1
         
-        self._prompt_tokens += _usage_int(usage, "prompt_token_count")
+        prompt_tokens = getattr(
+            usage,
+            "prompt_token_count",
+            None,
+        )
+        
+        if type(prompt_tokens) is int and prompt_tokens >= 0:
+            self._prompt_tokens += prompt_tokens
+            self._prompt_tokens_per_call.append(prompt_tokens)
+        else:
+            self._prompt_tokens_per_call.append(None)
         
         self._cached_prompt_tokens += _usage_int(usage, "cached_content_token_count")
         
@@ -378,12 +396,23 @@ class LLMPlanner:
             output_tokens = None
             estimated_cost_usd = None
             
+        valid_prompt_tokens = [
+            value
+            for value in self._prompt_tokens_per_call
+            if value is not None
+        ]
+        
+        max_prompt_tokens = max(valid_prompt_tokens) if valid_prompt_tokens else None
+            
         return PlannerTelemetry(
             planner_calls=self._planner_calls,
             api_calls=self._api_calls,
             usage_metadata_calls=self._usage_metadata_calls,
             
             prompt_tokens=self._prompt_tokens if meatadata_available else None,
+            prompt_tokens_per_call=tuple(self._prompt_tokens_per_call),
+            max_prompt_tokens=max_prompt_tokens,
+            
             cached_prompt_tokens=self._cached_prompt_tokens if meatadata_available else None,
             tool_use_prompt_tokens=self._tool_use_prompt_tokens if meatadata_available else None,
             

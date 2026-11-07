@@ -1,10 +1,10 @@
-# Architecture / Parameter Freeze v1.0.1
+# Architecture / Parameter Freeze v1.0.2
 
 - 상태: **FROZEN**
-- 기준일: 2026-11-06 (Asia/Seoul)
+- 기준일: 2026-11-07 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
 - 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.2"`
-- 기준 구현 commit: `b10dc9c3c26b59e082e5a49953debb98d25be346`
+- 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`
 
 ## Patch note - v1.0.1
 
@@ -123,7 +123,7 @@ Algorithm specification, Prompt 및 Planner behavior checksum도 freeze에 포�
 
 | 파일 | SHA-256 |
 |---|---|
-| `docs/algorithm.md` | `e0fe8ba41023b6b00926564e85dfd49abe5463528a0b3a9964b64983b5c7034a` |
+| `docs/algorithm.md` | `f029a473fa91a292e6c6d4ee693546e42787e1f6a41d550c71781668156b05ab` |
 | `system_v1.txt` | `7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0` |
 | `tools_v1.txt` | `d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812` |
 | `agent.llm_planner:SYSTEM_INSTRUCTION` | `aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f` |

@@ -95,7 +95,7 @@ benchmark/runner.py
 
 미연결 또는 추가 검증 필요
 - 과거 State와 현재 행동 Constraint를 함께 요구하는 복합 시점 통합 테스트
-- 실제 LLM planner와 embedding/provider adapter
+- 과거 State와 현재 행동 Constraint를 함께 요구하는 복합 경로의 benchmark 검증
 ```
 
 ---

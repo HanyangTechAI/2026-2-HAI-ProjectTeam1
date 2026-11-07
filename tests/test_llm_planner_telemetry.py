@@ -123,6 +123,16 @@ class LLMPlannerTelemetryTests(unittest.TestCase):
             expected_cost,
             places=12,
         )
+        
+        self.assertEqual(
+            telemetry.prompt_tokens_per_call,
+            (100,),
+        )
+
+        self.assertEqual(
+            telemetry.max_prompt_tokens,
+            100,
+        )
 
     def test_multiple_calls_are_accumulated(self):
         planner = LLMPlanner(
@@ -163,6 +173,16 @@ class LLMPlannerTelemetryTests(unittest.TestCase):
         self.assertEqual(
             telemetry.total_tokens,
             375,
+        )
+        
+        self.assertEqual(
+            telemetry.prompt_tokens_per_call,
+            (100, 100, 100),
+        )
+
+        self.assertEqual(
+            telemetry.max_prompt_tokens,
+            100,
         )
 
     def test_no_api_call_has_zero_cost(self):

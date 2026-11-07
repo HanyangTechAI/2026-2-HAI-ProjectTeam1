@@ -20,6 +20,8 @@ from dataclasses import asdict, is_dataclass, replace
 from datetime import datetime, timedelta
 from enum import Enum
 import importlib
+import importlib.metadata as importlib_metadata
+import platform
 import json
 import subprocess
 import sys
@@ -223,6 +225,90 @@ def _git_revision() -> dict[str, Any]:
         return {"git_commit": None, "git_dirty": None}
     return {"git_commit": commit,
             "git_dirty": bool(dirty.returncode) if dirty.returncode in (0, 1) else None}
+
+
+def _distribution_version(distribution_name: str) -> str | None:
+    try:
+        return importlib_metadata.version(distribution_name)
+    except importlib_metadata.PackageNotFoundError:
+        return None
+    
+    
+def _embedding_runtime_metadata(embedder: Embedder | None) -> dict[str, Any] | None:
+    if embedder is None:
+        return None
+    
+    module_name = getattr(
+        embedder,
+        "__module__",
+        None,
+    )
+    
+    qualname = getattr(
+        embedder,
+        "__qualname__",
+        getattr(embedder, "__name__", None),
+    )
+    
+    metadata: dict[str, Any] = {
+        "callable": f"{module_name}:{qualname}" if module_name and qualname else repr(embedder),
+    }
+    
+    if not isinstance(module_name, str):
+        return metadata
+    
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError:
+        return metadata
+    
+    getter = getattr(
+        module,
+        "embedding_runtime_metadata",
+        None,
+    )
+    
+    if getter is None:
+        return metadata
+    
+    if not callable(getter):
+        raise TypeError("embedding_runtime_metadata must be callable")
+    
+    details = getter()
+    
+    if not isinstance(details, Mapping):
+        raise TypeError("embedding_runtime_metadata() must return a mapping")
+    
+    metadata.update(_json_record(details))
+    
+    return metadata
+
+
+def _runtime_environment_metadata(embedder: Embedder | None) -> dict[str, Any]:
+    return {
+        "python": {
+            "version": platform.python_version(),
+            "implementation": platform.python_implementation(),
+            "executable": sys.executable,
+        },
+        
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+        },
+        
+        "packages": {
+            "google-genai": _distribution_version("google-genai"),
+            "sentence-transformers": _distribution_version("sentence-transformers"),
+            
+            "transformers": _distribution_version("transformers"),
+            "huggingface-hub": _distribution_version("huggingface-hub"),
+            "torch": _distribution_version("torch"),
+        },
+        
+        "embedding": _embedding_runtime_metadata(embedder),
+    }
 
 
 def _prompt_checksums(system_prompt: str, tool_definitions: str,
@@ -454,6 +540,112 @@ def _mandatory_memory_overflow(outcome: PipelineRunResult) -> bool | None:
     )
 
 
+def _prompt_token_audit(
+    *,
+    executed_steps,
+    actual_prompt_tokens,
+    context_budget: int,
+) -> dict[str, Any]:
+    if type(context_budget) is not int or context_budget < 0:
+        raise ValueError("context_budget must be a non-negative integer")
+    
+    counted = [
+        step.context_result.total_input_tokens
+        for step in executed_steps
+    ]
+    
+    raw_actual = [] if actual_prompt_tokens is None else list(actual_prompt_tokens)
+    
+    actual: list[int | None] = []
+    
+    for value in raw_actual:
+        if value is None:
+            actual.append(None)
+        elif type(value) is int and value >= 0:
+            actual.append(value)
+        else:
+            raise ValueError("actual prompt tokens must contain non-negative integers or None")
+        
+    call_count_match = len(counted) == len(actual)
+    
+    complete = call_count_match and all(
+        value is not None
+        for value in actual
+    )
+    
+    pair_count = min(
+        len(counted),
+        len(actual),
+    )
+    
+    deltas: list[int | None] = []
+    
+    for index in range(pair_count):
+        actual_value = actual[index]
+        
+        if actual_value is None:
+            deltas.append(None)
+        else:
+            deltas.append(actual_value - counted[index])
+            
+    valid_deltas = [
+        value
+        for value in deltas
+        if value is not None
+    ]
+    
+    max_positive_delta = max(0, max(valid_deltas)) if valid_deltas else None
+    
+    max_absolute_delta = max(abs(value) for value in valid_deltas) if valid_deltas else None
+    
+    max_actual = (
+        max(
+            value
+            for value in actual
+            if value is not None
+        )
+        if any(
+            value is not None
+            for value in actual
+        )
+        else None
+    )
+    
+    max_counted = max(counted) if counted else None
+    
+    actual_budget_exceeded = any(
+        value > context_budget
+        for value in actual
+        if value is not None
+    ) if complete else None
+    
+    counted_budget_exceeded = any(
+        value > context_budget
+        for value in counted
+    )
+    
+    return {
+        "context_budget": context_budget,
+        
+        "counted_prompt_tokens_per_call": counted,
+        "actual_prompt_tokens_per_call": actual,
+        
+        "delta_actual_minus_counted_per_call": deltas,
+        
+        "call_count_match": call_count_match,
+        "complete": complete,
+        
+        "max_counted_prompt_tokens": max_counted,
+        "max_actual_prompt_tokens": max_actual,
+        
+        "max_positive_delta": max_positive_delta,
+        "max_absolute_delta": max_absolute_delta,
+        
+        "counted_budget_exceeded": counted_budget_exceeded,
+        "actual_budget_exceeded": actual_budget_exceeded,
+    }
+
+
 def _run_one(
     scenario: Mapping[str, Any],
     strategy: str,
@@ -575,7 +767,14 @@ def _run_one(
     
     llm_usage = outcome.llm_usage or {}
     
+    prompt_token_audit = _prompt_token_audit(
+        executed_steps=executed_steps,
+        actual_prompt_tokens=llm_usage.get("prompt_tokens_per_call"),
+        context_budget=scenario["context_budget"],
+    )
+    
     run.update(
+        prompt_token_audit=prompt_token_audit,
         selection_result=_json_record(selection),
         context_result=_json_record(context),
         token_count_mode=token_count_mode,
@@ -606,6 +805,8 @@ def _run_one(
             
             output_tokens=llm_usage.get("output_tokens"),
             llm_prompt_tokens=llm_usage.get("prompt_tokens"),
+            llm_prompt_tokens_per_call=llm_usage.get("prompt_tokens_per_call"),
+            llm_max_prompt_tokens=llm_usage.get("max_prompt_tokens"),
             llm_cached_prompt_tokens=llm_usage.get("cached_prompt_tokens"),
             llm_tool_use_prompt_tokens=llm_usage.get("tool_use_prompt_tokens"),
             llm_candidate_tokens=llm_usage.get("candidate_tokens"),
@@ -802,8 +1003,11 @@ def run_scenarios(
             "type": token_count_mode(token_counter)
         }
 
+    runtime_environment = _runtime_environment_metadata(embedder)
+
     provenance = dict(
         **_git_revision(),
+        runtime_environment=runtime_environment,
         prompt_checksums=_prompt_checksums(system_prompt, tool_definitions, llm_config),
         bootstrap_seed=seed,
         dataset_seeds=sorted({scenario.get("metadata", {}).get("seed") for scenario in enabled
