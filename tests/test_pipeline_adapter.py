@@ -27,6 +27,7 @@ from benchmark.runner import (
     FROZEN_ALGORITHM_SHA256, FROZEN_PLANNER_BEHAVIOR_SHA256,
     STRATEGIES, _run_one, checkpoint_status, main, run_scenarios,
 )
+from agent.llm_planner import LLMRunConfig
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, provisional_token_count,
     token_count_mode,
@@ -796,6 +797,30 @@ class PipelineAdapterTests(unittest.TestCase):
             return _run_one(*args, **kwargs)
         with tempfile.TemporaryDirectory() as output, patch("benchmark.runner._run_one", side_effect=inspect_run):
             self.run_runner(output, repeats=2, checkpoint_interval=100)
+
+    def test_run_rejects_llm_and_tokenizer_model_mismatch_before_agent_creation(self):
+        count = Mock(side_effect=AssertionError("CountTokens must not be called"))
+        counter = GeminiTokenCounter(
+            model="other-model", client=SimpleNamespace(models=SimpleNamespace(count_tokens=count)),
+        )
+        with tempfile.TemporaryDirectory() as output:
+            with self.assertRaisesRegex(ValueError, "LLM model and Gemini token counter model must match"):
+                self.run_runner(output, token_counter=counter,
+                                llm_config=LLMRunConfig(model=TARGET_GEMINI_MODEL))
+            self.assertFalse((Path(output) / "runs.jsonl").exists())
+        self.assertEqual(self.agents, [])
+        count.assert_not_called()
+
+
+    def test_experiment_configs_share_flash_lite_settings(self):
+        smoke = json.loads(Path("experiments/configs/smoke.json").read_text())["model"]
+        for name in ("main", "pilot", "ablation", "stress", "reference"):
+            with self.subTest(config=name):
+                config = json.loads(Path(f"experiments/configs/{name}.json").read_text())
+                self.assertEqual(config["model"], smoke)
+        self.assertEqual(smoke["name"], TARGET_GEMINI_MODEL)
+
+
 
     def test_runner_rejects_tokenizer_mode_mismatch(self):
         scenario = copy.deepcopy(

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import importlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 from time import perf_counter
@@ -134,6 +135,34 @@ def _json_record(value: Any) -> Any:
     if isinstance(value, (tuple, list)):
         return [_json_record(item) for item in value]
     return value
+
+
+def _git_revision() -> dict[str, Any]:
+    """Resolve this checkout, independent of the caller's working directory."""
+    root = Path(__file__).resolve().parent.parent
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"], cwd=root,
+            check=True, capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "diff-index", "--quiet", "HEAD", "--"], cwd=root,
+            capture_output=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {"git_commit": None, "git_dirty": None}
+    return {"git_commit": commit,
+            "git_dirty": bool(dirty.returncode) if dirty.returncode in (0, 1) else None}
+
+
+def _prompt_checksums(system_prompt: str, tool_definitions: str,
+                      llm_config: LLMRunConfig | None) -> dict[str, str | None]:
+    """SHA-256 of the exact UTF-8 strings supplied to the runtime."""
+    prompts = {"system_prompt": system_prompt, "tool_definitions": tool_definitions,
+               "system_instruction": None if llm_config is None else llm_config.system_instruction}
+    return {name: None if value is None else hashlib.sha256(value.encode("utf-8")).hexdigest()
+            for name, value in prompts.items()}
+
 
 
 def _report_progress(completed: int, total: int, started: float, message: str, *, initial_completed: int = 0) -> None:
@@ -667,8 +696,16 @@ def run_scenarios(
             "type": token_count_mode(token_counter)
         }
 
+    provenance = dict(
+        **_git_revision(),
+        prompt_checksums=_prompt_checksums(system_prompt, tool_definitions, llm_config),
+        bootstrap_seed=seed,
+        dataset_seeds=sorted({scenario.get("metadata", {}).get("seed") for scenario in enabled
+                              if scenario.get("metadata", {}).get("seed") is not None}),
+    )
     planner_behavior_hashes = _planner_behavior_sha256()
     experiment_metadata = {
+        **provenance,
         "strategies": list(strategies),
         "proposed_ablations": list(proposed_ablations),
         "n_scenarios": len(enabled),
@@ -679,7 +716,6 @@ def run_scenarios(
         "utility_weights": list(utility_weights),
         "max_steps": max_steps,
         "bootstrap_iterations": bootstrap_iterations,
-        "bootstrap_seed": seed,
         "token_count_mode": mode,
         "tokenizer": tokenizer_metadata,
         "token_cache_policy": "isolated_per_run" if isinstance(token_counter, GeminiTokenCounter) else None,
@@ -751,27 +787,28 @@ def run_scenarios(
                             cache_scope = (token_counter.isolated_cache()
                                            if isinstance(token_counter, GeminiTokenCounter) else nullcontext())
                             with cache_scope:
-                                checkpoint.append(
-                                    _run_one(
-                                        scenario,
-                                        strategy,
-                                        repeat_id,
-                                        agent_factory=agent_factory,
-                                        environment_agent_factory=environment_agent_factory,
-                                        embedder=embedder,
-                                        system_prompt=system_prompt,
-                                        tool_definitions=tool_definitions,
-                                        token_count_mode=mode,
-                                        token_counter=token_counter,
-                                        top_k=top_k,
-                                        metric_k=metric_k,
-                                        utility_weights=utility_weights,
-                                        max_steps=max_steps,
-                                        goal_checker=goal_checker,
-                                        proposed_ablation=ablation,
-                                        llm_config=llm_config,
-                                    )
+                                row = _run_one(
+                                    scenario,
+                                    strategy,
+                                    repeat_id,
+                                    agent_factory=agent_factory,
+                                    environment_agent_factory=environment_agent_factory,
+                                    embedder=embedder,
+                                    system_prompt=system_prompt,
+                                    tool_definitions=tool_definitions,
+                                    token_count_mode=mode,
+                                    token_counter=token_counter,
+                                    top_k=top_k,
+                                    metric_k=metric_k,
+                                    utility_weights=utility_weights,
+                                    max_steps=max_steps,
+                                    goal_checker=goal_checker,
+                                    proposed_ablation=ablation,
+                                    llm_config=llm_config,
                                 )
+                                row.update(provenance)
+                                row["dataset_seed"] = scenario.get("metadata", {}).get("seed")
+                                checkpoint.append(row)
                         except (Exception, KeyboardInterrupt):
                             if show_progress:
                                 _report_progress(len(rows), total_runs, progress_started, "interrupted " + current, initial_completed=initial_completed)
@@ -800,6 +837,7 @@ def run_scenarios(
             if sys.stderr.isatty():
                 print(file=sys.stderr, flush=True)
         return dict(
+            **provenance,
             n_runs=len(rows),
             n_scenarios=len(enabled),
             summary=summary,
