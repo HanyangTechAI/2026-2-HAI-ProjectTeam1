@@ -2166,6 +2166,10 @@ class ExecutionLog:
     context_budget: int
     memory_tokens: int
     input_tokens: int
+    output_tokens: int | None
+
+    # CountTokens 측정과 provider usage의 호출별 비교
+    prompt_token_audit: dict[str, object]
 
     pipeline_status: PipelineStatus
 
@@ -2176,9 +2180,12 @@ class ExecutionLog:
     constraint_violation: bool | None
     stale_state_used: bool | None
 
-    latency_ms: float | None
-    cost: float | None
+    planning_latency_ms: float | None
+    total_latency_ms: float | None  # 실행 진단용이며 전략 집계에서는 제외
+    total_llm_cost: float | None
 ```
+
+실험 단위 provenance에는 Git revision과 prompt checksum 외에도 `runtime_environment`를 기록한다. 여기에는 Python·platform, 주요 package 버전과 embedder callable이 포함된다. 표준 `multilingual_embedder`는 Hugging Face cache에서 확인한 resolved snapshot revision, `normalize_embeddings=True`, timing 전 preload 여부까지 제공하며 revision을 확인할 수 없으면 본실험을 시작하지 않는다.
 
 ---
 

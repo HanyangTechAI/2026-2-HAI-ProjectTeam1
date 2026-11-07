@@ -382,7 +382,6 @@ def _partial_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "input_tokens", 
             "output_tokens",
             "planning_latency_ms",
-            "total_latency_ms",
             "total_llm_cost",
         ):
             value = evaluation.get(name)

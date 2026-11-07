@@ -271,11 +271,17 @@ TVA = 올바른 temporal version을 선택한 sample 수 / temporal version 판�
 
 ### Latency
 
-가능한 경우 다음을 측정한다.
+전략 비교에는 다음 값을 사용한다.
 
-- Retrieval latency
-- LLM inference latency
-- Total latency
+- Planning Latency: LLM Planner가 action을 결정하는 데 걸린 시간
+
+`total_latency_ms`는 실행 진단을 위해 개별 run에 계속 기록하지만,
+전략 간 효율 비교 지표에는 사용하지 않는다.
+
+현재 Total Latency에는 semantic embedding의 LRU cache hit 여부,
+최초 model warm-up 및 기타 runtime overhead가 포함될 수 있으며,
+전략별 cache access pattern도 다르다. 따라서 이를 Memory Policy 자체의
+latency 차이로 해석하지 않는다.
 
 ### Cost
 
@@ -600,6 +606,8 @@ deterministic 판정에는 직접 사용하지 않는다.
 - `retrieval_tokens`: 실행 adapter가 제공한 경우에만 기록하는 검색 token 수
 - `input_tokens`: 실행기가 제공한 실제 입력 측정값. 현재 Agent에서는 여러 호출 중 최대 단일 입력 크기이며, 누적 비용용 입력 합계가 아님
 - `output_tokens`: Planner의 모든 API 호출에서 발생한 candidate token과 thinking token의 실행 전체 누적값. 사용량 metadata가 없는 API 호출이 있으면 `null`
+- `prompt_token_audit`: 각 실행 단계에서 CountTokens로 측정한 입력과 Gemini usage metadata의 실제 prompt token을 호출별로 비교한다. 호출 수 일치·metadata 완전성, 호출별 차이, 최대 차이와 양쪽의 Budget 초과 여부를 기록하며 실제 usage가 없으면 감사 결과를 불완전 상태로 남긴다.
+- `total_latency_ms`: 개별 실행 진단용 wall-clock 값. cache hit, model warm-up과 runtime overhead가 섞일 수 있으므로 전략별 요약 metric에는 포함하지 않는다.
 - `selected_memory_ids`: 일반 검색, 버전 확장, 보호 검색 및 예산 선택 이후 실제 LLM Context에 포함된 Memory 집합
 - `temporal_version_required`: 해당 sample에서 State version 선택이 필요한지 여부
 - `temporal_version_correct`: 실제 선택된 Memory가 해당 시점의 올바른 State version인지 여부
@@ -766,7 +774,7 @@ Snapshot 기반 evaluator, JSONL 결과 저장, sample 단위 집계와 실행 �
 
 `benchmark/generator.py`는 temporal_update/approval 시나리오를 grid별 JSON 또는 ZIP으로 생성한다. History 길이·Horizon·Noise 비율의 요청값과 측정값을 구분한다. Ablation은 Full Proposed와 Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 제거하는 4개 변형으로 구성한다.
 
-Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있고 현재 측정 대상은 `gemini-3.1-flash-lite`이다. 실행 환경에는 `google-genai`와 `GEMINI_API_KEY`가 필요하다. Runner는 `--gemini-token-model`, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 모델을 선택한다. 생성기는 `--gemini-token-model`을 명시해야 Gemini counter를 선택하며, 옵션을 생략하면 환경변수와 무관하게 `provisional_token_count`를 사용한다. 사용자 카운터는 `--token-counter module:function`으로 주입한다. 모델 전환 시 기존 Gemini 측정 데이터의 label만 바꾸지 않고 History·Memory·최종 Context를 새 모델로 다시 측정한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. `agent/llm_planner.py`의 LLM Planner는 `--config`의 model 설정 또는 `--llm-model`로 활성화한다. 모든 실험 config는 `gemini-3.1-flash-lite`, temperature 0, 출력 한도 512와 공통 system prompt를 사용한다. CLI는 생성 모델에서 CountTokens 모델 기본값을 가져오며 명시한 측정 모델이나 환경 변수와 다르면 API 호출 전에 중단한다. 프로그램 호출도 GeminiTokenCounter와 LLMRunConfig의 모델 일치를 검사한다. 모델 응답의 usage metadata가 있으면 prompt·cached prompt·tool-use prompt·candidate·thinking·total token을 실행 전체에 누적하고, candidate와 thinking token을 합친 `output_tokens`, 추정 비용과 planning latency를 `runs.jsonl` 및 평가 결과에 기록한다. API 호출이 없으면 출력 토큰과 비용은 0이며, API 호출은 있었지만 usage metadata가 없으면 토큰과 비용은 `null`이다.
+Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있고 현재 측정 대상은 `gemini-3.1-flash-lite`이다. 실행 환경에는 `google-genai`와 `GEMINI_API_KEY`가 필요하다. Runner는 `--gemini-token-model`, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 모델을 선택한다. 생성기는 `--gemini-token-model`을 명시해야 Gemini counter를 선택하며, 옵션을 생략하면 환경변수와 무관하게 `provisional_token_count`를 사용한다. 사용자 카운터는 `--token-counter module:function`으로 주입한다. 모델 전환 시 기존 Gemini 측정 데이터의 label만 바꾸지 않고 History·Memory·최종 Context를 새 모델로 다시 측정한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. 표준 embedder 실행 시 모델을 timing 전에 preload하고 Hugging Face cache snapshot의 resolved revision을 확인하며, Runner는 이 정보와 Python·platform·주요 package 버전을 `runtime_environment`에 기록한다. `agent/llm_planner.py`의 LLM Planner는 `--config`의 model 설정 또는 `--llm-model`로 활성화한다. 모든 실험 config는 `gemini-3.1-flash-lite`, temperature 0, 출력 한도 512와 공통 system prompt를 사용한다. CLI는 생성 모델에서 CountTokens 모델 기본값을 가져오며 명시한 측정 모델이나 환경 변수와 다르면 API 호출 전에 중단한다. 프로그램 호출도 GeminiTokenCounter와 LLMRunConfig의 모델 일치를 검사한다. 모델 응답의 usage metadata가 있으면 prompt·cached prompt·tool-use prompt·candidate·thinking·total token을 실행 전체에 누적하고, candidate와 thinking token을 합친 `output_tokens`, 추정 비용과 planning latency를 `runs.jsonl` 및 평가 결과에 기록한다. 호출별 실제 prompt token은 CountTokens 측정값과 `prompt_token_audit`에서 비교한다. API 호출이 없으면 출력 토큰과 비용은 0이며, API 호출은 있었지만 usage metadata가 없으면 토큰과 비용은 `null`이다.
 
 ## 15. 본실험 실행 조건
 

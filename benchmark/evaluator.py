@@ -420,7 +420,7 @@ SUMMARY_METRICS = (
     "state_omission_rate", "state_error_rate",
     "precision_at_k", "mrr", "answer_normalized_exact_match", "answer_f1",
     "applicable_protected_recall", "input_tokens", "output_tokens",
-    "planning_latency_ms", "total_latency_ms", "total_llm_cost",
+    "planning_latency_ms", "total_llm_cost",
 )
 
 
