@@ -60,7 +60,7 @@ def _cached_model_revision(model_id: str) -> str | None:
     return revision.lower()
 
 
-def embedding_runtime_metadta() -> dict[str, object]:
+def embedding_runtime_metadata() -> dict[str, object]:
     _get_model()
     
     revision = _cached_model_revision(EXPERIMENT_EMBEDDING_MODEL)
