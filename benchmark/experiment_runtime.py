@@ -9,8 +9,7 @@ from agent.tools.email import EmailTool
 from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 
-
-_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+from .experiment_settings import EXPERIMENT_EMBEDDING_MODEL
 
 _model: SentenceTransformer | None = None
 
@@ -19,7 +18,7 @@ def _get_model() -> SentenceTransformer:
     global _model
     
     if _model is None:
-        _model = SentenceTransformer(_MODEL_NAME)
+        _model = SentenceTransformer(EXPERIMENT_EMBEDDING_MODEL)
         
     return _model
 

@@ -1292,7 +1292,7 @@ def select_memory(
     *,
     embedder: Embedder,
     token_counter: TokenCounter | None = None,
-    top_k: int = 20,
+    top_k: int = 5,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
     ablation: SelectorAblationConfig = FULL_ABLATION,
 ) -> SelectionResult:
@@ -2042,7 +2042,7 @@ def evaluate(
     run_result: Any,
     *,
     strategy: str | None = None,
-    k: int = 20,
+    k: int = 5,
     repeat_id: int = 0
 ) -> EvaluationResult:
     ...

@@ -23,7 +23,10 @@ from agent.agent import Agent, AgentAction
 from agent.tools.executor import ToolExecutor
 from agent.tools.file import FileTool
 from benchmark.evaluator import aggregate_results, evaluate
-from benchmark.runner import STRATEGIES, _run_one, checkpoint_status, main, run_scenarios
+from benchmark.runner import (
+    FROZEN_ALGORITHM_SHA256, FROZEN_PLANNER_BEHAVIOR_SHA256,
+    STRATEGIES, _run_one, checkpoint_status, main, run_scenarios,
+)
 from agent.llm_planner import LLMRunConfig
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, provisional_token_count,
@@ -211,11 +214,23 @@ class PipelineAdapterTests(unittest.TestCase):
             )
             rows = [json.loads(line) for line in Path(result["runs_path"]).read_text(encoding="utf-8").splitlines()]
             summary = json.loads(Path(result["summary_path"]).read_text(encoding="utf-8"))
+            experiment = json.loads(
+                (Path(output) / "experiment.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(result["n_runs"], 8)
             self.assertEqual(len(self.agents), 8)
             self.assertEqual(len({id(agent) for agent in self.agents}), 8)
             self.assertEqual(len(summary), 4)
             self.assertEqual({row["strategy"] for row in rows}, set(STRATEGIES))
+            self.assertEqual(experiment["algorithm_hash"], FROZEN_ALGORITHM_SHA256)
+            self.assertEqual(
+                experiment["planner_rules_hash"],
+                FROZEN_PLANNER_BEHAVIOR_SHA256["SYSTEM_INSTRUCTION"],
+            )
+            self.assertEqual(
+                experiment["action_schema_hash"],
+                FROZEN_PLANNER_BEHAVIOR_SHA256["ACTION_SCHEMA"],
+            )
             for row in rows:
                 run = row["run_result"]
                 self.assertTrue(row["evaluation"]["task_success"])
@@ -668,8 +683,8 @@ class PipelineAdapterTests(unittest.TestCase):
         self.assertEqual(len(row["run_result"]["tool_calls"]), 1)
         self.assertFalse(row["run_result"]["goal_completed"])
         self.assertFalse(row["evaluation"]["task_success"])
-        
-        
+
+
     def test_progress_counts_ablation_repeats_and_keeps_stdout_clean(self):
         stderr, stdout = io.StringIO(), io.StringIO()
         with tempfile.TemporaryDirectory() as output, redirect_stderr(stderr), redirect_stdout(stdout):

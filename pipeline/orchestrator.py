@@ -109,7 +109,7 @@ def make_baseline_policy(
     strategy: str,
     *,
     embedder: Embedder | None = None,
-    top_k: int = 20,
+    top_k: int = 5,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
 ) -> SelectionPolicy:
     strategies = (
@@ -170,7 +170,7 @@ def make_baseline_policy(
 def make_proposed_policy(
     *,
     embedder: Embedder,
-    top_k: int = 20,
+    top_k: int = 5,
     utility_weights: tuple[float, float, float] = DEFAULT_UTILITY_WEIGHTS,
     ablation: SelectorAblationConfig = FULL_ABLATION,
 ) -> SelectionPolicy:

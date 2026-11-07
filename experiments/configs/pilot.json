@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.1", "kind": "architecture_parameter_freeze"},
   "scope": "pilot",
   "status": "generation_only",
   "executable": false,
@@ -10,7 +10,7 @@
     "provider": "google",
     "name": "gemini-3.1-flash-lite",
     "temperature": 0,
-    "max_output_tokens": 4096,
+    "max_output_tokens": 512,
     "thinking_level": "LOW",
     "system_prompt_file": "experiments/prompts/system_v1.txt",
     "tool_definitions_file": "experiments/prompts/tools_v1.txt",
@@ -19,10 +19,11 @@
     "timeout_ms": 60000
   },
   "runtime": {
-    "candidate_top_k": 20,
+    "candidate_top_k": 5,
     "max_steps": 8,
     "utility_weights": [0.6, 0.3, 0.1],
     "embedder": "benchmark.experiment_runtime:multilingual_embedder",
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
     "token_counter": {
       "provider": "google",
       "model": "gemini-3.1-flash-lite",

@@ -211,7 +211,7 @@ python -m benchmark.runner ... \
 
 `benchmark/generated/smoke_gemini`와 `benchmark/generated/pilot_gemini.zip`은 `gemini-3.8-flash`로 실측한 기존 재현성 자료이다. 모델별 token 수와 그에 맞춘 padding이 달라질 수 있으므로 metadata의 모델명만 바꾸어 재사용하지 않는다. `GEMINI_API_KEY`가 준비된 환경에서 위 모델로 다시 생성한 뒤 manifest·scenario의 `token_count_mode`, History 길이, Noise 비율과 독립 재측정을 함께 검증해야 한다.
 
-기본 실험 embedder는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`이며 `benchmark.experiment_runtime:multilingual_embedder`로 주입할 수 있다. 본실험에서는 모델명·가중치 버전과 실행 환경을 고정하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 현재 코드의 Gemini 연결은 CountTokens 전용이며, 실제 응답 생성은 아직 결정적 규칙 `Planner`를 사용한다. 향후 생성 LLM adapter를 연결할 때는 `gemini-3.1-flash-lite`와 그 decoding/thinking 설정을 별도로 구현·고정해야 한다.
+V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 현재 코드의 Gemini 연결은 CountTokens 전용이며, 실제 응답 생성은 아직 결정적 규칙 `Planner`를 사용한다. 향후 생성 LLM adapter를 연결할 때는 `gemini-3.1-flash-lite`와 그 decoding/thinking 설정을 별도로 구현·고정해야 한다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 

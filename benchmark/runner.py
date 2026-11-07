@@ -26,7 +26,7 @@ from typing import Any
 
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
-from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
+from agent.llm_planner import ACTION_SCHEMA, LLMRunConfig, SYSTEM_INSTRUCTION
 
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, TokenCounter, count_tokens,
@@ -42,22 +42,56 @@ from pipeline.orchestrator import GoalChecker, PipelineRunResult
 from pipeline.pipeline_adapter import AgentFactory, make_pipeline_adapter
 
 from .evaluator import aggregate_results, evaluate
+from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_MODEL
 
 
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0"
+FREEZE_VERSION = "1.0.1"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
-FROZEN_EMBEDDER = "benchmark.experiment_runtime:multilingual_embedder"
+FROZEN_ALGORITHM_SPEC_FILE = "docs/algorithm.md"
+FROZEN_EMBEDDER = EXPERIMENT_EMBEDDER_SPEC
+FROZEN_EMBEDDING_MODEL = EXPERIMENT_EMBEDDING_MODEL
+FROZEN_ALGORITHM_SHA256 = "e0fe8ba41023b6b00926564e85dfd49abe5463528a0b3a9964b64983b5c7034a"
 FROZEN_PROMPT_SHA256 = {
     FROZEN_SYSTEM_PROMPT_FILE: "7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0",
     FROZEN_TOOL_DEFINITIONS_FILE: "d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812",
 }
+FROZEN_PLANNER_BEHAVIOR_SHA256 = {
+    "SYSTEM_INSTRUCTION": "aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f",
+    "ACTION_SCHEMA": "634277e47b8b38427623d5d9116289d90d04868a43f4753ed7ab779a750370b9",
+}
 EXECUTABLE_STATUS = "executable"
 NON_EXECUTABLE_STATUSES = frozenset({"generation_only", "deferred"})
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _algorithm_spec_sha256() -> str:
+    path = PROJECT_ROOT / FROZEN_ALGORITHM_SPEC_FILE
+    if not path.is_file():
+        raise ValueError(
+            f"frozen algorithm specification does not exist: {FROZEN_ALGORITHM_SPEC_FILE}"
+        )
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _planner_behavior_sha256() -> dict[str, str]:
+    action_schema = json.dumps(
+        ACTION_SCHEMA,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return {
+        "SYSTEM_INSTRUCTION": hashlib.sha256(
+            SYSTEM_INSTRUCTION.encode("utf-8")
+        ).hexdigest(),
+        "ACTION_SCHEMA": hashlib.sha256(action_schema).hexdigest(),
+    }
 
 
 def _environment_snapshot(scenario: Mapping[str, Any]) -> dict[str, Any]:
@@ -516,7 +550,7 @@ def run_scenarios(
     strategies: Sequence[str] = STRATEGIES,
     embedder: Embedder | None = None,
     token_counter: TokenCounter | None = provisional_token_count,
-    top_k: int = 20,
+    top_k: int = 5,
     metric_k: int | None = None,
     repeats: int = 1,
     utility_weights: tuple[float, float, float] = (0.6, 0.3, 0.1),
@@ -668,6 +702,7 @@ def run_scenarios(
         dataset_seeds=sorted({scenario.get("metadata", {}).get("seed") for scenario in enabled
                               if scenario.get("metadata", {}).get("seed") is not None}),
     )
+    planner_behavior_hashes = _planner_behavior_sha256()
     experiment_metadata = {
         **provenance,
         "strategies": list(strategies),
@@ -686,6 +721,9 @@ def run_scenarios(
         "scenario_ids": ids,
         "system_prompt": system_prompt,
         "tool_definitions": tool_definitions,
+        "algorithm_hash": _algorithm_spec_sha256(),
+        "planner_rules_hash": planner_behavior_hashes["SYSTEM_INSTRUCTION"],
+        "action_schema_hash": planner_behavior_hashes["ACTION_SCHEMA"],
         "llm": None if llm_config is None else llm_config.to_dict(),
         "config": None if config_metadata is None else _json_record(config_metadata),
         "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
@@ -890,7 +928,7 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         "provider": "google",
         "name": FROZEN_MODEL,
         "temperature": 0,
-        "max_output_tokens": 4096,
+        "max_output_tokens": 512,
         "thinking_level": "LOW",
         "system_prompt_file": FROZEN_SYSTEM_PROMPT_FILE,
         "tool_definitions_file": FROZEN_TOOL_DEFINITIONS_FILE,
@@ -907,10 +945,11 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         raise ValueError("config model.thinking_level must be LOW, MEDIUM, or HIGH")
 
     expected_runtime = {
-        "candidate_top_k": 20,
+        "candidate_top_k": 5,
         "max_steps": 8,
         "utility_weights": [0.6, 0.3, 0.1],
         "embedder": FROZEN_EMBEDDER,
+        "embedding_model": FROZEN_EMBEDDING_MODEL,
     }
     for key, expected in expected_runtime.items():
         if runtime.get(key) != expected:
@@ -942,6 +981,20 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         if actual_hash != expected_hash:
             raise ValueError(
                 f"frozen prompt changed: {prompt_path}; bump freeze.version before execution"
+            )
+    actual_algorithm_hash = _algorithm_spec_sha256()
+    if actual_algorithm_hash != FROZEN_ALGORITHM_SHA256:
+        raise ValueError(
+            "frozen algorithm specification changed: "
+            f"{FROZEN_ALGORITHM_SPEC_FILE}; bump freeze.version before execution"
+        )
+    planner_behavior_hashes = _planner_behavior_sha256()
+    for name, expected_hash in FROZEN_PLANNER_BEHAVIOR_SHA256.items():
+        actual_hash = planner_behavior_hashes[name]
+        if actual_hash != expected_hash:
+            raise ValueError(
+                "frozen planner behavior changed: "
+                f"agent.llm_planner:{name}; bump freeze.version before execution"
             )
     return loaded
 
@@ -1075,6 +1128,13 @@ def main() -> None:
     evaluation_config = _mapping(config["evaluation"], "evaluation") if config else {}
     overrides: dict[str, Any] = {}
 
+    if (config and args.embedder is not None
+            and args.embedder != runtime_config["embedder"]):
+        parser.error(
+            "--embedder cannot override the frozen experiment embedder; "
+            "omit --config for an ad-hoc run"
+        )
+
     if config:
         configured_strategies, configured_ablations = _config_strategy_plan(config["strategies"])
     else:
@@ -1092,7 +1152,7 @@ def main() -> None:
         "experiments/results/baselines", has_config=has_config, overrides=overrides,
     )
     top_k = _resolved_value(
-        "candidate_top_k", args.top_k, runtime_config.get("candidate_top_k"), 20,
+        "candidate_top_k", args.top_k, runtime_config.get("candidate_top_k"), 5,
         has_config=has_config, overrides=overrides,
     )
     metric_k = _resolved_value(
@@ -1148,7 +1208,7 @@ def main() -> None:
     )
     max_output_tokens = _resolved_value(
         "model.max_output_tokens", args.max_output_tokens,
-        model_config.get("max_output_tokens"), 1024,
+        model_config.get("max_output_tokens"), 512,
         has_config=has_config, overrides=overrides,
     )
     thinking_level = _resolved_value(
@@ -1244,6 +1304,10 @@ def main() -> None:
         "freeze": config["freeze"],
         "scope": config["scope"],
         "status": config["status"],
+        "embedder": {
+            "callable": embedder_spec,
+            "model": runtime_config["embedding_model"],
+        },
     }
     result = run_scenarios(
         scenarios,
