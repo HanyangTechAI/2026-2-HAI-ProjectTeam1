@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0.1", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.2", "kind": "architecture_parameter_freeze"},
   "scope": "pilot",
   "status": "generation_only",
   "executable": false,

@@ -6,7 +6,7 @@ from typing import Sequence
 from memory.schema import MemoryItem, MemoryType
 from memory.selector import PipelineStatus, SelectionResult
 
-from .tokenizer import provisional_token_count, TokenCounter, count_tokens
+from .tokenizer import provisional_token_count, TokenCounter, count_tokens, count_request_tokens
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ def fixed_context_tokens(
         flexible=(),
     )
     
-    return count_tokens(context, counter)
+    return count_request_tokens(context, counter)
 
 
 def _group_for_display(
@@ -111,7 +111,7 @@ def build_context(
             flexible=display_flexible,
         )
         
-        total_tokens = count_tokens(context, counter)
+        total_tokens = count_request_tokens(context, counter)
         
         if total_tokens <= total_budget:
             protected_tokens = _section_token_count(

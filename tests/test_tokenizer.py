@@ -7,6 +7,7 @@ from unittest.mock import patch
 from context.tokenizer import (
     GeminiTokenCounter,
     TARGET_GEMINI_MODEL,
+    count_request_tokens,
     count_tokens,
     provisional_token_count,
 )
@@ -20,13 +21,37 @@ class FakeCountTokensResponse:
 class FakeModels:
     def __init__(self):
         self.call_count = 0
+        self.calls = []
 
-    def count_tokens(self, *, model, contents):
+    def count_tokens(
+        self,
+        *,
+        model,
+        contents,
+        config=None,
+    ):
         self.call_count += 1
 
-        # 테스트를 위한 deterministic fake 결과
+        self.calls.append(
+            {
+                "model": model,
+                "contents": contents,
+                "config": config,
+            }
+        )
+
+        total = len(contents)
+
+        if config:
+            system_instruction = config.get(
+                "system_instruction"
+            )
+
+            if system_instruction:
+                total += len(system_instruction)
+
         return FakeCountTokensResponse(
-            total_tokens=len(contents)
+            total_tokens=total
         )
 
 
@@ -379,6 +404,85 @@ class TokenizerTests(unittest.TestCase):
             self.assertEqual(
                 client_b.models.call_count,
                 1,
+            )
+            
+            
+    def test_request_count_includes_system_instruction(self):
+        client = FakeClient()
+
+        counter = GeminiTokenCounter(
+            model="fake-gemini",
+            client=client,
+        )
+
+        counter.configure_request(
+            system_instruction="SYSTEM",
+            generation_config={
+                "system_instruction": "SYSTEM",
+            },
+        )
+
+        # bare memory/content token cost
+        self.assertEqual(
+            counter("hello"),
+            5,
+        )
+
+        # 실제 request budget
+        self.assertEqual(
+            counter.count_request("hello"),
+            11,
+        )
+
+        self.assertEqual(
+            client.models.calls[-1]["config"],
+            {
+                "system_instruction": "SYSTEM",
+            },
+        )
+        
+        
+    def test_request_count_does_not_change_bare_memory_count(self):
+        client = FakeClient()
+
+        counter = GeminiTokenCounter(
+            model="fake-gemini",
+            client=client,
+        )
+
+        counter.configure_request(
+            system_instruction="SYSTEM",
+        )
+
+        bare = count_tokens(
+            "memory",
+            counter,
+        )
+
+        request = count_request_tokens(
+            "memory",
+            counter,
+        )
+
+        self.assertEqual(bare, 6)
+        self.assertEqual(request, 12)
+        
+        
+    def test_request_configuration_mismatch_is_rejected(self):
+        counter = GeminiTokenCounter(
+            model="fake-gemini",
+            client=FakeClient(),
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "does not match",
+        ):
+            counter.configure_request(
+                system_instruction="A",
+                generation_config={
+                    "system_instruction": "B",
+                },
             )
             
             

@@ -347,10 +347,12 @@ class LLMPlanner:
         if type(total) is int and total >= 0:
             self._total_tokens += total
         else:
+            candidate = candidate_tokens if type(candidate_tokens) is int and candidate_tokens >= 0 else 0
+            
             self._total_tokens += (
                 _usage_int(usage, "prompt_token_count")
                 + _usage_int(usage, "tool_use_prompt_token_count")
-                + candidate_tokens if type(candidate_tokens) is int and candidate_tokens >= 0 else 0
+                + candidate
                 + _usage_int(usage, "thoughts_token_count")
             )
             

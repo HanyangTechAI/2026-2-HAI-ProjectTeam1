@@ -5,7 +5,7 @@ import hashlib
 import sqlite3
 import time
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import lru_cache
 from typing import Any
 from pathlib import Path
@@ -101,6 +101,10 @@ class GeminiTokenCounter:
         
         self._cached_count = lru_cache(maxsize=cache_size)(self._count_tokens_cached)
         
+        self._request_count_config: dict[str, Any] | None = None
+        
+        self._cached_request_count = lru_cache(maxsize=cache_size)(self._count_request_tokens_cached)
+        
     def __call__(self, text: str) -> int:
         if not isinstance(text, str):
             raise TypeError("text must be a string")
@@ -125,17 +129,27 @@ class GeminiTokenCounter:
         return token_count
     
     
-    def _count_tokens_from_api(self, text: str) -> int:
+    def _count_tokens_from_api(
+        self, 
+        text: str,
+        *,
+        config: Mapping[str, Any] | None = None,
+    ) -> int:
         last_error: Exception | None = None
         
         for attempt in range(self.max_retries + 1):
             try:
                 self._api_calls += 1
                 
-                response = self._client.models.count_tokens(
-                    model=self.model,
-                    contents=text,
-                )
+                request: dict[str, Any] = {
+                    "model": self.model,
+                    "contents": text,
+                }
+                
+                if config is not None:
+                    request["config"] = dict(config)
+                
+                response = self._client.models.count_tokens(**request)
                 
                 total_tokens = getattr(response, "total_tokens", None)
                 
@@ -269,6 +283,7 @@ class GeminiTokenCounter:
 
     def clear_cache(self) -> None:
         self._cached_count.cache_clear()
+        self._cached_request_count.cache_clear()
         
         
     def clear_persistent_cache(self) -> None:
@@ -305,17 +320,86 @@ class GeminiTokenCounter:
         
         
     def metadata(self) -> dict[str, Any]:
+        system_instruction = None
+        
+        if self._request_count_config is not None:
+            system_instruction = self._request_count_config.get("system_instruction")
+        
         return {
             "type": "gemini",
             "model": self.model,
             "method": "countTokens",
-            "request_shape": "single_user_text",
+            "request_shape": "contents_plus_system_instruction" if system_instruction else "single_user_text",
+            "request_aware_budgeting": self._request_count_config is not None,
+            "system_instruction_sha256": hashlib.sha256(system_instruction.encode("utf-8")).hexdigest() if system_instruction else None,
             "memory_cache_size": self.cache_size,
             "max_retries": self.max_retries,
             "retry_base_seconds": self.retry_base_seconds,
             "persistent_cache": self._persistent_cache_path is not None,
             "stats": self.stats(),
         }
+        
+        
+    def configure_request(
+        self,
+        *,
+        system_instruction: str | None = None,
+        generation_config: Mapping[str, Any] | None = None,
+    ) -> None:
+        if system_instruction is not None and not isinstance(system_instruction, str):
+            raise TypeError("system_instruction must be a string or None")
+        
+        if generation_config is not None and not isinstance(generation_config, Mapping):
+            raise TypeError("generation_config must be a mapping or None")
+        
+        generation_config = {} if generation_config is None else dict(generation_config)
+        
+        config_system_instruction = generation_config.get("system_instruction")
+        
+        if config_system_instruction is not None and not isinstance(config_system_instruction, str):
+            raise TypeError("generation_config.system_instruction must be a string or None")
+        
+        if system_instruction is not None and config_system_instruction is not None and system_instruction != config_system_instruction:
+            raise ValueError("system_instruction does not match generation_config.system_instruction")
+        
+        effective_system_instruction = system_instruction if system_instruction is not None else config_system_instruction
+        
+        request_config: dict[str, Any] = {}
+        
+        if effective_system_instruction:
+            request_config["system_instruction"] = effective_system_instruction
+            
+        tools = generation_config.get("tools")
+        
+        if tools is not None:
+            request_config["tools"] = tools
+            
+        self._request_count_config = request_config if request_config else None
+        
+        self._cached_request_count.cache_clear()
+        
+        
+    def count_request(
+        self,
+        text: str,
+    ) -> int:
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
+        
+        return self._cached_request_count(text)
+    
+    
+    def _count_request_tokens_cached(
+        self,
+        text: str,
+    ) -> int:
+        if self._request_count_config is None:
+            return self(text)
+        
+        return self._count_tokens_from_api(
+            text,
+            config=self._request_count_config,
+        )
 
 
 def count_tokens(
@@ -328,6 +412,35 @@ def count_tokens(
     counter = token_counter or provisional_token_count
     count = counter(text)
     
+    if type(count) is not int:
+        raise TypeError("token_counter must return an integer")
+    
+    if count < 0:
+        raise ValueError("token_counter must return a non-negative integer")
+    
+    return count
+
+
+def count_request_tokens(
+    text: str,
+    token_counter: TokenCounter | None = None,
+) -> int:
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    
+    counter = token_counter or provisional_token_count
+    
+    request_counter = getattr(
+        counter,
+        "count_request",
+        None,
+    )
+    
+    if callable(request_counter):
+        count = request_counter(text)
+    else:
+        count = counter(text)
+        
     if type(count) is not int:
         raise TypeError("token_counter must return an integer")
     

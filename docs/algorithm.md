@@ -1135,7 +1135,26 @@ FUNCTION SELECT_MEMORY(
 6. Current Task
 ```
 
-Memory 선택 시 계산한 Token Cost와 실제 Formatting된 Prompt의 Token Count에는 차이가 발생할 수 있으므로, 최종 Context를 다시 Tokenize한다.
+Memory 선택 시 각 Memory의 Token Cost는 해당 Memory content 자체에 대해 측정한다.
+Protected/Required/Flexible Memory의 상대적 Token Cost와 packing은 이 bare content
+token count를 사용한다.
+
+반면 Context Budget B는 실제 Agent API 입력 전체의 상한으로 정의한다.
+Gemini 실행에서는 최종 Formatting된 Context를 contents로, 고정된 Planner
+SYSTEM_INSTRUCTION을 CountTokens의 system_instruction으로 전달하여 다시 측정한다.
+
+따라서 fixed_context_tokens와 build_context의 최종 Budget Validation은
+request-aware token count를 사용하며, MemoryItem 개별 Token Cost는
+system instruction을 반복 포함하지 않는다.
+
+최종 request-aware input token count가 B를 초과하면 Flexible Memory를
+우선 제거하여 재측정한다. Flexible Memory를 모두 제거한 뒤에도 Protected
+Memory와 Required State를 포함한 request가 B를 초과하면
+INSUFFICIENT_CONTEXT_BUDGET으로 중단하고 LLM을 호출하지 않는다.
+
+provisional_token_count 또는 request-aware counting을 제공하지 않는 custom
+TokenCounter를 사용하는 테스트에서는 기존 bare text count가 fallback으로 사용된다.
+실제 Main Experiment에서는 Gemini CountTokens request-aware 경로를 사용한다.
 
 현재 구현은 `context/tokenizer.py`의 동일한 `TokenCounter`를 `fixed_context_tokens`와 `build_context`에 주입한다. `count_tokens`는 counter 반환값이 음수가 아닌 정수인지 검증한다. 모델별 Tokenizer가 없을 때 사용하는 `provisional_token_count`는 임시 공백 기준 측정이며 실제 모델 Token Usage로 보고하지 않는다.
 

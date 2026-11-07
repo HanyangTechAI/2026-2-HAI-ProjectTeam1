@@ -116,6 +116,36 @@ class ContextBuilderTests(unittest.TestCase):
             result,
             provisional_token_count(expected),
         )
+        
+        
+    def test_fixed_context_budget_includes_request_overhead(self):
+        counter = RequestAwareCounter()
+
+        bare_context = (
+            "[SYSTEM]\n"
+            f"{SYSTEM_PROMPT}\n\n"
+            "[TOOL DEFINITIONS]\n"
+            f"{TOOL_DEFINITIONS}\n\n"
+            "[CURRENT TASK]\n"
+            f"{QUERY}"
+        )
+
+        bare = provisional_token_count(
+            bare_context
+        )
+
+        measured = fixed_context_tokens(
+            SYSTEM_PROMPT,
+            TOOL_DEFINITIONS,
+            QUERY,
+            token_counter=counter,
+        )
+
+        self.assertEqual(
+            measured,
+            bare + 7,
+        )
+        
 
     def test_build_context_contains_sections_in_expected_order(self):
         result = build_context(
@@ -168,6 +198,35 @@ class ContextBuilderTests(unittest.TestCase):
             "- 사용자는 간결한 이메일을 선호한다.",
             context,
         )
+        
+        
+    def test_final_context_budget_uses_request_aware_count(self):
+        counter = RequestAwareCounter()
+
+        result = build_context(
+            SYSTEM_PROMPT,
+            TOOL_DEFINITIONS,
+            QUERY,
+            selection(
+                protected=(self.protected,),
+                states=(self.state,),
+            ),
+            total_budget=1000,
+            token_counter=counter,
+        )
+
+        self.assertEqual(
+            result.status,
+            PipelineStatus.OK,
+        )
+
+        self.assertEqual(
+            result.total_input_tokens,
+            provisional_token_count(
+                result.context
+            ) + 7,
+        )
+        
 
     def test_empty_memory_sections_are_omitted(self):
         result = build_context(
@@ -662,6 +721,17 @@ class ContextBuilderTests(unittest.TestCase):
 
         self.assertEqual(result.context, fixed_only.context)
 
+
+
+class RequestAwareCounter:
+    def __call__(self, text: str) -> int:
+        return provisional_token_count(text)
+
+    def count_request(self, text: str) -> int:
+        return (
+            provisional_token_count(text)
+            + 7
+        )
 
 
 if __name__ == "__main__":

@@ -3,10 +3,10 @@
 - 상태: **FROZEN**
 - 기준일: 2026-11-06 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.1"`
+- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.2"`
 - 기준 구현 commit: `b10dc9c3c26b59e082e5a49953debb98d25be346`
 
-## Patch note — v1.0.1
+## Patch note - v1.0.1
 
 v1.0.1은 연구 아키텍처 또는 주요 실험 파라미터의 변경이 아니라,
 Pilot에서 발견된 approval semantics 오류를 수정한 patch freeze이다.
@@ -28,6 +28,19 @@ LLM model 및 실험 grid는 v1.0과 동일하다.
 이 문서는 본실험 전에 변경할 수 있는 요소와 고정된 요소를 분리한다. 아래 항목을
 바꾸는 실행은 V1.0 결과와 같은 실험으로 합치지 않는다. 필요한 경우 freeze version을
 올리고, 입력을 다시 생성·측정하며, 결과 디렉터리를 분리한다.
+
+## Patch note - V1.0.2
+
+V1.0.2는 Context Budget의 token counting 범위를 실제 Gemini request 입력과
+일치시키는 accounting patch이다.
+
+- MemoryItem 개별 Token Cost는 기존과 동일하게 content-only CountTokens를 사용한다.
+- fixed_context_tokens와 최종 Context Budget Validation은
+  contents + Planner SYSTEM_INSTRUCTION을 CountTokens한다.
+- LLM model, Embedder, retrieval algorithm, K, utility weights, dataset grid,
+  prompts 및 Planner behavior는 변경하지 않는다.
+- 따라서 알고리즘의 Memory 선택 원칙은 동일하며, Context Budget B의
+  측정 범위만 실제 Agent input semantics와 일치시킨다.
 
 ## 1. Frozen architecture
 
