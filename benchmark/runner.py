@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import fcntl
 import os
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 from contextlib import nullcontext
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass, replace
@@ -67,6 +70,73 @@ FROZEN_PLANNER_BEHAVIOR_SHA256 = {
 EXECUTABLE_STATUS = "executable"
 NON_EXECUTABLE_STATUSES = frozenset({"generation_only", "deferred"})
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _open_lock_file(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    stream = path.open("a+b")
+    
+    stream.seek(0, os.SEEK_END)
+    
+    if stream.tell() == 0:
+        stream.write(b"\0")
+        stream.flush()
+        os.fsync(stream.fileno())
+        
+    stream.seek(0)
+    
+    return stream
+
+
+def _try_lock(stream) -> bool:
+    stream.seek(0)
+    
+    if os.name == "nt":
+        try:
+            msvcrt.locking(
+                stream.fileno(),
+                msvcrt.LK_NBLCK,
+                1,
+            )
+            return True
+        except OSError:
+            return False
+        
+    try:
+        fcntl.flock(
+            stream.fileno(),
+            fcntl.LOCK_EX | fcntl.LOCK_NB,
+        )
+        return True
+    except BlockingIOError:
+        return False
+    
+    
+def _unlock(stream) -> None:
+    if stream.closed:
+        return
+    
+    stream.seek(0)
+    
+    if os.name == "nt":
+        try:
+            msvcrt.locking(
+                stream.fileno(),
+                msvcrt.LK_UNLCK,
+                1,
+            )
+        except OSError:
+            pass
+        return
+    
+    try:
+        fcntl.flock(
+            stream.fileno(),
+            fcntl.LOCK_UN,
+        )
+    except OSError:
+        pass
 
 
 def _algorithm_spec_sha256() -> str:
@@ -219,8 +289,16 @@ def _partial_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                                                        final_parse_fallbacks=0, failure_counts={}, metrics={}))
         for failure in evaluation.get("failure_types", []):
             group["failure_counts"][failure] = group["failure_counts"].get(failure, 0) + 1
-        for name in ("required_state_accuracy", "temporal_version_correct",
-                     "constraint_violation_rate", "input_tokens", "total_latency_ms"):
+        for name in (
+            "required_state_accuracy", 
+            "temporal_version_correct",
+            "constraint_violation_rate", 
+            "input_tokens", 
+            "output_tokens",
+            "planning_latency_ms",
+            "total_latency_ms",
+            "total_llm_cost",
+        ):
             value = evaluation.get(name)
             if isinstance(value, (int, float)):
                 metric = group["metrics"].setdefault(name, {"sum": 0, "n": 0})
@@ -246,12 +324,20 @@ def checkpoint_status(directory: str | Path) -> dict[str, Any]:
     output = Path(directory)
     progress = json.loads((output / "progress.json").read_text(encoding="utf-8"))
     rows, _ = _read_saved_rows(output / "runs.jsonl")
-    with (output / ".runner.lock").open("r") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lock = _open_lock_file(output / ".runner.lock")
+    
+    try:
+        acquired = _try_lock(lock)
+        
+        if acquired:
             active = False
-        except BlockingIOError:
+            _unlock(lock)
+        else:
             active = True
+            
+    finally:
+        lock.close()
+    
     if progress["state"] == "running" and not active:
         progress["state"] = "interrupted"
     progress.update(runner_active=active, completed=len(rows),
@@ -275,12 +361,10 @@ class _RunCheckpoint:
 
     def __enter__(self):
         self.output.mkdir(parents=True, exist_ok=True)
-        self.lock = (self.output / ".runner.lock").open("a")
+        self.lock = _open_lock_file(self.output / ".runner.lock")
         try:
-            try:
-                fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise ValueError("another runner is using this output directory") from None
+            if not _try_lock(self.lock):
+                raise ValueError("another runner is using this output directory")
             metadata_path = self.output / "experiment.json"
             runs_path = self.output / "runs.jsonl"
             if self.resume:
@@ -310,7 +394,10 @@ class _RunCheckpoint:
         except BaseException:
             if hasattr(self, "stream"):
                 self.stream.close()
+                
+            _unlock(self.lock)
             self.lock.close()
+            
             raise
 
     def publish(self):
@@ -338,6 +425,8 @@ class _RunCheckpoint:
             self.publish()
         finally:
             self.stream.close()
+            
+            _unlock(self.lock)
             self.lock.close()
 
 
@@ -483,6 +572,9 @@ def _run_one(
         fixed_input_tokens = final_step.fixed_tokens
 
     run = _json_record(outcome)
+    
+    llm_usage = outcome.llm_usage or {}
+    
     run.update(
         selection_result=_json_record(selection),
         context_result=_json_record(context),
@@ -506,13 +598,27 @@ def _run_one(
             for mid in selection.retrieved_memory_ids
             for memory in memories if memory.memory_id == mid
         ],
+        
         usage=dict(
             fixed_input_tokens=fixed_input_tokens,
             input_tokens=input_tokens,
             total_input_tokens=outcome.total_input_tokens,
-            output_tokens=None,
+            
+            output_tokens=llm_usage.get("output_tokens"),
+            llm_prompt_tokens=llm_usage.get("prompt_tokens"),
+            llm_cached_prompt_tokens=llm_usage.get("cached_prompt_tokens"),
+            llm_tool_use_prompt_tokens=llm_usage.get("tool_use_prompt_tokens"),
+            llm_candidate_tokens=llm_usage.get("candidate_tokens"),
+            llm_thoughts_tokens=llm_usage.get("thoughts_tokens"),
+            llm_total_tokens=llm_usage.get("total_tokens"),
+            llm_api_calls=llm_usage.get("api_calls"),
         ),
-        planning_latency_ms=None, total_llm_cost=None,
+        
+        planning_latency_ms=outcome.planning_latency_ms,
+        total_llm_cost=outcome.total_llm_cost,
+        
+        llm_usage=llm_usage or None,
+        
         agent_executed=outcome.agent_executed,
         mandatory_memory_overflow=_mandatory_memory_overflow(outcome),
     )

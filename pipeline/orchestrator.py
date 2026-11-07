@@ -75,6 +75,10 @@ class PipelineRunResult:
     total_input_tokens: int
     final_turn: int
     
+    llm_usage: dict | None = None
+    planning_latency_ms: float | None = None
+    total_llm_cost: float | None = None
+    
     @property
     def agent_executed(self) -> bool:
         return any(
@@ -335,6 +339,25 @@ class Orchestrator:
             reason: str,
             completed: bool = False,
         ) -> PipelineRunResult:
+            llm_usage = None
+            planning_latency_ms = None
+            total_llm_cost = None
+            
+            telemetry_getter = getattr(self.agent.planner, "telemetry", None)
+            
+            if callable(telemetry_getter):
+                telemetry = telemetry_getter()
+                
+                if hasattr(telemetry, "to_dict"):
+                    llm_usage = telemetry.to_dict()
+                elif isinstance(telemetry, dict):
+                    llm_usage = dict(telemetry)
+                else:
+                    raise TypeError("planner.telemetry() must return a mapping or object with to_dict()")
+                
+                planning_latency_ms = llm_usage.get("planning_latency_ms")
+                total_llm_cost = llm_usage.get("estmated_cost_usd")
+            
             return PipelineRunResult(
                 status=status,
                 stopped_reason=reason,
@@ -346,6 +369,10 @@ class Orchestrator:
                 steps=tuple(traces),
                 total_input_tokens=total_input_tokens,
                 final_turn=current_turn,
+                
+                llm_usage=llm_usage,
+                planning_latency_ms=planning_latency_ms,
+                total_llm_cost=total_llm_cost,
             )
             
         for step_number in range(1, self.max_steps + 1):

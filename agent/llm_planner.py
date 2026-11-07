@@ -12,6 +12,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from time import perf_counter
 
 from .agent import AgentAction
 from .tools.calendar import CalendarTool
@@ -129,6 +130,60 @@ ACTION_SCHEMA: dict[str, Any] = {
 }
 
 
+GEMINI_31_FLASH_LITE_INPUT_USD_PER_MILLION = 0.25
+GEMINI_31_FLASH_LITE_OUTPUT_USD_PER_MILLION = 1.50
+GEMINI_31_FLASH_LITE_CACHED_INPUT_USD_PER_MILLION = 0.025
+
+
+@dataclass(frozen=True)
+class PlannerTelemetry:
+    planner_calls: int
+    api_calls: int
+    usage_metadata_calls: int
+    
+    prompt_tokens: int | None
+    cached_prompt_tokens: int | None
+    tool_use_prompt_tokens: int | None
+    
+    candidate_tokens: int | None
+    thoughts_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    
+    planning_latency_ms: float
+    estimated_cost_usd: float | None
+    
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "planner_calls": self.planner_calls,
+            "api_calls": self.api_calls,
+            "usage_metadata_calls": self.usage_metadata_calls,
+            
+            "prompt_tokens": self.prompt_tokens,
+            "cached_prompt_tokens": self.cached_prompt_tokens,
+            "tool_use_prompt_tokens": self.tool_use_prompt_tokens,
+            
+            "candidate_tokens": self.candidate_tokens,
+            "thoughts_tokens": self.thoughts_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+            
+            "planning_latency_ms": self.planning_latency_ms,
+            "estimated_cost_usd": self.estimated_cost_usd,
+            
+            "pricing": {
+                "currency": "USD",
+                "provider": "google",
+                "model": DEFAULT_MODEL,
+                "tier": "developer_api_standard_paid",
+                "input_per_million": GEMINI_31_FLASH_LITE_INPUT_USD_PER_MILLION,
+                "cached_input_per_million": GEMINI_31_FLASH_LITE_CACHED_INPUT_USD_PER_MILLION,
+                "output_per_million": GEMINI_31_FLASH_LITE_OUTPUT_USD_PER_MILLION,
+                "output_includes_thinking": True,
+            }
+        }
+
+
 class LLMPlanner:
     """Gemini 3.1 Flash-Lite의 JSON 응답을 AgentAction으로 바꾸는 계획기.
 
@@ -184,26 +239,53 @@ class LLMPlanner:
         self._sleeper = sleeper or _sleep
         self._client = client
         self._api_key = api_key
+        
+        self._planner_calls = 0
+        self._api_calls = 0
+        self._usage_metadata_calls = 0
+        
+        self._prompt_tokens = 0
+        self._cached_prompt_tokens = 0
+        self._tool_use_prompt_tokens = 0
+        
+        self._cadidate_tokens = 0
+        self._thoughts_tokens = 0
+        self._total_tokens = 0
+        
+        self._planning_latency_ms = 0.0
 
     def plan(self, context: str) -> AgentAction:
         """완성된 context를 모델에 넘기고 AgentAction 하나를 돌려준다."""
         if not isinstance(context, str) or not context.strip():
             return _text("context가 비어 있어 행동하지 않았습니다.")
-        client = self._client_or_create()
-        for attempt in range(self.max_retries + 1):
-            try:
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=context,
-                    config=self.generation_config(),
-                )
-                return agent_action_from_model_output(_payload_from_response(response))
-            except Exception as exc:
-                if attempt < self.max_retries and _transient(exc):
-                    self._sleeper(self.retry_base_seconds * (2 ** attempt))
-                    continue
-                return _text(f"모델 호출에 실패했습니다: {type(exc).__name__}")
-        return _text("모델 호출에 실패했습니다.")
+        
+        self._planner_calls += 1
+        started = perf_counter()
+        
+        try:
+            client = self._client_or_create()
+            for attempt in range(self.max_retries + 1):
+                try:
+                    self._api_calls += 1
+                    
+                    response = client.models.generate_content(
+                        model=self.model,
+                        contents=context,
+                        config=self.generation_config(),
+                    )
+                    
+                    self._record_usage_metadata(response)
+                    
+                    return agent_action_from_model_output(_payload_from_response(response))
+                except Exception as exc:
+                    if attempt < self.max_retries and _transient(exc):
+                        self._sleeper(self.retry_base_seconds * (2 ** attempt))
+                        continue
+                    return _text(f"모델 호출에 실패했습니다: {type(exc).__name__}")
+            return _text("모델 호출에 실패했습니다.")
+        
+        finally:
+            self._planning_latency_ms += (perf_counter() - started) * 1000.0
 
     def _client_or_create(self) -> Any:
         if self._client is not None:
@@ -234,7 +316,83 @@ class LLMPlanner:
             "response_json_schema": ACTION_SCHEMA,
             "thinking_config": {"thinking_level": self.thinking_level},
         }
-
+        
+        
+    def _record_usage_metadata(self, response: Any) -> None:
+        usage = getattr(response, "usage_metadata", None)
+        
+        if usage is None:
+            return
+        
+        self._usage_metadata_calls += 1
+        
+        self._prompt_tokens += _usage_int(usage, "prompt_token_count")
+        
+        self._cached_prompt_tokens += _usage_int(usage, "cached_content_token_count")
+        
+        self._tool_use_prompt_tokens += _usage_int(usage, "tool_use_prompt_token_count")
+        
+        candidate_tokens = getattr(usage, "candidates_token_count", None)
+        
+        if candidate_tokens is None:
+            candidate_tokens = getattr(usage, "response_token_count", None)
+            
+        if type(candidate_tokens) is int and candidate_tokens >= 0:
+            self._cadidate_tokens += candidate_tokens
+            
+        self._thoughts_tokens += _usage_int(usage, "thoughts_token_count")
+        
+        total = getattr(usage, "total_token_count", None)
+        
+        if type(total) is int and total >= 0:
+            self._total_tokens += total
+        else:
+            self._total_tokens += (
+                _usage_int(usage, "prompt_token_count")
+                + _usage_int(usage, "tool_use_prompt_token_count")
+                + candidate_tokens if type(candidate_tokens) is int and candidate_tokens >= 0 else 0
+                + _usage_int(usage, "thoughts_token_count")
+            )
+            
+            
+    def telemetry(self) -> PlannerTelemetry:
+        meatadata_available = self._usage_metadata_calls > 0
+        
+        if meatadata_available:
+            output_tokens = self._cadidate_tokens + self._thoughts_tokens
+            billable_intput_tokens = self._prompt_tokens + self._tool_use_prompt_tokens
+            cached_tokens = min(self._cached_prompt_tokens, billable_intput_tokens)
+            uncached_tokens = max(0, billable_intput_tokens - cached_tokens)
+            
+            estimated_cost_usd = (
+                uncached_tokens * GEMINI_31_FLASH_LITE_INPUT_USD_PER_MILLION + cached_tokens * GEMINI_31_FLASH_LITE_CACHED_INPUT_USD_PER_MILLION + output_tokens * GEMINI_31_FLASH_LITE_OUTPUT_USD_PER_MILLION
+                ) / 1_000_000.0
+            
+        elif self._api_calls == 0:
+            output_tokens = 0
+            estimated_cost_usd = 0.0
+            
+        else:
+            output_tokens = None
+            estimated_cost_usd = None
+            
+        return PlannerTelemetry(
+            planner_calls=self._planner_calls,
+            api_calls=self._api_calls,
+            usage_metadata_calls=self._usage_metadata_calls,
+            
+            prompt_tokens=self._prompt_tokens if meatadata_available else None,
+            cached_prompt_tokens=self._cached_prompt_tokens if meatadata_available else None,
+            tool_use_prompt_tokens=self._tool_use_prompt_tokens if meatadata_available else None,
+            
+            candidate_tokens=self._cadidate_tokens if meatadata_available else None,
+            thoughts_tokens=self._thoughts_tokens if meatadata_available else None,
+            output_tokens=output_tokens,
+            total_tokens=self._total_tokens if meatadata_available else None,
+            
+            planning_latency_ms=self._planning_latency_ms,
+            estimated_cost_usd=estimated_cost_usd,
+        )
 
 def shared_system_instruction(system_prompt: str) -> str:
     """실험 시스템 프롬프트와 JSON 행동 규칙을 한 문자열로 붙인다.
@@ -495,3 +653,12 @@ def _transient(exc: BaseException) -> bool:
         return True
     name = type(exc).__name__.lower()
     return any(word in name for word in ("timeout", "connection", "unavailable", "ratelimit", "rate_limit"))
+
+
+def _usage_int(usage: Any, name: str) -> int:
+    value = getattr(usage, name, None)
+    
+    if type(value) is int and value >= 0:
+        return value
+    
+    return 0

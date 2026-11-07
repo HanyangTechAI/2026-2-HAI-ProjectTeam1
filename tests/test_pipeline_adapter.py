@@ -732,7 +732,7 @@ class PipelineAdapterTests(unittest.TestCase):
             with patch("benchmark.runner._run_one", wraps=_run_one) as resumed:
                 result = self.run_runner(output, strategies=STRATEGIES, embedder=embed, resume=True)
             self.assertEqual(resumed.call_count, 3)
-            rows = [json.loads(line) for line in prior.read_text().splitlines()]
+            rows = [json.loads(line) for line in prior.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(rows), 4)
             self.assertEqual(len({(r["strategy"], r["repeat_id"]) for r in rows}), 4)
             self.assertEqual(result["summary"], aggregate_results(
