@@ -155,6 +155,26 @@ Metadata에는 `request_shape=generateContentRequest`,
 system instruction SHA-256을 기록한다. REST CountTokens도 Token retry 정책과 같은
 재시도 대상·횟수·backoff를 사용하고 `URLError`를 transient connection failure로 본다.
 
+### Preflight 결과 및 Safety Margin 확정
+
+- 대상 모델: Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`)
+- 측정 예산: `1,024 / 2,048` tokens
+- 검증한 실제 Prompt 호출: `106`회
+- CountTokens 대비 최대 양수 오차: `1` token
+- 실제 Prompt Budget 초과: `0`건
+- Prompt Audit 불완전: `0`건
+- 최종 공통 Safety Margin: `32` tokens
+- Budget Policy: `total_input`
+
+**1K 실행 가능성 제한:** 현재 생성 데이터에서는 고정 입력과 Mandatory Memory의
+합이 명목상 1K Budget을 초과한다. 따라서 Proposed는 8개 Preflight 시나리오 모두
+`INSUFFICIENT_CONTEXT_BUDGET`으로 중단됐다. 이 중단은 필수 기억 보존 정책에 따른
+결과이며 정상적인 Agent 행동 실패와 별도로 분석한다.
+
+1K 조건은 예산 실현 가능성과 안전 중단 분석에 사용한다. 전략별 실제 행동 성능
+비교는 LLM 실행 가능 구간에서 추가로 수행하며, 전체 TSR에는 예산 중단도 실패로
+포함한다.
+
 ## 3. Frozen experiment scopes
 
 ### Main — executable, 필수
