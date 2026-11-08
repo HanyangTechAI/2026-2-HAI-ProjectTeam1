@@ -1,0 +1,77 @@
+
+name: Python CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python 3.12 / Unit Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    env:
+      PYTHONUTF8: "1"
+      PYTHONUNBUFFERED: "1"
+      GEMINI_API_KEY: ""
+
+    steps:
+      # 1. 저장소 체크아웃
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # 2. Python 환경 구성
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # 3. 의존성 설치
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+          # CI는 GPU가 필요 없으므로 CPU 전용 PyTorch 사용
+          python -m pip install torch \
+            --index-url https://download.pytorch.org/whl/cpu
+
+          python -m pip install -r requirements.txt
+
+      # 4. 의존성 충돌 확인
+      - name: Check dependencies
+        run: python -m pip check
+
+      # 5. Python 구문 검사
+      - name: Check Python syntax
+        run: |
+          python -m compileall -q \
+            agent \
+            benchmark \
+            context \
+            memory \
+            pipeline \
+            tests
+
+      # 6. 전체 단위 테스트
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests -v
