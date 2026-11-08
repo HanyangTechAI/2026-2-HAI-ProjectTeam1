@@ -7,8 +7,17 @@ import tempfile
 import unittest
 
 from benchmark.evaluator import (
-    aggregate_results, evaluate, expand_config, load_config,
-    normalized_exact_match, paired_success_deltas, retrieval_metrics, token_f1,
+    aggregate_results, 
+    evaluate, 
+    expand_config, 
+    load_config,
+    normalized_exact_match, 
+    paired_success_deltas, 
+    retrieval_metrics, 
+    token_f1,
+    verify_embedding_revision_consistency,
+    METRIC_ROLES,
+    SUMMARY_METRICS,
 )
 from memory.selector import PipelineStatus, SelectionResult
 
@@ -401,6 +410,131 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(metrics["precision_at_k"], .5)
         self.assertEqual(metrics["mrr"], .5)
         self.assertIsNone(retrieval_metrics([], [])["recall_at_k"])
+        
+        
+    def test_embedding_revision_consistency(self):
+        config = {
+            "grid": {
+                "context_token_budget": [
+                    1024,
+                    2048,
+                ],
+                "horizon_turns": [
+                    10,
+                    50,
+                ],
+            },
+            "runtime": {
+                "embedding_model": "test-model",
+            },
+        }
+
+        revision = "a" * 40
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            for index in range(4):
+                cell = root / f"cell_{index}"
+                cell.mkdir()
+
+                metadata = {
+                    "runtime_environment": {
+                        "embedding": {
+                            "model": "test-model",
+                            "resolved_revision": revision,
+                        }
+                    }
+                }
+
+                (
+                    cell / "experiment.json"
+                ).write_text(
+                    json.dumps(metadata),
+                    encoding="utf-8",
+                )
+
+            result = (
+                verify_embedding_revision_consistency(
+                    root,
+                    config,
+                )
+            )
+
+            self.assertEqual(
+                result["status"],
+                "pass",
+            )
+
+            self.assertEqual(
+                result["expected_cells"],
+                4,
+            )
+
+            self.assertEqual(
+                result["observed_cells"],
+                4,
+            )
+
+            self.assertEqual(
+                result["resolved_revision"],
+                revision,
+            )
+            
+            
+    def test_embedding_revision_mismatch_is_rejected(
+        self,
+    ):
+        config = {
+            "grid": {
+                "context_token_budget": [
+                    1024,
+                    2048,
+                ],
+            },
+            "runtime": {
+                "embedding_model": "test-model",
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            revisions = [
+                "a" * 40,
+                "b" * 40,
+            ]
+
+            for index, revision in enumerate(
+                revisions
+            ):
+                cell = root / f"cell_{index}"
+                cell.mkdir()
+
+                metadata = {
+                    "runtime_environment": {
+                        "embedding": {
+                            "model": "test-model",
+                            "resolved_revision": revision,
+                        }
+                    }
+                }
+
+                (
+                    cell / "experiment.json"
+                ).write_text(
+                    json.dumps(metadata),
+                    encoding="utf-8",
+                )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "revision mismatch",
+            ):
+                verify_embedding_revision_consistency(
+                    root,
+                    config,
+                )
 
 
 class SelectionTraceTests(unittest.TestCase):
@@ -486,6 +620,35 @@ class SelectionTraceTests(unittest.TestCase):
         metric = aggregate_results(rows, bootstrap_iterations=100)[0]["metrics"]["budget_selection_failure"]
         self.assertEqual(metric["mean"], .5)
         self.assertEqual(metric["n"], 2)
+        
+        
+    def test_planning_latency_is_secondary_metric(self):
+        self.assertIn(
+            "planning_latency_ms",
+            METRIC_ROLES["secondary_efficiency"],
+        )
+
+        self.assertNotIn(
+            "planning_latency_ms",
+            METRIC_ROLES["primary_outcome"],
+        )
+        
+        
+    def test_total_latency_is_not_comparison_metric(self):
+        self.assertNotIn(
+            "total_latency_ms",
+            METRIC_ROLES["primary_outcome"],
+        )
+
+        self.assertNotIn(
+            "total_latency_ms",
+            METRIC_ROLES["secondary_efficiency"],
+        )
+
+        self.assertNotIn(
+            "total_latency_ms",
+            SUMMARY_METRICS,
+        )
 
 
 class AggregationTests(unittest.TestCase):

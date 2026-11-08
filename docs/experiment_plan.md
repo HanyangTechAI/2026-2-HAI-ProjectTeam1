@@ -511,8 +511,10 @@ Context에 모두 포함되고 행동도 성공한 경우다. 전체 입력 계�
   "repeat_id": 0,
   "pipeline_status": "ok",
   "context_token_budget": 2048,
+  "effective_context_budget": 2016,
+  "request_token_safety_margin": 32,
   "fixed_input_tokens": 310,
-  "available_memory_tokens": 1738,
+  "available_memory_tokens": 1706,
   "history_length_tokens": 10000,
   "horizon_turns": 50,
   "constraint_count": 1,
@@ -601,6 +603,8 @@ deterministic 판정에는 직접 사용하지 않는다.
 - `retrieved_memories`: 제공된 경우 최초 검색 당시 상태 snapshot을 보존해 사후 분석에 사용. 현재 stale 판정은 이 snapshot 대신 `wrong_version_memory_ids`와 ID 교집합으로 계산
 - `target_memory_ids`: evaluation sample의 정답 Memory 집합
 - `context_token_budget`: 해당 실험 실행에 설정된 전체 Agent 입력 Context의 token 상한
+- `effective_context_budget`: 명목 Context Budget에서 `request_token_safety_margin`을 뺀 실제 선택·조립 상한
+- `request_token_safety_margin`: CountTokens와 provider usage 차이를 흡수하기 위해 모든 전략에 공통 적용한 예약 token 수. 기본값은 `0`
 - `fixed_input_tokens`: System Prompt, 현재 요청과 Tool 정의 등 고정 입력의 token 수
 - `available_memory_tokens`: 전체 Context 상한에서 고정 입력을 제외한 Memory 가용 token 수
 - `retrieval_tokens`: 실행 adapter가 제공한 경우에만 기록하는 검색 token 수
@@ -614,6 +618,8 @@ deterministic 판정에는 직접 사용하지 않는다.
 - `stale_selected_memory_count`: 실제 LLM context에 포함된 Memory 중 `wrong_version_memory_ids`에 속하는 수. 과거 요청의 정답은 superseded되어도 제외
 
 따라서 Evaluation schema는 공통 Memory schema를 대체하거나 새롭게 정의하는 것이 아니다. 공통 Memory schema를 입력으로 사용하고, 그중 평가에 필요한 상태를 snapshot으로 보존한 뒤 실험 조건과 계산된 metric을 추가한 실행 결과 schema이다.
+
+집계 결과는 `metric_roles.json`에서 지표 역할을 명시한다. Task success·제약 위반·Required State·stale/temporal 정확성은 primary outcome, 입력·출력 token·Planning Latency·LLM 비용은 secondary efficiency, 검색·선택·상태 오류 분석값은 supporting diagnostic이다. `total_latency_ms`는 어느 비교 역할에도 포함하지 않는다. Main 집계는 `--experiment-root`를 필수로 받아 모든 grid cell의 `experiment.json` 수와 embedding model·resolved revision 일치를 확인하고 `provenance_audit.json`을 남긴다. 셀 수가 다르거나 revision이 섞이면 집계를 중단한다.
 
 ```text
 Common Memory Schema

@@ -27,8 +27,15 @@ python -m benchmark.generator --config experiments/configs/smoke.json --output b
 필수 실험 데이터는 설정 경로와 출력 경로를 바꾸어 생성한다.
 
 ```powershell
-python -m benchmark.generator --config experiments/configs/main.json --archive --output benchmark/generated/main.zip
-Expand-Archive -LiteralPath benchmark/generated/main.zip -DestinationPath benchmark/generated/main
+python -m benchmark.generator `
+  --config experiments/configs/main.json `
+  --archive `
+  --output benchmark/generated/main_gemini_3_1_flash_lite.zip `
+  --gemini-token-model gemini-3.1-flash-lite `
+  --gemini-token-cache .cache/main_gemini_3_1_flash_lite.sqlite3
+Expand-Archive `
+  -LiteralPath benchmark/generated/main_gemini_3_1_flash_lite.zip `
+  -DestinationPath benchmark/generated/main_gemini_3_1_flash_lite
 ```
 
 `--archive`는 셀 JSON과 루트의 `manifest.json`을 ZIP 한 개에 저장한다. Main의 반복되는 긴 대화를 압축해 보관하는 방식이며 데이터와 정답은 디렉터리 출력과 같다. Runner는 ZIP을 직접 읽지 않으므로 압축을 푼 뒤 셀 JSON 하나를 지정한다. 압축 없이 만들려면 `--archive`를 생략하고 출력 디렉터리를 지정한다.
@@ -200,6 +207,8 @@ python -m benchmark.runner --help
 ```
 
 현재 Runner는 단일 셀 JSON에 대해 Sliding Window, Vector Top-k, Utility-per-Token, Proposed와 repeat를 실행한다. Proposed는 외부 embedder와 각 Scenario의 ISO 8601 `current_time`을 요구하며 생성 데이터에는 이 값이 포함된다. `--proposed-ablations full no_constraint_preservation no_temporal no_state_mandatory no_budget_aware_packing`처럼 preset을 선택하면 동일 Scenario에서 각 변형을 실행한다. 실제 Gemini LLM Planner는 freeze config의 model 설정 또는 `--llm-model`로 활성화할 수 있다. 여러 셀을 순회하는 전체 grid 실행과 `reference.json`의 Long Context 실행은 별도 작업이다.
+
+`--request-token-safety-margin N`을 지정하면 Scenario의 명목 Budget에서 `N`을 뺀 실효 Budget으로 선택과 Context 조립을 수행한다. 값은 0 이상의 정수이고 모든 입력 Budget보다 작아야 하며 기본값은 `0`이다. 결과에는 명목 Budget, 실효 Budget과 margin을 함께 기록한다. Prompt audit의 CountTokens 초과 여부는 실효 Budget을, provider가 보고한 실제 prompt token 초과 여부는 명목 Budget을 기준으로 판정한다.
 
 생성한 시나리오의 파일 목록과 사전 승인 ID를 mock Tool에 넣으려면 `--environment-agent-factory module:function`을 사용한다. 이 함수는 실행마다 해당 시나리오의 `environment` 사본만 받아 새 Agent를 반환한다. 정답, 검색 fixture와 기대 호출은 받지 않는다. 기존 인자 없는 `--agent-factory`와 동시에 지정하지 않는다.
 

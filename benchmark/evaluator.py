@@ -296,17 +296,28 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     temporal_version_correct = correct_states == len(states) and omissions == 0 and stale_states == 0 and errors == 0 if temporal_required else None
     temporal_context_correct = required_ids <= selected_ids and not wrong_version_ids & selected_ids if temporal_required else None
     budget = scenario.get("context_budget", scenario.get("context_token_budget"))
+    effective_budget = run.get("effective_context_budget", budget)
+    safety_margin = run.get("request_token_safety_margin", 0)
     usage = run.get("usage") or {}
     input_tokens = usage.get("input_tokens", context.get("input_tokens", run.get("input_tokens")))
     fixed_tokens = usage.get("fixed_input_tokens", run.get("fixed_input_tokens"))
     output_tokens = usage.get("output_tokens", run.get("output_tokens"))
-    for name, value in (("context_budget", budget), ("input_tokens", input_tokens),
-                        ("fixed_input_tokens", fixed_tokens), ("output_tokens", output_tokens)):
+    for name, value in (
+        ("context_budget", budget), 
+        ("effective_context_budget", effective_budget),
+        ("request_token_safety_margin", safety_margin),
+        ("input_tokens", input_tokens),
+        ("fixed_input_tokens", fixed_tokens), 
+        ("output_tokens", output_tokens)
+    ):
         if value is not None and (type(value) is not int or value < 0):
             raise ValueError(f"{name} must be a non-negative integer")
     if budget is None or (status == "ok" and input_tokens is None):
         raise ValueError("context_budget and actual input_tokens for successful runs are required")
-    budget_exceeded = input_tokens is not None and input_tokens > budget
+    counted_budget_exceeded = input_tokens is not None and input_tokens > effective_budget
+    prompt_audit = run.get("prompt_token_audit") or {}
+    actual_budget_exceeded = prompt_audit.get("actual_budget_exceeded") is True
+    budget_exceeded = counted_budget_exceeded or actual_budget_exceeded
     invalid_fixed_budget = fixed_tokens is not None and fixed_tokens > budget
     expected = scenario.get("expected_tool_calls", [])
     forbidden = scenario.get("forbidden_tool_calls", [])
@@ -372,8 +383,14 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     metrics.update(answer_scores)
     metrics.update(selection_diagnostics)
     metrics.update(
-        context_token_budget=budget, fixed_input_tokens=fixed_tokens,
-        available_memory_tokens=budget - fixed_tokens if fixed_tokens is not None else None,
+        context_token_budget=budget, 
+        effective_context_budget=effective_budget,
+        request_token_safety_margin=safety_margin,
+        fixed_input_tokens=fixed_tokens,
+        available_memory_tokens=effective_budget - fixed_tokens if fixed_tokens is not None else None,
+        counted_budget_exceeded=counted_budget_exceeded,
+        actual_prompt_budget_exceeded=actual_budget_exceeded,
+        budget_exceeded=budget_exceeded,
         retrieved_memory_ids=retrieved, selected_memory_ids=selected, target_memory_ids=targets,
         retrieved_memories=run.get("retrieved_memories", []),
         retrieval_k=k, retrieval_applicable=retrieval_applicable,
@@ -402,7 +419,7 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         stale_selected_memory_count=len(wrong_version_ids & selected_ids),
         approval_behavior_correct=all(approval_checks) if approval_checks else None,
         mandatory_memory_overflow=run.get("mandatory_memory_overflow"),
-        budget_exceeded=budget_exceeded, invalid_fixed_budget=invalid_fixed_budget,
+        invalid_fixed_budget=invalid_fixed_budget,
         expected_tool_calls_present=expected_ok,
         forbidden_tool_call_used=forbidden_hit, input_tokens=input_tokens, output_tokens=output_tokens,
         retrieval_tokens=usage.get("retrieval_tokens"), memory_tokens=context.get("memory_tokens", selection.get("memory_tokens")),
@@ -411,6 +428,29 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     )
     return EvaluationResult(str(sample_id), str(strategy), repeat_id, status, bool(success), metrics)
 
+
+PRIMARY_OUTCOME_METRICS = (
+    "task_success", "constraint_violation_rate", "required_state_accuracy",
+    "stale_state_usage_rate", "temporal_version_correct", "temporal_context_correct",
+)
+
+SECONDARY_EFFICIENCY_METRICS = (
+    "input_tokens", "output_tokens",
+    "planning_latency_ms", "total_llm_cost",
+)
+
+SUPPORTING_DIAGNOSTIC_METRICS = (
+    "general_retrieval_miss", "selection_failure", "budget_selection_failure",
+    "recall_at_k", "state_omission_rate", "state_error_rate",
+    "precision_at_k", "mrr", "answer_normalized_exact_match", "answer_f1",
+    "applicable_protected_recall",
+)
+
+METRIC_ROLES = {
+    "primary_outcome": PRIMARY_OUTCOME_METRICS,
+    "secondary_efficiency": SECONDARY_EFFICIENCY_METRICS,
+    "supporting_diagnostic": SUPPORTING_DIAGNOSTIC_METRICS,
+}
 
 SUMMARY_METRICS = (
     "task_success", "constraint_violation_rate", "required_state_accuracy",
@@ -538,6 +578,98 @@ def expand_config(config: dict) -> list[dict]:
             for values in itertools.product(*(config["grid"][key] for key in keys))
             for seed in config["seeds"] for repeat in range(config["repeats"])
             for strategy in config["strategies"]]
+    
+    
+def verify_embedding_revision_consistency(
+    experiment_root: str | Path,
+    config: Mapping[str, Any],
+) -> dict[str, Any]:
+    root = Path(experiment_root)
+    
+    if not root.is_dir():
+        raise ValueError(f"experiment root does not exist: {root}")
+    
+    grid = config.get("grid")
+    
+    if not isinstance(grid, Mapping) or not grid:
+        raise ValueError("config.grid is required for provenance validation")
+    
+    expected_cells = math.prod(
+        len(values)
+        for values in grid.values()
+    )
+    
+    experiment_paths = sorted(root.glob("*/experiment.json"))
+    
+    if len(experiment_paths) != expected_cells:
+        raise ValueError(f"experiment cell count mismatch: expected {expected_cells}, found {len(experiment_paths)}")
+    
+    runtime_config = config.get("runtime") or {}
+    
+    expected_model = runtime_config.get("embedding_model") if isinstance(runtime_config, Mapping) else None
+    
+    cells: list[dict[str, Any]] = []
+    
+    for path in experiment_paths:
+        try:
+            metadata = json.loads(path.read_text(encoding="utf-8"))
+        except (
+            OSError, 
+            json.JSONDecodeError
+        ) as exc:
+            raise ValueError(f"could not read experiment metadata: {path}") from exc
+        
+        runtime = metadata.get("runtime_environment")
+        
+        if not isinstance(runtime, Mapping):
+            raise ValueError(f"runtime_environment missing from {path}")
+              
+        embedding = runtime.get("embedding")
+        
+        if not isinstance(embedding, Mapping):
+            raise ValueError(f"runtime_environment.embedding missing from {path}")
+        
+        model = embedding.get("model")
+        revision = embedding.get("resolved_revision")
+        
+        if not isinstance(revision, str) or not revision.strip():
+            raise ValueError(f"embedding resolved_revision missing from {path}")
+        
+        if expected_model is not None and model != expected_model:
+            raise ValueError(f"embedding model mismatch in {path}: expected {expected_model!r}, got {model!r}")
+        
+        cells.append(
+            {
+                "cell_id": path.parent.name,
+                "experiment_path": str(path),
+                "embedding_model": model,
+                "resolved_revision": revision,
+            }
+        )
+        
+    revisions = sorted(
+        {
+            cell["resolved_revision"]
+            for cell in cells
+        }
+    )
+    
+    if len(revisions) != 1:
+        details = ", ".join(
+            f"{cell['cell_id']}={cell['resolved_revision']}"
+            for cell in cells
+        )
+        
+        raise ValueError(f"embedding revision mismatch across experiment cells: {details}")
+    
+    return {
+        "status": "pass",
+        "expected_cells": expected_cells,
+        "observed_cells": len(cells),
+        "embedding_model": expected_model,
+        "resolved_revision": revisions[0],
+        "cells": cells,
+    }
 
 
 def main() -> None:
@@ -546,6 +678,7 @@ def main() -> None:
     parser.add_argument("--input", help="JSONL rows containing scenario and run_result")
     parser.add_argument("--output", required=True, help="output directory")
     parser.add_argument("--plan-only", action="store_true")
+    parser.add_argument("--experiment-root", help="Directory containing one subdirectory per experiment cell with experiment.json")
     args = parser.parse_args()
     config = load_config(args.config)
     out = Path(args.output)
@@ -555,6 +688,27 @@ def main() -> None:
         return
     if not args.input:
         parser.error("--input is required unless --plan-only is set")
+    provenance_audit = None
+    if config.get("scope") == "main":
+        if not args.experiment_root:
+            parser.error("--experiment-root is required for main aggregation")
+        
+        try:
+            provenance_audit = verify_embedding_revision_consistency(
+                args.experiment_root,
+                config,
+            )
+        except ValueError as exc:
+            parser.error(f"provenance validation failed: {exc}")
+            
+    elif args.experiment_root:
+        try:
+            provenance_audit=verify_embedding_revision_consistency(
+                args.experiment_root,
+                config,
+            )
+        except ValueError as exc:
+            parser.error(f"provenance validation failed: {exc}")
     results = []
     for line_number, line in enumerate(Path(args.input).read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
@@ -581,6 +735,26 @@ def main() -> None:
     (out / "evaluations.jsonl").write_text("".join(json.dumps(r.to_dict(), ensure_ascii=False) + "\n" for r in results), encoding="utf-8")
     for filename, value in (("summary.json", summary), ("deltas.json", deltas), ("config.json", config)):
         (out / filename).write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out / "metric_roles.json").write_text(
+        json.dumps(
+            {
+                key: list(values)
+                for key, values in METRIC_ROLES.items()
+            },
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    if provenance_audit is not None:
+        (out / "provenance_audit.json").write_text(
+            json.dumps(
+                provenance_audit,
+                ensure_ascii=False,
+                indent=2,
+            ) + "\n",
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":

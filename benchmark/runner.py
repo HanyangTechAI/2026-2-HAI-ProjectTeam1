@@ -543,10 +543,17 @@ def _prompt_token_audit(
     *,
     executed_steps,
     actual_prompt_tokens,
-    context_budget: int,
+    nominal_context_budget: int,
+    effective_context_budget: int,
 ) -> dict[str, Any]:
-    if type(context_budget) is not int or context_budget < 0:
-        raise ValueError("context_budget must be a non-negative integer")
+    if type(nominal_context_budget) is not int or nominal_context_budget < 0:
+        raise ValueError("nominal_context_budget must be a non-negative integer")
+    
+    if type(effective_context_budget) is not int or effective_context_budget < 0:
+        raise ValueError("effective_context_budget must be a non-negative integer")
+    
+    if effective_context_budget > nominal_context_budget:
+        raise ValueError("effective_context_budget cannot exceed nominal_context_budget")
     
     counted = [
         step.context_result.total_input_tokens
@@ -612,19 +619,23 @@ def _prompt_token_audit(
     
     max_counted = max(counted) if counted else None
     
+    counted_budget_exceeded = any(
+        value > effective_context_budget
+        for value in counted
+    )
+    
     actual_budget_exceeded = any(
-        value > context_budget
+        value > nominal_context_budget
         for value in actual
         if value is not None
     ) if complete else None
     
-    counted_budget_exceeded = any(
-        value > context_budget
-        for value in counted
-    )
-    
     return {
-        "context_budget": context_budget,
+        "nominal_context_budget": nominal_context_budget,
+        
+        "effective_context_budget": effective_context_budget,
+        
+        "request_token_safety_margin": nominal_context_budget - effective_context_budget,
         
         "counted_prompt_tokens_per_call": counted,
         "actual_prompt_tokens_per_call": actual,
@@ -664,7 +675,14 @@ def _run_one(
     goal_checker: GoalChecker | None,
     proposed_ablation: SelectorAblationConfig | None,
     llm_config: LLMRunConfig | None,
+    request_token_safety_margin: int,
 ) -> dict[str, Any]:
+    nominal_context_budget = scenario["context_budget"]
+    
+    effective_context_budget = nominal_context_budget - request_token_safety_margin
+    
+    if effective_context_budget < 0:
+        raise ValueError("request_token_safety_margin exceeds scenario context budget")
     start = perf_counter()
     # Store에 재삽입하지 않고 기존 버전 관계를 유지한 채 스냅샷을 복원한다.
     memories = tuple(MemoryItem.from_dict(item) for item in scenario["memory_snapshot"])
@@ -720,7 +738,7 @@ def _run_one(
         query=scenario["query"],
         session_id=scenario["session_id"],
         memories=memories,
-        total_budget=scenario["context_budget"],
+        total_budget=effective_context_budget,
         current_turn=scenario["current_turn"],
         current_time=_scenario_current_time(scenario),
     )
@@ -769,7 +787,8 @@ def _run_one(
     prompt_token_audit = _prompt_token_audit(
         executed_steps=executed_steps,
         actual_prompt_tokens=llm_usage.get("prompt_tokens_per_call"),
-        context_budget=scenario["context_budget"],
+        nominal_context_budget=nominal_context_budget,
+        effective_context_budget=effective_context_budget,
     )
     
     run.update(
@@ -821,6 +840,10 @@ def _run_one(
         
         agent_executed=outcome.agent_executed,
         mandatory_memory_overflow=_mandatory_memory_overflow(outcome),
+        
+        nominal_context_budget=nominal_context_budget,
+        effective_context_budget=effective_context_budget,
+        request_token_safety_margin=request_token_safety_margin,
     )
     final_ids = set(context.selected_memory_ids) if outcome.status == PipelineStatus.OK else set()
     run["context_result"]["memory_tokens"] = sum(
@@ -872,6 +895,7 @@ def run_scenarios(
     show_progress: bool = False,
     resume: bool = False,
     checkpoint_interval: int = 100,
+    request_token_safety_margin: int = 0,
 ) -> dict[str, Any]:
     """활성 integration 시나리오를 전략·반복별로 실행한다.
 
@@ -994,6 +1018,17 @@ def run_scenarios(
             f"scenario={sorted(scenario_modes)}, runtime={mode}; "
             "regenerate scenarios with the runtime model instead of relabeling metadata"
         )
+        
+    if type(request_token_safety_margin) is not int or request_token_safety_margin < 0:
+        raise ValueError("request_token_safety_margin must be a non-negative integer")
+
+    smallest_budget = min(
+        scenario["context_budget"]
+        for scenario in enabled
+    )
+    
+    if request_token_safety_margin > 0 and request_token_safety_margin >= smallest_budget:
+        raise ValueError("request_token_safety_margin must be smaller than every context budget")
 
     if isinstance(token_counter, GeminiTokenCounter):
         tokenizer_metadata = token_counter.metadata()
@@ -1037,6 +1072,7 @@ def run_scenarios(
         "llm": None if llm_config is None else llm_config.to_dict(),
         "config": None if config_metadata is None else _json_record(config_metadata),
         "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
+        "request_token_safety_margin": request_token_safety_margin,
     }
 
     output = Path(output_directory)
@@ -1114,6 +1150,7 @@ def run_scenarios(
                                     goal_checker=goal_checker,
                                     proposed_ablation=ablation,
                                     llm_config=llm_config,
+                                    request_token_safety_margin=request_token_safety_margin,
                                 )
                                 row.update(provenance)
                                 row["dataset_seed"] = scenario.get("metadata", {}).get("seed")
@@ -1412,6 +1449,7 @@ def main() -> None:
     parser.add_argument("--gemini-token-retries", type=int)
     parser.add_argument("--gemini-token-retry-base-seconds", type=float)
     parser.add_argument("--proposed-ablations", nargs="+", choices=tuple(ABLATION_PRESETS.keys()))
+    parser.add_argument("--request-token-safety-margin", type=int)
     args = parser.parse_args()
     if args.status:
         if not args.output:
@@ -1436,6 +1474,10 @@ def main() -> None:
     token_config = (_mapping(runtime_config["token_counter"], "runtime.token_counter")
                     if config else {})
     evaluation_config = _mapping(config["evaluation"], "evaluation") if config else {}
+    budget_policy_config = _mapping(
+        config["budget_policy"],
+        "budget_policy",
+    ) if config else {}
     overrides: dict[str, Any] = {}
 
     if (config and args.embedder is not None
@@ -1563,6 +1605,14 @@ def main() -> None:
         token_config.get("retry_base_seconds"), 0.5,
         has_config=has_config, overrides=overrides,
     )
+    request_token_safety_margin = _resolved_value(
+        "request_token_safeety_margin",
+        args.request_token_safety_margin,
+        budget_policy_config.get("request_token_safety_margin"),
+        0,
+        has_config=has_config,
+        overrides=overrides,
+    )
     if args.token_counter and config:
         overrides["token_counter"] = {
             "configured": _json_record(token_config),
@@ -1637,6 +1687,7 @@ def main() -> None:
         cli_overrides=overrides,
         show_progress=not args.no_progress,
         resume=args.resume, checkpoint_interval=args.checkpoint_interval,
+        request_token_safety_margin=request_token_safety_margin,
     )
     if isinstance(token_counter, GeminiTokenCounter):
         result["tokenizer"] = {

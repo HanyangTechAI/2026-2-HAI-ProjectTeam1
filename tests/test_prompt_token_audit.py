@@ -23,7 +23,8 @@ class PromptTokenAuditTests(unittest.TestCase):
                 800,
                 900,
             ],
-            context_budget=1024,
+            nominal_context_budget=1024,
+            effective_context_budget=1024,
         )
 
         self.assertTrue(
@@ -49,7 +50,8 @@ class PromptTokenAuditTests(unittest.TestCase):
                 801,
                 902,
             ],
-            context_budget=1024,
+            nominal_context_budget=1024,
+            effective_context_budget=1024,
         )
 
         self.assertEqual(
@@ -76,7 +78,8 @@ class PromptTokenAuditTests(unittest.TestCase):
             actual_prompt_tokens=[
                 1026,
             ],
-            context_budget=1024,
+            nominal_context_budget=1024,
+            effective_context_budget=1024,
         )
 
         self.assertFalse(
@@ -96,7 +99,8 @@ class PromptTokenAuditTests(unittest.TestCase):
             actual_prompt_tokens=[
                 801,
             ],
-            context_budget=1024,
+            nominal_context_budget=1024,
+            effective_context_budget=1024,
         )
 
         self.assertFalse(
@@ -110,6 +114,50 @@ class PromptTokenAuditTests(unittest.TestCase):
         self.assertIsNone(
             result["actual_budget_exceeded"]
         )
+        
+        
+    def test_safety_margin_absorbs_token_difference(self):
+        result = _prompt_token_audit(
+            executed_steps=[
+                step(990),
+            ],
+            actual_prompt_tokens=[
+                1008,
+            ],
+            nominal_context_budget=1024,
+            effective_context_budget=992,
+        )
+
+        self.assertTrue(result["complete"])
+        self.assertFalse(result["counted_budget_exceeded"])
+        self.assertFalse(result["actual_budget_exceeded"])
+
+        self.assertEqual(
+            result["request_token_safety_margin"],
+            32,
+        )
+
+        self.assertEqual(
+            result["max_positive_delta"],
+            18,
+        )
+
+
+    def test_actual_overflow_after_margin_is_detected(self):
+        result = _prompt_token_audit(
+            executed_steps=[
+                step(992),
+            ],
+            actual_prompt_tokens=[
+                1026,
+            ],
+            nominal_context_budget=1024,
+            effective_context_budget=992,
+        )
+
+        self.assertTrue(result["complete"])
+        self.assertFalse(result["counted_budget_exceeded"])
+        self.assertTrue(result["actual_budget_exceeded"])
 
 
 if __name__ == "__main__":

@@ -2164,6 +2164,8 @@ class ExecutionLog:
     dropped_flexible_ids: list[str]
 
     context_budget: int
+    effective_context_budget: int
+    request_token_safety_margin: int
     memory_tokens: int
     input_tokens: int
     output_tokens: int | None
@@ -2186,6 +2188,8 @@ class ExecutionLog:
 ```
 
 실험 단위 provenance에는 Git revision과 prompt checksum 외에도 `runtime_environment`를 기록한다. 여기에는 Python·platform, 주요 package 버전과 embedder callable이 포함된다. 표준 `multilingual_embedder`는 Hugging Face cache에서 확인한 resolved snapshot revision, `normalize_embeddings=True`, timing 전 preload 여부까지 제공하며 revision을 확인할 수 없으면 본실험을 시작하지 않는다.
+
+Evaluator의 Main 집계는 모든 grid cell의 `experiment.json`을 읽어 예상 셀 수, embedding model과 resolved revision의 일관성을 먼저 검증한다. 통과 결과는 `provenance_audit.json`에, primary outcome·secondary efficiency·supporting diagnostic 분류는 `metric_roles.json`에 저장한다. `budget_exceeded`는 CountTokens 입력이 실효 Budget을 넘었거나, 완전한 prompt audit에서 실제 provider 입력이 명목 Budget을 넘은 경우 true다.
 
 ---
 

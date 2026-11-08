@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import unittest
 
-from agent.llm_planner import LLMRunConfig, shared_system_instruction
+from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
 from benchmark.evaluator import load_config
 from benchmark.runner import run_scenarios
 from context.tokenizer import GeminiTokenCounter
@@ -55,8 +55,12 @@ class SmokeConfigTests(unittest.TestCase):
             llm_config=LLMRunConfig(
                 model=model_name,
                 temperature=model["temperature"],
-                system_instruction=shared_system_instruction(system_prompt),
+                system_instruction=SYSTEM_INSTRUCTION,
                 max_output_tokens=model["max_output_tokens"],
+                thinking_level=model["thinking_level"],
+                max_retries=model["max_retries"],
+                retry_base_seconds=model["retry_base_seconds"],
+                timeout_ms=model["timeout_ms"],
             ),
         )
 

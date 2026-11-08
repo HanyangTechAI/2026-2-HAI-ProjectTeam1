@@ -67,6 +67,7 @@ subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 
 - `git_commit`: 실행 시작 시 checkout의 HEAD SHA. `git_dirty`는 tracked 파일의 미커밋 변경 여부이며, Git 정보를 읽을 수 없으면 두 값은 `null`이다. 기존 `resume_identity.code`는 실제 소스 내용의 해시를 보존한다.
 - `runtime_environment`: Python 구현·버전·실행 파일, OS·machine, `google-genai`·`sentence-transformers`·`transformers`·`huggingface-hub`·`torch` 버전과 embedder 정보를 기록한다. 표준 다국어 embedder는 Hugging Face cache에서 확인한 실제 snapshot revision과 정규화·사전 로드 여부도 남긴다.
+- `request_token_safety_margin`: provider usage와 CountTokens 사이의 작은 차이를 흡수하기 위해 명목 Context Budget에서 미리 빼는 값이다. 기본값은 `0`이며, 설정 또는 `--request-token-safety-margin`으로 지정하면 모든 전략이 동일한 실효 Budget을 사용한다.
 - `prompt_checksums`: 실행에 넘긴 `system_prompt`, `tool_definitions`, LLM의 실제 `system_instruction` 문자열을 각각 UTF-8로 인코딩한 SHA-256. 공백과 개행을 포함하며, `llm_config`가 없으면 `system_instruction`은 `null`이다.
 - `bootstrap_seed`: 집계 신뢰구간 계산에 사용하는 `--seed` 값. `dataset_seeds`는 선택된 시나리오의 `metadata.seed` 목록이며, 각 결과 행의 `dataset_seed`는 해당 시나리오의 값이다. 생성 seed가 없는 입력은 행에 `null`로 기록하고 목록에서는 제외한다. 현재 LLM 요청에는 seed를 전달하지 않는다.
 
