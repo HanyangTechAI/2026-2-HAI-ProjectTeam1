@@ -217,6 +217,8 @@ python -m benchmark.runner ... \
 
 현재 Gemini 측정 기본값은 정식 모델 ID `gemini-3.1-flash-lite`이다. `GeminiTokenCounter`는 동일 문자열의 CountTokens 결과를 메모리 LRU와 모델별 SQLite 캐시에 저장하고 408·429·5xx 및 연결 오류를 지수 backoff로 재시도한다. Runner는 전략 간 캐시 선점 효과를 막기 위해 각 실행 전후 메모리 캐시를 비우고 실행 중에는 영속 캐시를 우회한다. 모델명이 캐시 key에 포함되므로 기존 `gemini-3.8-flash` 캐시는 충돌하지 않으며 삭제할 필요가 없다. `--token-counter module:function`과 `--gemini-token-model`은 동시에 사용할 수 없다. 사용자 counter를 지정하지 않으면 Gemini가 기본이며 모델 선택 우선순위는 `--gemini-token-model` 인자, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순이다. API key는 `GEMINI_API_KEY`에서 읽는다. 공백 기준 임시 counter를 쓰려면 사용자 counter로 명시적으로 주입해야 하며 실제 모델 Token Usage로 보고하지 않는다.
 
+MemoryItem의 content-only 비용은 `google-genai` SDK로 측정한다. Runner의 고정 입력과 최종 Context Budget은 실제 생성 입력에 맞춘 `generateContentRequest`를 Developer API REST `countTokens`에 보내 model·contents·system instruction·설정된 tools까지 함께 측정한다. Metadata에는 SDK/REST transport와 request-aware 여부를 구분해 기록하며, 전체 요청 측정에는 `GEMINI_API_KEY`가 반드시 필요하다.
+
 `benchmark/generated/smoke_gemini`와 `benchmark/generated/pilot_gemini.zip`은 `gemini-3.8-flash`로 실측한 기존 재현성 자료이다. 모델별 token 수와 그에 맞춘 padding이 달라질 수 있으므로 metadata의 모델명만 바꾸어 재사용하지 않는다. `GEMINI_API_KEY`가 준비된 환경에서 위 모델로 다시 생성한 뒤 manifest·scenario의 `token_count_mode`, History 길이, Noise 비율과 독립 재측정을 함께 검증해야 한다.
 
 V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 응답 생성은 config 또는 `--llm-model`로 `gemini-3.1-flash-lite` LLM Planner를 활성화하며, 생성 모델과 CountTokens 모델이 다르면 API 호출 전에 중단한다. freeze config는 temperature 0, 최대 출력 512 token, thinking level `LOW`를 고정한다.

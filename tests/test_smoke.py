@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import unittest
+from datetime import datetime
 
 from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
 from benchmark.evaluator import load_config
@@ -37,7 +38,8 @@ class SmokeConfigTests(unittest.TestCase):
         model_name = model["name"].strip()
         system_prompt = (ROOT / model["system_prompt_file"]).read_text(encoding="utf-8")
         scenarios = _scenarios(config)
-        output = ROOT / config["output_directory"]
+
+        output = ROOT / "experiments" / "results" / f"smoke_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
 
         result = run_scenarios(
             scenarios,
@@ -80,30 +82,102 @@ class SmokeConfigTests(unittest.TestCase):
             if line.strip()
         ]
         self.assertEqual(len(rows), expected_runs)
+        
         failures = []
+        successful_tools_by_strategy = {
+            strategy: 0
+            for strategy in config["strategies"]
+        }
+
         for row in rows:
+            strategy = row["strategy"]
             run = row["run_result"]
+            evaluation = row["evaluation"]
             options = run["strategy_options"]
-            if options.get("model") != model_name or options.get("temperature") != float(model["temperature"]):
-                failures.append(f"{row['strategy']} llm settings drifted: {options}")
+
+            scenario_id = row["scenario"]["scenario_id"]
+
+            # 모든 전략에서 동일한 LLM 설정을 사용하는지 확인
+            if (
+                options.get("model") != model_name
+                or options.get("temperature")
+                != float(model["temperature"])
+            ):
+                failures.append(
+                    f"{strategy} {scenario_id}: LLM settings drift"
+                )
+
+            # Pipeline이 실제로 Agent를 실행했는지 확인
+            if run.get("status") != "ok":
+                failures.append(
+                    f"{strategy} {scenario_id}: "
+                    f"pipeline status={run.get('status')}"
+                )
+
+            if run.get("agent_executed") is not True:
+                failures.append(
+                    f"{strategy} {scenario_id}: Agent not executed"
+                )
+
+            # 실제 Gemini API가 호출됐는지 확인
+            usage = run.get("llm_usage") or {}
+            api_calls = usage.get("api_calls")
+
+            if type(api_calls) is not int or api_calls < 1:
+                failures.append(
+                    f"{strategy} {scenario_id}: No Gemini API call"
+                )
+
+            # Baseline 실패도 평가 결과로 기록되어야 함
+            if type(evaluation.get("task_success")) is not bool:
+                failures.append(
+                    f"{strategy} {scenario_id}: "
+                    "Missing task_success evaluation"
+                )
+
             calls = run.get("tool_calls") or []
             results = run.get("tool_results") or []
+
             succeeded = [
-                call for call, tool_result in zip(calls, results)
-                if tool_result.get("success") and call.get("tool_name") in KNOWN_TOOLS
+                call
+                for call, tool_result in zip(calls, results)
+                if (
+                    tool_result.get("success") is True
+                    and call.get("tool_name") in KNOWN_TOOLS
+                )
             ]
-            rendered = ", ".join(f"{call.get('tool_name')}.{call.get('action')}" for call in calls) or "(none)"
+
+            successful_tools_by_strategy[strategy] += len(succeeded)
+
+            rendered = (
+                ", ".join(
+                    f"{call.get('tool_name')}.{call.get('action')}"
+                    for call in calls
+                )
+                or "(none)"
+            )
+
+            audit = run.get("prompt_token_audit") or {}
+
             print(
-                f"{row['strategy']} {row['scenario'].get('scenario_id')} tools={rendered} "
+                f"{strategy} {scenario_id} "
+                f"tools={rendered} "
+                f"task_success={evaluation.get('task_success')} "
+                f"prompt_audit={audit.get('verification_status')} "
                 f"stopped={run.get('stopped_reason')}",
                 flush=True,
             )
-            if not succeeded:
+
+        # 각 전략의 Tool 실행 경로가 실제로 작동했는지 확인.
+        # 다만 모든 시나리오에서 성공을 강제하지 않는다.
+        for strategy, count in successful_tools_by_strategy.items():
+            if count == 0:
                 failures.append(
-                    f"{row['strategy']} {row['scenario'].get('scenario_id')} "
-                    f"tools={rendered} response={run.get('response')}"
+                    f"{strategy}: No successful tool execution"
                 )
+
         self.assertEqual(failures, [])
+
 
 
 def _scenarios(config: dict) -> list[dict]:

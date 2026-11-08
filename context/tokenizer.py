@@ -4,12 +4,15 @@ import os
 import hashlib
 import sqlite3
 import time
+import json
 
 from collections.abc import Callable, Mapping
 from functools import lru_cache
 from typing import Any
 from pathlib import Path
 from contextlib import closing, contextmanager
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 
 TokenCounter = Callable[[str], int]
@@ -68,6 +71,8 @@ class GeminiTokenCounter:
         self.retry_base_seconds = float(retry_base_seconds)
         
         self.sleeper = sleeper
+        
+        self._request_api_key = api_key or os.getenv("GEMINI_API_KEY")
 
         if client is None:
             try:
@@ -178,7 +183,7 @@ class GeminiTokenCounter:
     
     @classmethod
     def _is_retryable_error(cls, exc: Exception) -> bool:
-        if isinstance(exc, (ConnectionError, TimeoutError)):
+        if isinstance(exc, (ConnectionError, TimeoutError, URLError)):
             return True
         
         status = getattr(exc, "status_code", None)
@@ -329,7 +334,8 @@ class GeminiTokenCounter:
             "type": "gemini",
             "model": self.model,
             "method": "countTokens",
-            "request_shape": "contents_plus_system_instruction" if system_instruction else "single_user_text",
+            "request_shape": "generateContentRequest" if system_instruction else "single_user_text",
+            "request_count_transport": "developer_api_rest" if self._request_count_config is not None else "google_genai_sdk",
             "request_aware_budgeting": self._request_count_config is not None,
             "system_instruction_sha256": hashlib.sha256(system_instruction.encode("utf-8")).hexdigest() if system_instruction else None,
             "memory_cache_size": self.cache_size,
@@ -396,10 +402,71 @@ class GeminiTokenCounter:
         if self._request_count_config is None:
             return self(text)
         
-        return self._count_tokens_from_api(
-            text,
-            config=self._request_count_config,
+        if not self._request_api_key:
+            raise ValueError("GEMINI_API_KEY is required for full request token counting")
+        
+        model_id = self.model.removeprefix("models/")
+        
+        request_body = {
+            "generateContentRequest": {
+                "model": f"models/{model_id}",
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": text}],
+                    }
+                ],
+            }
+        }
+        
+        system_instruction = self._request_count_config.get("system_instruction")
+        
+        if system_instruction:
+            request_body["generateContentRequest"]["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+            
+        tools = self._request_count_config.get("tools")
+        
+        if tools is not None:
+            request_body["generateContentRequest"]["tools"] = tools
+            
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:countTokens"
+        
+        request = Request(
+            url=endpoint,
+            data=json.dumps(
+                request_body,
+                ensure_ascii=False,
+            ).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": self._request_api_key,
+            },
+            method="POST",
         )
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                self._api_calls += 1
+                
+                with urlopen(request, timeout=60) as response:
+                    result = json.load(response)
+                    
+                count = result.get("totalTokens")
+                
+                if type(count) is not int or count < 0:
+                    raise RuntimeError("Gemini CountTokens returned invalid totalTokens")
+                
+                return count
+            
+            except Exception as exc:
+                if attempt >= self.max_retries or not self._is_retryable_error(exc):
+                    raise
+                
+                self._retry_count += 1
+                
+                self.sleeper(self.retry_base_seconds * (2 ** attempt))
+        
+        raise RuntimeError("Gemini CountTokens failed")
 
 
 def count_tokens(

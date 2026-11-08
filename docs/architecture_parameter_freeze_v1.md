@@ -35,8 +35,9 @@ V1.0.2는 Context Budget의 token counting 범위를 실제 Gemini request 입�
 일치시키는 accounting patch이다.
 
 - MemoryItem 개별 Token Cost는 기존과 동일하게 content-only CountTokens를 사용한다.
-- fixed_context_tokens와 최종 Context Budget Validation은
-  contents + Planner SYSTEM_INSTRUCTION을 CountTokens한다.
+- fixed_context_tokens와 최종 Context Budget Validation은 실제 요청의 model, contents,
+  Planner SYSTEM_INSTRUCTION과 설정된 tools를 `generateContentRequest` 형태로
+  CountTokens한다.
 - LLM model, Embedder, retrieval algorithm, K, utility weights, dataset grid,
   prompts 및 Planner behavior는 변경하지 않는다.
 - 따라서 알고리즘의 Memory 선택 원칙은 동일하며, Context Budget B의
@@ -111,6 +112,7 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 | Max agent steps | `8` |
 | Utility weights | relevance `0.6`, importance `0.3`, recency `0.1` |
 | Token counter | Gemini CountTokens / `gemini-3.1-flash-lite` |
+| Request CountTokens transport | Developer API REST / `generateContentRequest` |
 | Token cache | memory `4096`, SQLite `.cache/gemini_token_cache.sqlite3` |
 | Token retry | 최대 `3`, base `0.5s`, exponential backoff |
 | Budget scope | `total_input` |
@@ -142,6 +144,16 @@ Runner는 version, 공통 모델/runtime 값, algorithm specification, prompt �
 behavior checksum을 검증한다.
 Config를 쓰지 않은 ad-hoc 실행 또는 명시적 CLI override는 가능하지만, freeze 본실험
 결과로 자동 간주하지 않으며 `experiment.json`에 effective value와 override를 기록한다.
+
+MemoryItem 개별 비용은 content-only 입력을 `google-genai` SDK의 CountTokens로 측정한다.
+반면 고정 입력과 최종 Context의 request-aware 측정은
+`v1beta/models/{model}:countTokens` REST endpoint에 `generateContentRequest` wrapper를
+보내며, 실제 생성 요청과 같은 model, user contents, systemInstruction 및 설정된 tools를
+포함한다. 이 경로는 명시적 `api_key` 또는 `GEMINI_API_KEY`가 반드시 필요하다.
+Metadata에는 `request_shape=generateContentRequest`,
+`request_count_transport=developer_api_rest`, `request_aware_budgeting=true`와
+system instruction SHA-256을 기록한다. REST CountTokens도 Token retry 정책과 같은
+재시도 대상·횟수·backoff를 사용하고 `URLError`를 transient connection failure로 본다.
 
 ## 3. Frozen experiment scopes
 

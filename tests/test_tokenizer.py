@@ -1,5 +1,7 @@
 import unittest
 import tempfile
+import io
+import json
 
 from pathlib import Path
 from unittest.mock import patch
@@ -413,6 +415,7 @@ class TokenizerTests(unittest.TestCase):
         counter = GeminiTokenCounter(
             model="fake-gemini",
             client=client,
+            api_key="test-key",
         )
 
         counter.configure_request(
@@ -422,32 +425,52 @@ class TokenizerTests(unittest.TestCase):
             },
         )
 
-        # bare memory/content token cost
-        self.assertEqual(
-            counter("hello"),
-            5,
+        # 일반 Memory 비용 측정은 기존 SDK 사용
+        self.assertEqual(counter("hello"), 5)
+
+        fake_result = io.BytesIO(
+            b'{"totalTokens": 11}'
         )
 
-        # 실제 request budget
-        self.assertEqual(
-            counter.count_request("hello"),
-            11,
-        )
+        with patch(
+            "context.tokenizer.urlopen",
+            return_value=fake_result,
+        ) as mocked:
+            self.assertEqual(
+                counter.count_request("hello"),
+                11,
+            )
+
+        request = mocked.call_args.args[0]
+        body = json.loads(request.data)
+
+        full_request = body["generateContentRequest"]
 
         self.assertEqual(
-            client.models.calls[-1]["config"],
-            {
-                "system_instruction": "SYSTEM",
-            },
+            full_request["model"],
+            "models/fake-gemini",
         )
-        
-        
+        self.assertEqual(
+            full_request["systemInstruction"]["parts"][0]["text"],
+            "SYSTEM",
+        )
+        self.assertEqual(
+            full_request["contents"][0]["parts"][0]["text"],
+            "hello",
+        )
+        self.assertEqual(
+            counter.metadata()["request_count_transport"],
+            "developer_api_rest",
+        )
+
+
     def test_request_count_does_not_change_bare_memory_count(self):
         client = FakeClient()
 
         counter = GeminiTokenCounter(
             model="fake-gemini",
             client=client,
+            api_key="test-key",
         )
 
         counter.configure_request(
@@ -459,10 +482,14 @@ class TokenizerTests(unittest.TestCase):
             counter,
         )
 
-        request = count_request_tokens(
-            "memory",
-            counter,
-        )
+        with patch(
+            "context.tokenizer.urlopen",
+            return_value=io.BytesIO(b'{"totalTokens": 12}'),
+        ):
+            request = count_request_tokens(
+                "memory",
+                counter,
+            )
 
         self.assertEqual(bare, 6)
         self.assertEqual(request, 12)
