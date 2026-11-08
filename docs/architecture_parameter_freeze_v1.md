@@ -205,6 +205,36 @@ Required-State Accuracy, Stale-State Usage, Temporal Version Accuracy, general r
 - `retrieval_k`는 평가 cutoff이고 `candidate_top_k`는 후보 검색 폭이다. 둘은 독립 값이다.
 - sample/repeat 단위 paired delta와 sample-cluster bootstrap 95% CI를 사용한다.
 
+### 4.1 Provider Failure Isolation
+
+LLM provider 전송·인증·rate limit·timeout·서버 오류는 Memory Policy 또는 모델의
+행동 실패와 분리한다. Provider 장애를 임의의 text action이나 Task failure row로
+변환하면 전략별 실행 순서와 장애 시점에 따라 성능 지표가 오염되므로 다음 계약을
+고정한다.
+
+- 408, 429, 500, 502, 503, 504와 connection·timeout·unavailable·rate-limit 계열
+  오류만 transient failure로 분류한다. `max_retries=2`, base `0.5s`의 exponential
+  backoff를 적용하므로 최초 요청을 포함한 최대 시도 횟수는 3회다.
+- transient retry가 모두 소진되거나 non-retryable 오류가 발생하면 Planner는
+  `LLMProviderError`를 발생시킨다. 오류에는 model, 실제 attempts, 원 예외 type과
+  가능한 경우 status code를 보존하고 원 예외를 exception cause로 연결한다.
+- Provider 오류를 `AgentAction`이나 “모델 호출 실패” text response로 바꾸지 않는다.
+  해당 strategy/sample/repeat의 결과 row와 deterministic evaluation은 생성하지 않으며,
+  batch는 즉시 중단한다.
+- 중단 전에 newline 단위로 확정된 `runs.jsonl` row는 보존한다. `progress.json`은
+  `interrupted`와 완료 row 수를 기록하고, 같은 resume identity로 `--resume`하면 이미
+  완료된 key를 재실행하지 않은 채 실패한 실행부터 계속한다.
+- HTTP 요청 자체는 성공했지만 structured response를 행동으로 파싱할 수 없는 경우는
+  Provider failure가 아니다. 이 경우 “모델 응답을 행동으로 읽지 못했습니다.”라는
+  정상 Agent 응답으로 남기고 evaluator가 모델 행동 실패로 판정한다.
+- `progress.json`이 `completed`가 아니거나 예정된 run key가 모두 확정되지 않은 batch는
+  본실험 집계에 사용하지 않는다. Provider 장애로 누락된 실행을 Task failure 0점으로
+  대체하거나 완료된 일부 row만으로 전략 성능을 비교하지 않는다.
+
+이 격리 정책은 Memory 선택 알고리즘, prompt, model parameter 또는 metric 정의를
+바꾸지 않는다. 다만 Provider failure를 연구 결과와 분리하는 실행·checkpoint 계약이므로
+모든 strategy와 repeat에 동일하게 적용한다.
+
 ## 5. Explicitly deferred
 
 다음은 V1.0 결과에 섞지 않는다.

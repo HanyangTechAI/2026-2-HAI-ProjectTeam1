@@ -682,6 +682,13 @@ External Memory 방식에서는 추가로 다음 정보를 기록한다.
 
 모든 주요 집계에는 반복 횟수, 평균, 95% 신뢰구간과 지표 적용 실행 수를 포함한다. RQ2의 선택적 ΔSuccess 분석에는 baseline별 차이와 CI를 추가한다. 위 TBD 표는 출력 계획이며 측정 결과가 아니다.
 
+Provider 요청 실패는 Task failure로 대체하지 않는다. transient 오류는 freeze된 retry
+정책으로 재시도하고, 소진되거나 non-retryable이면 Runner를 중단해 완료 row만
+checkpoint에 보존한다. `--resume`으로 예정된 run key를 모두 완료한 뒤에만 본실험을
+집계한다. 반면 Provider가 응답했지만 structured action parsing이 실패한 경우는 실제
+모델 출력 실패이므로 evaluator 대상에 포함한다. 세부 계약은
+[Architecture / Parameter Freeze의 Provider Failure Isolation](architecture_parameter_freeze_v1.md#41-provider-failure-isolation)을 따른다.
+
 ---
 
 ## 11. Failure Analysis

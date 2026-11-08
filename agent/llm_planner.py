@@ -54,6 +54,28 @@ ACTION_TO_TOOL = {action: tool_name for (tool_name, action) in TOOL_METHODS}
 TOOL_NAMES = frozenset({"email", "file", "calendar", "task"})
 _TRANSIENT_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
+class LLMProviderError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        model: str,
+        attempts: int,
+        cause: Exception,
+    ) -> None:
+        self.model = model
+        self.attempts = attempts
+        self.error_type = type(cause).__name__
+        
+        status = getattr(cause, "status_code", None)
+        
+        if status is None:
+            status = getattr(cause, "code", None)
+            
+        self.status_code = status
+        
+        super().__init__(f"LLM provider request failed: model={model}, attempts={attempts}, error_type={self.error_type}, status_code={status}")
+        
+
 SYSTEM_INSTRUCTION = """\
 너는 Context Builder가 만든 context를 읽고 행동 하나를 고른다.
 context에 적힌 [PROTECTED CONSTRAINTS]를 지킨다.
@@ -282,15 +304,26 @@ class LLMPlanner:
                         config=self.generation_config(),
                     )
                     
-                    self._record_usage_metadata(response)
-                    
-                    return agent_action_from_model_output(_payload_from_response(response))
                 except Exception as exc:
                     if attempt < self.max_retries and _transient(exc):
                         self._sleeper(self.retry_base_seconds * (2 ** attempt))
                         continue
-                    return _text(f"모델 호출에 실패했습니다: {type(exc).__name__}")
-            return _text("모델 호출에 실패했습니다.")
+                    raise LLMProviderError(
+                        model=self.model,
+                        attempts=attempt + 1,
+                        cause=exc
+                    ) from exc
+                
+                self._record_usage_metadata(response)
+                
+                try:
+                    payload = _payload_from_response(response)
+                except ValueError:
+                    return _text("모델 응답을 행동으로 읽지 못했습니다.")
+                
+                return agent_action_from_model_output(payload)
+            
+            raise RuntimeError("LLM retry loop exited unexpectedly")
         
         finally:
             self._planning_latency_ms += (perf_counter() - started) * 1000.0
