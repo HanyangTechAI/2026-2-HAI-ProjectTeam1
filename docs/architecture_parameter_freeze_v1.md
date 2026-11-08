@@ -134,6 +134,9 @@ Algorithm specification, Prompt 및 Planner behavior checksum도 freeze에 포�
 정규화한 UTF-8 JSON 바이트를 해시한다. 실행 시 두 값은 `experiment.json`의
 `planner_rules_hash`와 `action_schema_hash`에 각각 기록한다. `docs/algorithm.md`는 파일의
 원본 바이트를 해시하며 실행 시 `experiment.json`의 `algorithm_hash`에 기록한다.
+파일 기반 freeze 대상인 `system_v1.txt`, `tools_v1.txt`, `docs/algorithm.md`는
+`.gitattributes`에서 `text eol=lf`로 고정한다. 따라서 Runner의 원본 바이트 SHA-256
+검증은 Windows와 Linux checkout에서 같은 LF 바이트를 기준으로 한다.
 
 Runner는 version, 공통 모델/runtime 값, algorithm specification, prompt 및 Planner
 behavior checksum을 검증한다.

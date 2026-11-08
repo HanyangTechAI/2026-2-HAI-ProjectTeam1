@@ -71,6 +71,8 @@ subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 - `prompt_checksums`: 실행에 넘긴 `system_prompt`, `tool_definitions`, LLM의 실제 `system_instruction` 문자열을 각각 UTF-8로 인코딩한 SHA-256. 공백과 개행을 포함하며, `llm_config`가 없으면 `system_instruction`은 `null`이다.
 - `bootstrap_seed`: 집계 신뢰구간 계산에 사용하는 `--seed` 값. `dataset_seeds`는 선택된 시나리오의 `metadata.seed` 목록이며, 각 결과 행의 `dataset_seed`는 해당 시나리오의 값이다. 생성 seed가 없는 입력은 행에 `null`로 기록하고 목록에서는 제외한다. 현재 LLM 요청에는 seed를 전달하지 않는다.
 
+Freeze checksum 대상인 `experiments/prompts/system_v1.txt`, `experiments/prompts/tools_v1.txt`, `docs/algorithm.md`는 `.gitattributes`에서 LF로 고정한다. Runner는 checkout된 원본 바이트의 SHA-256을 검증하므로 Windows와 Linux에서 개행 변환 때문에 같은 freeze가 다르게 판정되지 않는다.
+
 ## 연구 질문
 
 1. **RQ1:** 동일한 Context Token Budget에서 Proposed가 기존 기억 방식보다 실제 Tool 행동을 포함한 작업 성공률(Action-Level TSR)을 높이는가?
@@ -220,6 +222,8 @@ V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformer
 ```text
 python -m unittest discover -s tests -v
 ```
+
+GitHub Actions의 `Python CI`도 `main` push·pull request와 수동 실행에서 같은 전체 테스트를 수행한다. Ubuntu 24.04와 Python 3.12를 사용하고 CPU 전용 PyTorch 및 `requirements.txt`를 설치한 뒤 `pip check`, 주요 Python 패키지의 `compileall`, 단위 테스트 순서로 검증한다. 실제 Gemini smoke 호출은 CI에서 `GEMINI_API_KEY`를 비워 두므로 건너뛴다.
 
 `tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter의 현재 ACTIVE State 복원을 검증하고, `tests/test_pipeline_adapter.py`는 과거 버전, Protected/Required-State 예산 실패, formatting overflow, 네 전략 공정성, Ablation 공통 schema와 Runner 기록을 검증한다. `tests/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/test_tokenizer.py`는 Gemini counter의 입력 검증, 메모리·SQLite 캐시, 재시도와 격리를 fake client로 검증한다.
 
