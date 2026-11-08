@@ -2173,6 +2173,15 @@ class ExecutionLog:
     # CountTokens 측정과 provider usage의 호출별 비교
     prompt_token_audit: dict[str, object]
 
+    # Provider usage 회계 완전성. 불완전하면 비용 관련 합계는 null
+    successful_response_calls: int | None
+    usage_metadata_calls: int | None
+    cost_usage_complete_calls: int | None
+    billing_uncertain_attempts: int | None
+    prompt_usage_complete: bool | None
+    cost_estimate_complete: bool | None
+    accounting_status: str | None
+
     pipeline_status: PipelineStatus
 
     tool_calls: list[ToolCall]
@@ -2190,6 +2199,8 @@ class ExecutionLog:
 실험 단위 provenance에는 Git revision과 prompt checksum 외에도 `runtime_environment`를 기록한다. 여기에는 Python·platform, 주요 package 버전과 embedder callable이 포함된다. 표준 `multilingual_embedder`는 Hugging Face cache에서 확인한 resolved snapshot revision, `normalize_embeddings=True`, timing 전 preload 여부까지 제공하며 revision을 확인할 수 없으면 본실험을 시작하지 않는다.
 
 Evaluator의 Main 집계는 모든 grid cell의 `experiment.json`을 읽어 예상 셀 수, embedding model과 resolved revision의 일관성을 먼저 검증한다. 통과 결과는 `provenance_audit.json`에, primary outcome·secondary efficiency·supporting diagnostic 분류는 `metric_roles.json`에 저장한다. `budget_exceeded`는 CountTokens 입력이 실효 Budget을 넘었거나, 완전한 prompt audit에서 실제 provider 입력이 명목 Budget을 넘은 경우 true다.
+
+Agent가 실행된 Main row는 `llm_api_calls >= 1`이고 `prompt_token_audit.complete=true`여야 한다. Prompt audit은 `verified`, `unverified`, `exceeded`, `not_applicable` 상태를 사용하며, 불완전 audit에서 초과가 관측되지 않은 경우 `actual_prompt_budget_exceeded=null`로 유지한다. Provider usage의 비용 계산 요건이나 retry 시도의 청구 여부가 하나라도 불확실하면 `cost_estimate_complete=false`이고 token 비용 합계와 `total_llm_cost`를 `null`로 기록한다.
 
 ---
 

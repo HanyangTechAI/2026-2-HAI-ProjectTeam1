@@ -316,8 +316,21 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         raise ValueError("context_budget and actual input_tokens for successful runs are required")
     counted_budget_exceeded = input_tokens is not None and input_tokens > effective_budget
     prompt_audit = run.get("prompt_token_audit") or {}
-    actual_budget_exceeded = prompt_audit.get("actual_budget_exceeded") is True
-    budget_exceeded = counted_budget_exceeded or actual_budget_exceeded
+    actual_budget_exceeded = prompt_audit.get("actual_budget_exceeded")
+    
+    if actual_budget_exceeded is not None and type(actual_budget_exceeded) is not bool:
+        raise ValueError("actual_budget_exceeded must be boolean or None")
+    
+    budget_exceeded = counted_budget_exceeded or actual_budget_exceeded is True
+    llm_api_calls = usage.get("llm_api_calls")
+    
+    if type(llm_api_calls) is int and llm_api_calls > 0:
+        prompt_budget_verified = prompt_audit.get("complete") is True
+    else:
+        prompt_budget_verified = None
+        
+    cost_estimate_complete = usage.get("llm_cost_estimate_complete")
+    
     invalid_fixed_budget = fixed_tokens is not None and fixed_tokens > budget
     expected = scenario.get("expected_tool_calls", [])
     forbidden = scenario.get("forbidden_tool_calls", [])
@@ -390,6 +403,9 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
         available_memory_tokens=effective_budget - fixed_tokens if fixed_tokens is not None else None,
         counted_budget_exceeded=counted_budget_exceeded,
         actual_prompt_budget_exceeded=actual_budget_exceeded,
+        prompt_budget_verified=prompt_budget_verified,
+        prompt_budget_verification_status=prompt_audit.get("verification_status"),
+        cost_estimate_complete=cost_estimate_complete,
         budget_exceeded=budget_exceeded,
         retrieved_memory_ids=retrieved, selected_memory_ids=selected, target_memory_ids=targets,
         retrieved_memories=run.get("retrieved_memories", []),
@@ -715,6 +731,22 @@ def main() -> None:
             continue
         try:
             row = json.loads(line)
+            
+            if config.get("scope") == "main":
+                run_result = row["run_result"]
+                
+                if run_result.get("agent_executed"):
+                    llm_usage = run_result.get("usage") or {}
+                    api_calls = llm_usage.get("llm_api_calls")
+                    
+                    audit = run_result.get("prompt_token_audit") or {}
+                    
+                    if type(api_calls) is not int or api_calls < 1:
+                        raise ValueError("Main LLM run has no valid API call count")
+                    
+                    if audit.get("complete") is not True:
+                        raise ValueError("Main prompt token audit is incomplete")
+            
             result = evaluate(row["scenario"], row["run_result"], strategy=row.get("strategy"),
                               repeat_id=row.get("repeat_id", 0), k=config["evaluation"]["retrieval_k"])
             if result.strategy not in config["strategies"]:

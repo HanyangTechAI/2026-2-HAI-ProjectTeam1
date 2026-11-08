@@ -235,6 +235,38 @@ LLM provider 전송·인증·rate limit·timeout·서버 오류는 Memory Policy
 바꾸지 않는다. 다만 Provider failure를 연구 결과와 분리하는 실행·checkpoint 계약이므로
 모든 strategy와 repeat에 동일하게 적용한다.
 
+### 4.2 Usage Accounting Completeness
+
+Provider usage metadata의 일부가 없거나 retry 중 실패한 요청의 청구 여부를 확인할 수
+없는데 관측된 값만 합산하면 token·비용을 실제보다 작게 보고할 수 있다. 따라서
+Planner와 Runner는 다음 완전성 계약을 적용한다.
+
+- `api_calls`는 실패한 retry를 포함한 모든 Provider 요청 시도 수이고,
+  `successful_response_calls`는 응답 객체를 받은 호출 수다.
+- `usage_metadata_calls`는 usage metadata가 존재한 응답 수이며,
+  `cost_usage_complete_calls`는 prompt, candidate/response, cached input, tool-use prompt,
+  thinking과 total token의 비용 계산 요건을 모두 만족한 응답 수다. 선택적 token 필드가
+  명시적으로 없으면 0으로 취급하지만 음수·비정수 또는 필수 candidate/response token
+  누락은 불완전으로 처리한다.
+- `billing_uncertain_attempts = api_calls - successful_response_calls`이다. retry 후 정상
+  응답을 받았더라도 이전 실패 시도가 과금됐는지 확정할 수 없으므로 전체 비용 추정은
+  불완전하다.
+- `prompt_usage_complete`는 모든 성공 응답에 유효한 prompt token이 있을 때만 true다.
+  이는 CountTokens 대비 실제 prompt Budget 검증에 사용한다.
+- `cost_estimate_complete`는 모든 API 시도가 성공 응답이며 모든 응답의 비용 metadata가
+  완전할 때만 true다. 하나라도 불완전하면 prompt/output/total token 합계와 추정 비용을
+  부분값이나 0으로 기록하지 않고 모두 `null`, `accounting_status="incomplete"`로 남긴다.
+  API 호출이 전혀 없으면 완전한 0회 실행으로 간주해 output token과 비용은 0이다.
+- Prompt audit은 `verified`, `unverified`, `exceeded`, `not_applicable` 상태를 기록한다.
+  불완전하더라도 관측된 실제 입력 하나가 명목 Budget을 넘으면 `exceeded=true`를
+  보존하며, 초과가 관측되지 않았지만 일부 usage가 없으면 초과 여부는 `null`이다.
+- Main 집계에서 Agent가 실행된 row는 양의 API call 수와 완전한 prompt audit을 반드시
+  가져야 한다. 조건을 만족하지 않는 row는 0이나 미초과로 간주하지 않고 집계를
+  중단한다. 비용 완전성은 별도 필드로 보고하며 불완전 비용을 성능·비용 비교에 넣지 않는다.
+
+이 규칙은 실제로 확인된 usage만 보고하고 미관측량을 0으로 대체하지 않는 보수적
+회계 원칙이며, 네 strategy에 동일하게 적용한다.
+
 ## 5. Explicitly deferred
 
 다음은 V1.0 결과에 섞지 않는다.

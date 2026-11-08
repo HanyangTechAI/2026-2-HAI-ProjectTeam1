@@ -628,11 +628,27 @@ def _prompt_token_audit(
         for value in counted
     )
     
-    actual_budget_exceeded = any(
+    observed_overflow = any(
         value > nominal_context_budget
         for value in actual
         if value is not None
-    ) if complete else None
+    )
+    
+    if observed_overflow:
+        actual_budget_exceeded = True
+    elif complete:
+        actual_budget_exceeded = False
+    else:
+        actual_budget_exceeded = None
+        
+    if not counted and not actual:
+        verification_status = "not_applicable"
+    elif actual_budget_exceeded is True:
+        verification_status = "exceeded"
+    elif complete:
+        verification_status = "verified"
+    else:
+        verification_status = "unverified"
     
     return {
         "nominal_context_budget": nominal_context_budget,
@@ -657,6 +673,8 @@ def _prompt_token_audit(
         
         "counted_budget_exceeded": counted_budget_exceeded,
         "actual_budget_exceeded": actual_budget_exceeded,
+        
+        "verification_status": verification_status,
     }
 
 
@@ -835,6 +853,14 @@ def _run_one(
             llm_thoughts_tokens=llm_usage.get("thoughts_tokens"),
             llm_total_tokens=llm_usage.get("total_tokens"),
             llm_api_calls=llm_usage.get("api_calls"),
+            
+            llm_successful_response_calls=llm_usage.get("successful_response_calls"),
+            llm_usage_metadata_calls=llm_usage.get("usage_metadata_calls"),
+            llm_cost_usage_complete_Calls=llm_usage.get("cost_usage_complete_calls"),
+            llm_billing_uncertain_attempts=llm_usage.get("billing_uncertain_attempts"),
+            llm_prompt_usage_complete=llm_usage.get("prompt_usage_complete"),
+            llm_cost_estimate_complete=llm_usage.get("cost_estimate_complete"),
+            llm_accounting_status=llm_usage.get("accounting_status"),
         ),
         
         planning_latency_ms=outcome.planning_latency_ms,

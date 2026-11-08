@@ -161,7 +161,17 @@ GEMINI_31_FLASH_LITE_CACHED_INPUT_USD_PER_MILLION = 0.025
 class PlannerTelemetry:
     planner_calls: int
     api_calls: int
+    
+    successful_response_calls: int
     usage_metadata_calls: int
+    
+    cost_usage_complete_calls: int
+    
+    billing_uncertain_attempts: int
+    
+    prompt_usage_complete: bool
+    
+    cost_estimate_complete: bool
     
     prompt_tokens: int | None
     prompt_tokens_per_call: tuple[int | None, ...]
@@ -182,7 +192,16 @@ class PlannerTelemetry:
         return {
             "planner_calls": self.planner_calls,
             "api_calls": self.api_calls,
+            
+            "successful_response_calls": self.successful_response_calls,
             "usage_metadata_calls": self.usage_metadata_calls,
+            "cost_usage_complete_calls": self.cost_usage_complete_calls,
+            "billing_uncertain_attempts": self.billing_uncertain_attempts,
+            
+            "prompt_usage_complete": self.prompt_usage_complete,
+            "cost_estimate_complete": self.cost_estimate_complete,
+            
+            "accounting_status": "complete" if self.cost_estimate_complete else "incomplete",
             
             "prompt_tokens": self.prompt_tokens,
             "prompt_tokens_per_call": list(self.prompt_tokens_per_call),
@@ -270,7 +289,12 @@ class LLMPlanner:
         
         self._planner_calls = 0
         self._api_calls = 0
+        
+        self._successful_response_calls = 0
+        
         self._usage_metadata_calls = 0
+        
+        self._cost_usage_complete_calls = 0
         
         self._prompt_tokens = 0
         self._prompt_tokens_per_call: list[int | None] = []
@@ -360,75 +384,95 @@ class LLMPlanner:
         
         
     def _record_usage_metadata(self, response: Any) -> None:
+        self._successful_response_calls += 1
         usage = getattr(response, "usage_metadata", None)
         
         if usage is None:
+            self._prompt_tokens_per_call.append(None)
             return
         
         self._usage_metadata_calls += 1
         
-        prompt_tokens = getattr(
+        prompt = getattr(
             usage,
             "prompt_token_count",
             None,
         )
         
-        if type(prompt_tokens) is int and prompt_tokens >= 0:
-            self._prompt_tokens += prompt_tokens
-            self._prompt_tokens_per_call.append(prompt_tokens)
-        else:
-            self._prompt_tokens_per_call.append(None)
-        
-        self._cached_prompt_tokens += _usage_int(usage, "cached_content_token_count")
-        
-        self._tool_use_prompt_tokens += _usage_int(usage, "tool_use_prompt_token_count")
-        
-        candidate_tokens = getattr(usage, "candidates_token_count", None)
-        
-        if candidate_tokens is None:
-            candidate_tokens = getattr(usage, "response_token_count", None)
+        if type(prompt) is not int or prompt < 0:
+            prompt = None
             
-        if type(candidate_tokens) is int and candidate_tokens >= 0:
-            self._cadidate_tokens += candidate_tokens
-            
-        self._thoughts_tokens += _usage_int(usage, "thoughts_token_count")
+        self._prompt_tokens_per_call.append(prompt)
         
-        total = getattr(usage, "total_token_count", None)
+        if prompt is not None:
+            self._prompt_tokens += prompt
         
-        if type(total) is int and total >= 0:
-            self._total_tokens += total
-        else:
-            candidate = candidate_tokens if type(candidate_tokens) is int and candidate_tokens >= 0 else 0
+        candidate = getattr(usage, "candidates_token_count", None)
+        
+        if candidate is None:
+            candidate = getattr(usage, "response_token_count", None)
             
-            self._total_tokens += (
-                _usage_int(usage, "prompt_token_count")
-                + _usage_int(usage, "tool_use_prompt_token_count")
-                + candidate
-                + _usage_int(usage, "thoughts_token_count")
+        if type(candidate) is not int or candidate < 0:
+            candidate = None
+            
+        cached = _optimal_usage_int(
+            usage,
+            "cached_content_token_count",
+        )
+        tool_use = _optimal_usage_int(
+            usage,
+            "tool_use_prompt_token_count",
+        )
+        thoughts = _optimal_usage_int(
+            usage, 
+            "thoughts_token_count",
+        )
+        
+        if any(
+            value is None
+            for value in (
+                prompt,
+                candidate,
+                cached,
+                tool_use,
+                thoughts,
             )
+        ):
+            return
+        
+        billable_input = prompt + tool_use
+        
+        if cached > billable_input:
+            return
+        
+        reported_total = getattr(usage, "total_token_count", None)
+        
+        if reported_total is None:
+            total = prompt + tool_use + candidate + thoughts
+        elif type(reported_total) is int and reported_total >= 0:
+            total = reported_total
+        else:
+            return
+        
+        self._cost_usage_complete_calls += 1
+        
+        self._cached_prompt_tokens += cached
+        self._tool_use_prompt_tokens += tool_use
+        self._cadidate_tokens += candidate
+        self._thoughts_tokens += thoughts
+        self._total_tokens += total
             
             
     def telemetry(self) -> PlannerTelemetry:
-        meatadata_available = self._usage_metadata_calls > 0
+        billing_uncertain_attempts  = self._api_calls - self._successful_response_calls
         
-        if meatadata_available:
-            output_tokens = self._cadidate_tokens + self._thoughts_tokens
-            billable_intput_tokens = self._prompt_tokens + self._tool_use_prompt_tokens
-            cached_tokens = min(self._cached_prompt_tokens, billable_intput_tokens)
-            uncached_tokens = max(0, billable_intput_tokens - cached_tokens)
-            
-            estimated_cost_usd = (
-                uncached_tokens * GEMINI_31_FLASH_LITE_INPUT_USD_PER_MILLION + cached_tokens * GEMINI_31_FLASH_LITE_CACHED_INPUT_USD_PER_MILLION + output_tokens * GEMINI_31_FLASH_LITE_OUTPUT_USD_PER_MILLION
-                ) / 1_000_000.0
-            
-        elif self._api_calls == 0:
-            output_tokens = 0
-            estimated_cost_usd = 0.0
-            
-        else:
-            output_tokens = None
-            estimated_cost_usd = None
-            
+        prompt_usage_complete = len(self._prompt_tokens_per_call) == self._successful_response_calls and all(
+            value is not None
+            for value in self._prompt_tokens_per_call
+        )
+        
+        cost_estimate_complete = self._api_calls == self._successful_response_calls == self._cost_usage_complete_calls
+        
         valid_prompt_tokens = [
             value
             for value in self._prompt_tokens_per_call
@@ -436,23 +480,60 @@ class LLMPlanner:
         ]
         
         max_prompt_tokens = max(valid_prompt_tokens) if valid_prompt_tokens else None
+        
+        if cost_estimate_complete:
+            prompt_tokens = self._prompt_tokens
+            cached_prompt_tokens = self._cached_prompt_tokens
+            tool_use_prompt_tokens = self._tool_use_prompt_tokens
+            candidate_tokens = self._cadidate_tokens
+            thoughts_tokens = self._thoughts_tokens
+            total_tokens = self._total_tokens
+            
+            output_tokens = candidate_tokens + thoughts_tokens
+            
+            billable_input = prompt_tokens + tool_use_prompt_tokens
+            
+            cached_input = min(
+                cached_prompt_tokens,
+                billable_input,
+            )
+            
+            uncached_input = billable_input - cached_input
+            
+            estimated_cost_usd = (uncached_input * GEMINI_31_FLASH_LITE_INPUT_USD_PER_MILLION + cached_input * GEMINI_31_FLASH_LITE_CACHED_INPUT_USD_PER_MILLION + output_tokens * GEMINI_31_FLASH_LITE_OUTPUT_USD_PER_MILLION) / 1_000_000.0
+            
+        else:
+            prompt_tokens = None
+            cached_prompt_tokens = None
+            tool_use_prompt_tokens = None
+            candidate_tokens = None
+            thoughts_tokens = None
+            output_tokens = None
+            total_tokens = None
+            estimated_cost_usd = None
             
         return PlannerTelemetry(
             planner_calls=self._planner_calls,
             api_calls=self._api_calls,
-            usage_metadata_calls=self._usage_metadata_calls,
             
-            prompt_tokens=self._prompt_tokens if meatadata_available else None,
+            successful_response_calls=self._successful_response_calls,
+            usage_metadata_calls=self._usage_metadata_calls,
+            cost_usage_complete_calls=self._cost_usage_complete_calls,
+            billing_uncertain_attempts=billing_uncertain_attempts,
+            
+            prompt_usage_complete=prompt_usage_complete,
+            cost_estimate_complete=cost_estimate_complete,
+            
+            prompt_tokens=prompt_tokens,
             prompt_tokens_per_call=tuple(self._prompt_tokens_per_call),
             max_prompt_tokens=max_prompt_tokens,
             
-            cached_prompt_tokens=self._cached_prompt_tokens if meatadata_available else None,
-            tool_use_prompt_tokens=self._tool_use_prompt_tokens if meatadata_available else None,
-            
-            candidate_tokens=self._cadidate_tokens if meatadata_available else None,
-            thoughts_tokens=self._thoughts_tokens if meatadata_available else None,
+            cached_prompt_tokens=cached_prompt_tokens,
+            tool_use_prompt_tokens=tool_use_prompt_tokens,
+            candidate_tokens=candidate_tokens,
+            thoughts_tokens=thoughts_tokens,
             output_tokens=output_tokens,
-            total_tokens=self._total_tokens if meatadata_available else None,
+            total_tokens=total_tokens,
             
             planning_latency_ms=self._planning_latency_ms,
             estimated_cost_usd=estimated_cost_usd,
@@ -726,3 +807,18 @@ def _usage_int(usage: Any, name: str) -> int:
         return value
     
     return 0
+
+
+def _optimal_usage_int(
+    usage: Any,
+    name: str,
+) -> int | None:
+    value = getattr(usage, name, None)
+    
+    if value is None:
+        return 0
+    
+    if type(value) is int and value >= 0:
+        return value
+    
+    return None
