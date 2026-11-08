@@ -856,7 +856,7 @@ def _run_one(
             
             llm_successful_response_calls=llm_usage.get("successful_response_calls"),
             llm_usage_metadata_calls=llm_usage.get("usage_metadata_calls"),
-            llm_cost_usage_complete_Calls=llm_usage.get("cost_usage_complete_calls"),
+            llm_cost_usage_complete_calls=llm_usage.get("cost_usage_complete_calls"),
             llm_billing_uncertain_attempts=llm_usage.get("billing_uncertain_attempts"),
             llm_prompt_usage_complete=llm_usage.get("prompt_usage_complete"),
             llm_cost_estimate_complete=llm_usage.get("cost_estimate_complete"),
@@ -1636,7 +1636,7 @@ def main() -> None:
         has_config=has_config, overrides=overrides,
     )
     request_token_safety_margin = _resolved_value(
-        "request_token_safeety_margin",
+        "request_token_safety_margin",
         args.request_token_safety_margin,
         budget_policy_config.get("request_token_safety_margin"),
         0,
