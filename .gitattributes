@@ -1,0 +1,4 @@
+# Freeze 대상 파일은 Windows/Linux 모두 LF로 유지한다.
+experiments/prompts/system_v1.txt text eol=lf
+experiments/prompts/tools_v1.txt text eol=lf
+docs/algorithm.md text eol=lf

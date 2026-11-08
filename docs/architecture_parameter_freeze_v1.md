@@ -124,8 +124,8 @@ Algorithm specification, Prompt 및 Planner behavior checksum도 freeze에 포�
 | 파일 | SHA-256 |
 |---|---|
 | `docs/algorithm.md` | `f029a473fa91a292e6c6d4ee693546e42787e1f6a41d550c71781668156b05ab` |
-| `system_v1.txt` | `7eed3aa88a49307e00cbf1e82d0874954ebf61ebcf18515cb9a090ab0d846ee0` |
-| `tools_v1.txt` | `d7abdb10edfa396788f8d1ad5f6aeb567eeacd6af5cab7c2232885e53f69a812` |
+| `system_v1.txt` | `9ad2e2d481997048ba770648ef1d07050a098a77674f5187c9dd645f75b6fac5` |
+| `tools_v1.txt` | `cc701a57b9aa951060ccfd28d69e74955e37af1e709ca932e04b96d725e61c3` |
 | `agent.llm_planner:SYSTEM_INSTRUCTION` | `aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f` |
 | `agent.llm_planner:ACTION_SCHEMA` | `634277e47b8b38427623d5d9116289d90d04868a43f4753ed7ab779a750370b9` |
 
