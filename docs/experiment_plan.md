@@ -1075,6 +1075,7 @@ H100·2K의 Sliding 2개 및 Utility 1개 실행은 내부 API 재시도 후 작
 이 실험은 제한 예산에서 필수 상태·제약 보존의 행동상 이점을 보여준다. 충분한 예산에서는 단순한 최근 기억 방식도 높은 성능을 보이며, 기억의 보존이 올바른 Tool 인자 사용까지 보장하지 않는다는 한계도 확인됐다. 현재 기준 실험은 보존하고 인터페이스·프롬프트·후보 검색을 개선하려면 새 freeze/결과군으로 분리한다.
 
 - [전체 Main 최종 분석](main_final_analysis_20261109.md)
+- [저장소에 포함한 집계 JSON·감사·그래프](results/main_20261109/README.md)
 - 최종 원본·집계: `experiments/results/main_final_20261109/`
 - `source_audit.json`, `pairing_audit.json`, `aggregate/provenance_audit.json`: 입력·코드·재현성 감사.
 - `aggregate/summary.json`, `aggregate/deltas.json`, `analysis.json`: 주요 결과·CI·진단.

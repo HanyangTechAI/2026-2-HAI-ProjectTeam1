@@ -1,0 +1,29 @@
+{
+  "primary_outcome": [
+    "task_success",
+    "constraint_violation_rate",
+    "required_state_accuracy",
+    "stale_state_usage_rate",
+    "temporal_version_correct",
+    "temporal_context_correct"
+  ],
+  "secondary_efficiency": [
+    "input_tokens",
+    "output_tokens",
+    "planning_latency_ms",
+    "total_llm_cost"
+  ],
+  "supporting_diagnostic": [
+    "general_retrieval_miss",
+    "selection_failure",
+    "budget_selection_failure",
+    "recall_at_k",
+    "state_omission_rate",
+    "state_error_rate",
+    "precision_at_k",
+    "mrr",
+    "answer_normalized_exact_match",
+    "answer_f1",
+    "applicable_protected_recall"
+  ]
+}

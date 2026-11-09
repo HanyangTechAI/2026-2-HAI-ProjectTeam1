@@ -1,0 +1,650 @@
+[
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": 0.15,
+      "ci95": [
+        0.05,
+        0.275
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        -0.025,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 10,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": 0.25,
+      "ci95": [
+        0.125,
+        0.375
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        -0.025,
+        0.2
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        -0.025,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 50,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        -0.025,
+        0.2
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 1024,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": 0.25,
+      "ci95": [
+        0.125,
+        0.375
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        -0.025,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 4096,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "sliding_window",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "vector_top_k",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 8192,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "baseline": "utility_per_token",
+    "delta_success": {
+      "mean": 0.1,
+      "ci95": [
+        0.0,
+        0.225
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  }
+]

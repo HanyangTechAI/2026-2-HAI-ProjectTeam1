@@ -53,6 +53,7 @@ thinking LOW, 출력 상한 2,048, top-k 5, max_steps 8, 입력 safety margin 32
 기본 과제는 40개이며 3,840개의 독립 과제를 평가한 것은 아니다.
 12셀 전체 표·신뢰구간·실패 사례는 [Experiment Plan의 최종 결과](docs/experiment_plan.md#17-전체-main-최종-결과-2026-11-09)와
 [최종 분석 보고서](docs/main_final_analysis_20261109.md)를 따른다.
+PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조
 

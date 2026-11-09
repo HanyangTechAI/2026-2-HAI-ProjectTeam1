@@ -1,0 +1,109 @@
+{
+  "freeze": {
+    "version": "1.0.3",
+    "kind": "architecture_parameter_freeze"
+  },
+  "scope": "main",
+  "status": "executable",
+  "executable": true,
+  "name": "main",
+  "description": "Required RQ1/RQ2: budget x horizon; history, noise, constraints and updates fixed.",
+  "model": {
+    "provider": "google",
+    "name": "gemini-3.1-flash-lite",
+    "temperature": 0,
+    "max_output_tokens": 2048,
+    "thinking_level": "LOW",
+    "system_prompt_file": "experiments/prompts/system_v1.txt",
+    "tool_definitions_file": "experiments/prompts/tools_v1.txt",
+    "max_retries": 2,
+    "retry_base_seconds": 0.5,
+    "timeout_ms": 60000
+  },
+  "runtime": {
+    "candidate_top_k": 5,
+    "max_steps": 8,
+    "utility_weights": [
+      0.6,
+      0.3,
+      0.1
+    ],
+    "embedder": "benchmark.experiment_runtime:multilingual_embedder",
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "token_counter": {
+      "provider": "google",
+      "model": "gemini-3.1-flash-lite",
+      "cache_size": 4096,
+      "persistent_cache_path": ".cache/gemini_token_cache.sqlite3",
+      "max_retries": 3,
+      "retry_base_seconds": 0.5
+    }
+  },
+  "dataset": {
+    "source": "synthetic",
+    "samples_per_cell": 20,
+    "task_types": [
+      "temporal_update",
+      "approval"
+    ]
+  },
+  "strategies": [
+    "proposed",
+    "sliding_window",
+    "vector_top_k",
+    "utility_per_token"
+  ],
+  "seeds": [
+    42,
+    43
+  ],
+  "repeats": 2,
+  "grid": {
+    "context_token_budget": [
+      1024,
+      2048,
+      4096,
+      8192
+    ],
+    "history_length_tokens": [
+      25000
+    ],
+    "horizon_turns": [
+      10,
+      50,
+      100
+    ],
+    "noise_memory_ratio": [
+      0.5
+    ],
+    "constraint_count": [
+      3
+    ],
+    "state_update_count": [
+      2
+    ]
+  },
+  "evaluation": {
+    "retrieval_k": 5,
+    "bootstrap_iterations": 2000,
+    "bootstrap_seed": 42,
+    "group_by": [
+      "strategy",
+      "context_token_budget",
+      "history_length_tokens",
+      "horizon_turns"
+    ],
+    "delta_group_by": [
+      "context_token_budget",
+      "history_length_tokens",
+      "horizon_turns"
+    ]
+  },
+  "budget_policy": {
+    "scope": "total_input",
+    "mandatory_overflow": "stop_and_log",
+    "full_context": "reference_only_if_over_budget",
+    "request_token_safety_margin": 32
+  },
+  "output_directory": "experiments/results/main"
+}

@@ -170,6 +170,7 @@ H10의 과거 조회는 60%로 H50/H100의 10%보다 높았지만, 승인 위반
 
 ## 9. 산출물과 재현
 
+- 저장소에 포함한 [검토용 집계·감사·그래프](results/main_20261109/README.md)를 통해 주요 수치를 확인할 수 있다. 대용량 원본 실행 로그는 아래 로컬 경로에 별도 보존한다.
 - 최종 로컬 경로: `experiments/results/main_final_20261109/`.
 - `source_audit.json`, `pairing_audit.json`: 12셀 입력·코드·정답 동일성, 예상 run key·해시 감사.
 - `combined_runs.jsonl`: 원본 순서를 보존해 합친 실행 입력. 각 차수의 원본 파일은 그대로 보존했다.

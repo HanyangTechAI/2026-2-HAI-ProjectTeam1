@@ -1,0 +1,82 @@
+{
+  "status": "pass",
+  "expected_cells": 12,
+  "observed_cells": 12,
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42",
+  "cells": [
+    {
+      "cell_id": "h100_b1024",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h100_b1024/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h100_b2048",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h100_b2048/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h100_b4096",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h100_b4096/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h100_b8192",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h100_b8192/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h10_b1024",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h10_b1024/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h10_b2048",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h10_b2048/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h10_b4096",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h10_b4096/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h10_b8192",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h10_b8192/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h50_b1024",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h50_b1024/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h50_b2048",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h50_b2048/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h50_b4096",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h50_b4096/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    },
+    {
+      "cell_id": "h50_b8192",
+      "experiment_path": "experiments/results/main_final_20261109/cells/h50_b8192/experiment.json",
+      "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "resolved_revision": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+    }
+  ],
+  "export_note": "Paths refer to local experiment metadata; raw run logs and metadata remain local. The audit was executed against all 12 metadata files before export."
+}
