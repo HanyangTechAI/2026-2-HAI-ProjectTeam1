@@ -868,6 +868,30 @@ Runner의 `--config`는 model뿐 아니라 runtime, strategies, repeats, evaluat
 실제 모델 smoke 검증은 3.1 데이터와 동일 모델의 CountTokens를 사용하며 토큰 측정
 방식을 임의로 바꾸지 않는다.
 
+### 15.1 신규 실행 환경의 live 4K/8K gate
+
+Freeze 승인 전에는 검증된 `benchmark/generated/main_gemini_3_1_flash_lite.zip`을
+입력으로 다음 live 4K/8K gate를 수행한다.
+
+```text
+python tests/smoke_4k8k.py prepare
+python tests/smoke_4k8k.py run
+python tests/smoke_4k8k.py report
+```
+
+이 gate는 seed `42, 43`, horizon `50`에서 동일한 8개 sample을 Budget `4096`과
+`8192`에 짝지어 추출하고 네 전략을 repeat `1`로 실행하므로 총 예정 실행은 `64`회다.
+Main 결과와 분리된 `experiments/results/smoke_4k8k`에 저장하며, 중단된 실행은 입력,
+config와 코드가 바뀌지 않은 경우에만 `run --resume`으로 계속한다. Report는 실행 및
+checkpoint 완결성, 전략별 실제 LLM 호출, request-aware CountTokens, Prompt Audit,
+Budget 초과, Safety Margin, embedding revision과 prompt checksum을 검사한다.
+`readiness=PASS` 전에는 Main 실행 준비가 완료된 것으로 보지 않는다. 비용 metadata가
+불완전한 run은 별도 warning과 `null` 비용으로 유지하고 비용 비교에서 제외한다.
+
+이 gate 절차는 신규 실행 환경의 검증 기준으로 보존한다. 아래 16·17절에 기록된
+기존 실행은 전략별 10개 조건의 사전 점검과 이후 전체 Main 감사를 수행했다.
+해당 Main 기록을 이 64회 gate의 실행 또는 PASS 기록으로 소급해 표시하지 않는다.
+
 ## 16. 2026-11-09 실행 현황과 1·2차 관측 결과
 
 ### 16.1 완료 범위와 공통 설정

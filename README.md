@@ -193,6 +193,24 @@ python prototype/run_demo.py  # 현재 레거시 API 불일치로 실행 불가
 
 현재 실행 가능한 검증 경로는 `python -m unittest discover -s tests -v`와 `python -m benchmark.runner --help`이다. 레거시 데모의 출력은 실제 LLM 성능 측정이 아니며 최신 Pipeline 동작을 증명하지 않는다.
 
+Freeze 승인 전 실 Gemini 4K/8K gate는 검증된
+`benchmark/generated/main_gemini_3_1_flash_lite.zip`에서 seed 42·43의 짝지은
+시나리오를 추출해 네 전략을 각 Budget에서 32회씩, 총 64회 실행한다. 이 결과는 Main
+효과 크기 보고에 합치지 않는다. `GEMINI_API_KEY`와 embedding model weight를 준비한 뒤
+다음 순서로 실행하며, 중단된 동일 실행은 `run --resume`으로 이어서 완료한다.
+
+```text
+python tests/smoke_4k8k.py prepare
+python tests/smoke_4k8k.py run
+python tests/smoke_4k8k.py report
+```
+
+`report`는 실행 수와 checkpoint 완결성, 네 전략의 실제 LLM 호출, request-aware
+CountTokens, Prompt Audit·Budget 초과, Safety Margin, embedding revision 및 prompt
+checksum을 검사해 `experiments/results/smoke_4k8k/smoke_gate_report.json`에
+`PASS` 또는 `HOLD`를 기록한다. 비용 회계 불완전은 성능 gate와 별도 warning으로
+보고하며, 해당 비용을 0으로 해석하지 않는다.
+
 실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token과 `memory/selector.py`의 Proposed를 공통 `SelectionResult`로 변환한다. Proposed Policy는 실행 입력의 Memory Snapshot으로 `SnapshotMemoryStore`를 만들고, 시간 해석 기준인 `current_time`을 요구한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 네 전략을 `PipelineAdapter`로 반복 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector Top-k, Utility-per-Token, Proposed에는 embedder가 필요하며 Proposed 시나리오에는 ISO 8601 `current_time`이 있어야 한다.
 
 LLM provider 요청이 retry 후에도 실패하면 실행은 `LLMProviderError`로 중단되고 완료된 checkpoint만 보존된다. Provider 장애를 Task failure나 text action으로 기록하지 않으며, `--resume`으로 누락된 run을 완료한 뒤 집계한다. 정상 응답을 structured action으로 해석하지 못한 경우는 Provider 장애와 구분하여 모델 출력 실패로 평가한다. 고정 계약은 [Provider Failure Isolation](docs/architecture_parameter_freeze_v1.md#41-provider-failure-isolation)을 따른다.

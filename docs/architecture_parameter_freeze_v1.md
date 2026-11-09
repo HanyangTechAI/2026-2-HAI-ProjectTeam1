@@ -45,6 +45,9 @@ V1.0.2는 Context Budget의 token counting 범위를 실제 Gemini request 입�
 
 ## Patch note - V1.0.3
 
+V1.0.3은 공통 출력 상한을 512에서 2048 token으로 올린 실행 파라미터 patch이다.
+모든 표준 experiment config와 config 없이 실행하는 Planner/Runner 기본값에 적용한다.
+
 2026-11-09의 실제 API 진단에서 출력 상한 512의 문제 조건 5개가 모두
 `finish_reason=MAX_TOKENS`로 끝나 미완성 행동 JSON을 반환했다. 같은 조건을
 출력 상한 2048로 한 번씩 재실행했을 때 10개 응답이 모두 `STOP`으로 종료되고
@@ -234,6 +237,16 @@ Planned agent runs는 `2160`이다.
 Budget `2048`, history `15000`, horizon `50`, 5 samples, seed `42`, repeat `1`이다.
 본실험 효과 크기 보고에는 사용하지 않는다.
 
+Freeze 승인용 live gate는 `tests/smoke_4k8k.py`로 별도 수행한다. 검증된 Gemini 3.1
+Main ZIP에서 seed `42, 43`, horizon `50`의 동일한 8개 sample을 Budget `4096`과
+`8192`에 짝지어 추출하고, 네 전략을 repeat `1`로 실행한다. Budget별 `32`회, 총
+`64`회의 예정 run을 모두 완료해야 한다. 이 gate 역시 Main 효과 크기 결과에는 섞지 않는다.
+
+`report` 단계는 run key 중복·누락, completed checkpoint, 실제 LLM 실행, request-aware
+CountTokens, Prompt Audit 완전성, 실제·측정 Budget 초과, 공통 Safety Margin,
+embedding revision 및 prompt checksum 일치를 검사한다. 필수 조건 위반 시 readiness는
+`HOLD`다. 비용 회계 불완전은 별도 warning으로 남기고 해당 비용 비교를 금지한다.
+
 ### Pilot — generation only
 
 100개의 distinct base sample을 생성·검증하는 입력 freeze다. Agent benchmark 실행에는
@@ -347,6 +360,9 @@ Architecture/parameter가 frozen인 것과 본실험 입력이 준비된 것은 
   `requirements.txt`의 lower bound만으로 동일 weight revision까지 보장하지 않는다.
 - 전체 test와 smoke가 통과하고 `experiment.json`의 model, tokenizer, K, utility weights,
   prompt, override 목록이 이 문서와 일치하는지 확인한 뒤 main을 실행한다.
+- `tests/smoke_4k8k.py prepare`, `run`, `report`를 순서대로 수행하고 live gate의
+  `smoke_gate_report.json`이 `readiness="PASS"`인지 확인한다. 중단된 동일 실행만
+  `run --resume`으로 이어서 수행한다.
 
 ## 7. Change control
 

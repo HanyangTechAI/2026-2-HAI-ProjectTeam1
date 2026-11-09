@@ -104,7 +104,7 @@ def prepare() -> None:
             print(
                 "NOTICE: dataset generation freeze and execution freeze differ: "
                 f"{generation_freeze} -> {execution_freeze}. "
-                "Review dataset provenance against the current request counting and output-limit freeze."
+                "The V1.0.3 execution freeze requires compatibility review."
             )
 
         DATA_DIR.mkdir(parents=True, exist_ok=True)
