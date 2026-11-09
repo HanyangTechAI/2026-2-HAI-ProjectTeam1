@@ -160,6 +160,24 @@ python prototype/run_demo.py  # 현재 레거시 API 불일치로 실행 불가
 
 현재 실행 가능한 검증 경로는 `python -m unittest discover -s tests -v`와 `python -m benchmark.runner --help`이다. 레거시 데모의 출력은 실제 LLM 성능 측정이 아니며 최신 Pipeline 동작을 증명하지 않는다.
 
+Freeze 승인 전 실 Gemini 4K/8K gate는 검증된
+`benchmark/generated/main_gemini_3_1_flash_lite.zip`에서 seed 42·43의 짝지은
+시나리오를 추출해 네 전략을 각 Budget에서 32회씩, 총 64회 실행한다. 이 결과는 Main
+효과 크기 보고에 합치지 않는다. `GEMINI_API_KEY`와 embedding model weight를 준비한 뒤
+다음 순서로 실행하며, 중단된 동일 실행은 `run --resume`으로 이어서 완료한다.
+
+```text
+python tests/smoke_4k8k.py prepare
+python tests/smoke_4k8k.py run
+python tests/smoke_4k8k.py report
+```
+
+`report`는 실행 수와 checkpoint 완결성, 네 전략의 실제 LLM 호출, request-aware
+CountTokens, Prompt Audit·Budget 초과, Safety Margin, embedding revision 및 prompt
+checksum을 검사해 `experiments/results/smoke_4k8k/smoke_gate_report.json`에
+`PASS` 또는 `HOLD`를 기록한다. 비용 회계 불완전은 성능 gate와 별도 warning으로
+보고하며, 해당 비용을 0으로 해석하지 않는다.
+
 실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token과 `memory/selector.py`의 Proposed를 공통 `SelectionResult`로 변환한다. Proposed Policy는 실행 입력의 Memory Snapshot으로 `SnapshotMemoryStore`를 만들고, 시간 해석 기준인 `current_time`을 요구한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 네 전략을 `PipelineAdapter`로 반복 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector Top-k, Utility-per-Token, Proposed에는 embedder가 필요하며 Proposed 시나리오에는 ISO 8601 `current_time`이 있어야 한다.
 
 LLM provider 요청이 retry 후에도 실패하면 실행은 `LLMProviderError`로 중단되고 완료된 checkpoint만 보존된다. Provider 장애를 Task failure나 text action으로 기록하지 않으며, `--resume`으로 누락된 run을 완료한 뒤 집계한다. 정상 응답을 structured action으로 해석하지 못한 경우는 Provider 장애와 구분하여 모델 출력 실패로 평가한다. 고정 계약은 [Provider Failure Isolation](docs/architecture_parameter_freeze_v1.md#41-provider-failure-isolation)을 따른다.
@@ -221,7 +239,7 @@ MemoryItem의 content-only 비용은 `google-genai` SDK로 측정한다. Runner�
 
 `benchmark/generated/smoke_gemini`와 `benchmark/generated/pilot_gemini.zip`은 `gemini-3.8-flash`로 실측한 기존 재현성 자료이다. 모델별 token 수와 그에 맞춘 padding이 달라질 수 있으므로 metadata의 모델명만 바꾸어 재사용하지 않는다. `GEMINI_API_KEY`가 준비된 환경에서 위 모델로 다시 생성한 뒤 manifest·scenario의 `token_count_mode`, History 길이, Noise 비율과 독립 재측정을 함께 검증해야 한다.
 
-V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 응답 생성은 config 또는 `--llm-model`로 `gemini-3.1-flash-lite` LLM Planner를 활성화하며, 생성 모델과 CountTokens 모델이 다르면 API 호출 전에 중단한다. freeze config는 temperature 0, 최대 출력 512 token, thinking level `LOW`를 고정한다.
+V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 응답 생성은 config 또는 `--llm-model`로 `gemini-3.1-flash-lite` LLM Planner를 활성화하며, 생성 모델과 CountTokens 모델이 다르면 API 호출 전에 중단한다. freeze config는 temperature 0, 최대 출력 2048 token, thinking level `LOW`를 고정한다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 

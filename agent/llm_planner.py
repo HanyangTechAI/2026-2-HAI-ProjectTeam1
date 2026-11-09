@@ -248,7 +248,7 @@ class LLMPlanner:
         api_key: str | None = None,
         temperature: float = 0,
         system_instruction: str = SYSTEM_INSTRUCTION,
-        max_output_tokens: int = 512,
+        max_output_tokens: int = 2048,
         thinking_level: str = "LOW",
         max_retries: int = 2,
         retry_base_seconds: float = 0.5,
@@ -562,7 +562,7 @@ class LLMRunConfig:
     model: str = DEFAULT_MODEL
     temperature: float = 0
     system_instruction: str = SYSTEM_INSTRUCTION
-    max_output_tokens: int = 512
+    max_output_tokens: int = 2048
     thinking_level: str = "LOW"
     max_retries: int = 2
     retry_base_seconds: float = 0.5

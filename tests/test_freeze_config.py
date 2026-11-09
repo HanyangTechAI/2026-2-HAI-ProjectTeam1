@@ -210,7 +210,7 @@ class FreezeConfigTests(unittest.TestCase):
         self.assertEqual(captured["cli_overrides"]["repeats"]["effective"], 1)
         self.assertEqual(llm_arguments["system_instruction"], SYSTEM_INSTRUCTION)
         self.assertNotIn(captured["system_prompt"].strip(), llm_arguments["system_instruction"])
-        self.assertEqual(llm_arguments["max_output_tokens"], 512)
+        self.assertEqual(llm_arguments["max_output_tokens"], 2048)
         self.assertEqual(llm_arguments["thinking_level"], "LOW")
         self.assertEqual(llm_arguments["max_retries"], 2)
         self.assertEqual(llm_arguments["retry_base_seconds"], 0.5)

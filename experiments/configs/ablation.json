@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0.2", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.3", "kind": "architecture_parameter_freeze"},
   "scope": "ablation",
   "status": "executable",
   "executable": true,
@@ -9,7 +9,7 @@
     "provider": "google",
     "name": "gemini-3.1-flash-lite",
     "temperature": 0,
-    "max_output_tokens": 512,
+    "max_output_tokens": 2048,
     "thinking_level": "LOW",
     "system_prompt_file": "experiments/prompts/system_v1.txt",
     "tool_definitions_file": "experiments/prompts/tools_v1.txt",
