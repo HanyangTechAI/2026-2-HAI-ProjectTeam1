@@ -4,6 +4,16 @@
 
 기존 [`benchmark/scenarios.json`](../benchmark/scenarios.json)의 S01~S39는 모듈 경계와 예외 정책을 검사하는 최소 fixture로 유지한다. 긴 이력을 사용하는 실험 데이터와 그 fixture의 용도는 다르다. 기존 fixture 설명은 [scenarios_usage.md](scenarios_usage.md)를 참고한다.
 
+## Freeze 1.0.3 입력 호환성
+
+2026-11-09부터 실행의 공통 출력 상한은 2048 token이다. 출력 상한은
+데이터 생성 grid나 History·Memory의 content-only token 수를 바꾸지 않는다.
+따라서 기존 `main_gemini_3_1_flash_lite.zip`의 생성 freeze가 1.0.1이어도,
+동일 Gemini 모델·입력·counter를 사용하는 1.0.3 실행에 원본 그대로 재사용한다.
+ZIP의 manifest·검증 보고서·해시를 수정해 새로 생성한 것처럼 표시하지 않는다.
+출력 상한 512의 기존 실행 결과는 새 결과와 합치지 않는다. 새 결과 경로를
+사용하고 실제 실행 freeze와 출력 상한은 `experiment.json`에서 확인한다.
+
 ## 생성 명령
 
 저장소 루트에서 다음 명령을 실행한다.

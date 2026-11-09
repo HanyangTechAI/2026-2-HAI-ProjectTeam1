@@ -87,6 +87,15 @@ class FreezeConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "model.provider"):
                 _load_runner_config(path)
 
+    def test_previous_output_limit_is_rejected_by_new_freeze(self):
+        config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))
+        config["model"]["max_output_tokens"] = 512
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "old-output-limit.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "model.max_output_tokens"):
+                _load_runner_config(path)
+
     def test_modified_planner_behavior_is_rejected(self):
         with patch(
             "benchmark.runner.SYSTEM_INSTRUCTION", SYSTEM_INSTRUCTION + "\nchanged",
@@ -210,7 +219,7 @@ class FreezeConfigTests(unittest.TestCase):
         self.assertEqual(captured["cli_overrides"]["repeats"]["effective"], 1)
         self.assertEqual(llm_arguments["system_instruction"], SYSTEM_INSTRUCTION)
         self.assertNotIn(captured["system_prompt"].strip(), llm_arguments["system_instruction"])
-        self.assertEqual(llm_arguments["max_output_tokens"], 512)
+        self.assertEqual(llm_arguments["max_output_tokens"], 2048)
         self.assertEqual(llm_arguments["thinking_level"], "LOW")
         self.assertEqual(llm_arguments["max_retries"], 2)
         self.assertEqual(llm_arguments["retry_base_seconds"], 0.5)

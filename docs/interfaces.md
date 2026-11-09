@@ -2211,6 +2211,26 @@ Evaluator의 Main 집계는 모든 grid cell의 `experiment.json`을 읽어 예�
 
 Agent가 실행된 Main row는 `llm_api_calls >= 1`이고 `prompt_token_audit.complete=true`여야 한다. Prompt audit은 `verified`, `unverified`, `exceeded`, `not_applicable` 상태를 사용하며, 불완전 audit에서 초과가 관측되지 않은 경우 `actual_prompt_budget_exceeded=null`로 유지한다. Provider usage의 비용 계산 요건이나 retry 시도의 청구 여부가 하나라도 불확실하면 `cost_estimate_complete=false`이고 token 비용 합계와 `total_llm_cost`를 `null`로 기록한다.
 
+Freeze 1.0.3의 공통 생성 출력 상한은 2048 token이다. 실제 출력 사용량과
+입력 Context Budget은 별개다. 응답별 진단은
+`run_result.llm_usage.response_diagnostics`에 다음 형태로 기록한다.
+
+```json
+{
+  "response_index": 1,
+  "finish_reasons": ["STOP"],
+  "candidate_tokens": 63,
+  "thoughts_tokens": 572
+}
+```
+
+`response_index`는 성공 응답 객체를 받은 순서로 1부터 증가한다.
+후보가 없으면 `finish_reasons=[]`, 사유가 없는 후보는 `null`로 기록하고
+provider가 token 값을 주지 않으면 해당 값은 `null`이다. `MAX_TOKENS`는
+출력 제한 진단이며 입력 Budget 실패와 구분한다. 기록 자체는 기존 행동 성공
+기준이나 재시도 정책을 바꾸지 않는다. 정답 Tool 행동 성공과 최종 응답 해석
+실패가 함께 발생하면 Action-Level 성공과 출력 진단을 함께 보고한다.
+
 ---
 
 # 27. 전체 Module Call Flow

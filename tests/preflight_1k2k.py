@@ -1,11 +1,11 @@
 """1K/2K Gemini Prompt Token Preflight for HAI ProjectTeam1.
 
-Place this file at the repository root. Commands:
-    python preflight_1k2k.py prepare
-    python preflight_1k2k.py run --margin 0
-    python preflight_1k2k.py report --margin 0
-    python preflight_1k2k.py run --margin 32
-    python preflight_1k2k.py report --margin 32
+Run from the repository root. Commands:
+    python tests/preflight_1k2k.py prepare
+    python tests/preflight_1k2k.py run --margin 0
+    python tests/preflight_1k2k.py report --margin 0
+    python tests/preflight_1k2k.py run --margin 32
+    python tests/preflight_1k2k.py report --margin 32
 
 This script does not modify the frozen configuration or Main ZIP.
 """
@@ -21,7 +21,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = ROOT / "benchmark/generated/main_gemini_3_1_flash_lite.zip"
 CONFIG = ROOT / "experiments/configs/main.json"
 DATA_DIR = ROOT / "benchmark/generated/preflight_1k2k"

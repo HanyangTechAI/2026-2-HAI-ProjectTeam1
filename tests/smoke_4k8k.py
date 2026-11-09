@@ -70,7 +70,7 @@ def check_frozen_config(config: dict) -> int:
         raise ValueError("Unexpected LLM model in main config")
     if config["runtime"]["token_counter"]["model"] != config["model"]["name"]:
         raise ValueError("Gemini CountTokens and generation model differ")
-    if config["model"]["max_output_tokens"] != 512 or config["model"]["thinking_level"] != "LOW":
+    if config["model"]["max_output_tokens"] != 2048 or config["model"]["thinking_level"] != "LOW":
         raise ValueError("Frozen model output/thinking config changed")
     if config["runtime"]["max_steps"] != 8:
         raise ValueError("Frozen max_steps changed")
@@ -104,7 +104,7 @@ def prepare() -> None:
             print(
                 "NOTICE: dataset generation freeze and execution freeze differ: "
                 f"{generation_freeze} -> {execution_freeze}. "
-                "The V1.0.2 request-aware counting patch requires compatibility review."
+                "Review dataset provenance against the current request counting and output-limit freeze."
             )
 
         DATA_DIR.mkdir(parents=True, exist_ok=True)

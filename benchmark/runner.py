@@ -53,7 +53,7 @@ from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0.2"
+FREEZE_VERSION = "1.0.3"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
@@ -1305,7 +1305,7 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         "provider": "google",
         "name": FROZEN_MODEL,
         "temperature": 0,
-        "max_output_tokens": 512,
+        "max_output_tokens": 2048,
         "thinking_level": "LOW",
         "system_prompt_file": FROZEN_SYSTEM_PROMPT_FILE,
         "tool_definitions_file": FROZEN_TOOL_DEFINITIONS_FILE,
@@ -1590,7 +1590,7 @@ def main() -> None:
     )
     max_output_tokens = _resolved_value(
         "model.max_output_tokens", args.max_output_tokens,
-        model_config.get("max_output_tokens"), 512,
+        model_config.get("max_output_tokens"), 2048,
         has_config=has_config, overrides=overrides,
     )
     thinking_level = _resolved_value(

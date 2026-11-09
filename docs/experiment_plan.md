@@ -71,6 +71,24 @@ Long Context        External Memory
             Evaluator
 ```
 
+### 2.0 공통 생성 설정과 출력 실패 진단
+
+Freeze 1.0.3에서 모델 `gemini-3.1-flash-lite`, temperature 0, thinking LOW,
+공통 프롬프트와 **max_output_tokens 2048**을 모든 전략에 동일하게 적용한다.
+출력 상한은 통제변인이며 필수 실험의 독립 변수는 Memory strategy와
+Budget × Horizon이다. 실제 출력 token 사용량은 thinking을 포함한 측정값이다.
+
+이전 512 상한 예비 점검에서는 일부 JSON 응답이 `MAX_TOKENS`로 잘렸다.
+새 설정의 실험은 새 결과 디렉터리에서 수행하고 이전 결과와 합치지 않는다.
+동일 모델·입력·counter를 유지하므로 기존 Gemini 측정 입력 ZIP의 생성 provenance를
+보존해 재사용하며 manifest를 새 실행 freeze로 덮어쓰지 않는다.
+
+응답별 종료 사유와 candidate/thoughts token을
+`run_result.llm_usage.response_diagnostics`에 기록한다. `MAX_TOKENS`와
+응답 해석 실패는 별도 진단으로 보고하고, 기존 Action-Level TSR 정의는 유지한다.
+정답 Tool 행동 성공 후 최종 응답이 잘린 경우 행동 성공과 응답 오류가 동시에
+기록될 수 있다. 실패 실행만 다른 상한으로 재실행해 기존 결과에 섞지 않는다.
+
 ### 2.1 Context Token Budget 정의
 
 `B`는 Memory만의 크기가 아니라 **Memory를 포함한 Agent 입력 Context 전체의 token 상한**으로 정의한다.
@@ -789,7 +807,7 @@ Snapshot 기반 evaluator, JSONL 결과 저장, sample 단위 집계와 실행 �
 
 `benchmark/generator.py`는 temporal_update/approval 시나리오를 grid별 JSON 또는 ZIP으로 생성한다. History 길이·Horizon·Noise 비율의 요청값과 측정값을 구분한다. Ablation은 Full Proposed와 Constraint Preservation, Temporal Resolution, State Mandatory, Token-aware Packing을 제거하는 4개 변형으로 구성한다.
 
-Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있고 현재 측정 대상은 `gemini-3.1-flash-lite`이다. 실행 환경에는 `google-genai`와 `GEMINI_API_KEY`가 필요하다. Memory content 비용은 SDK의 content-only CountTokens로 측정하고, 최종 요청 Budget은 Developer API REST의 `generateContentRequest` wrapper로 model·contents·system instruction·설정된 tools를 함께 측정한다. Runner는 `--gemini-token-model`, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 모델을 선택한다. 생성기는 `--gemini-token-model`을 명시해야 Gemini counter를 선택하며, 옵션을 생략하면 환경변수와 무관하게 `provisional_token_count`를 사용한다. 사용자 카운터는 `--token-counter module:function`으로 주입한다. 모델 전환 시 기존 Gemini 측정 데이터의 label만 바꾸지 않고 History·Memory·최종 Context를 새 모델로 다시 측정한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. 표준 embedder 실행 시 모델을 timing 전에 preload하고 Hugging Face cache snapshot의 resolved revision을 확인하며, Runner는 이 정보와 Python·platform·주요 package 버전을 `runtime_environment`에 기록한다. `agent/llm_planner.py`의 LLM Planner는 `--config`의 model 설정 또는 `--llm-model`로 활성화한다. 모든 실험 config는 `gemini-3.1-flash-lite`, temperature 0, 출력 한도 512와 공통 system prompt를 사용한다. CLI는 생성 모델에서 CountTokens 모델 기본값을 가져오며 명시한 측정 모델이나 환경 변수와 다르면 API 호출 전에 중단한다. 프로그램 호출도 GeminiTokenCounter와 LLMRunConfig의 모델 일치를 검사한다. 모델 응답의 prompt usage는 호출별로 보존해 request-aware CountTokens 측정값과 `prompt_token_audit`에서 비교한다. 전체 token 합계와 비용은 모든 API 시도의 accounting이 완전할 때만 기록한다. usage 누락, 잘못된 값 또는 응답 없는 retry 시도가 있으면 부분 합계를 숨기고 `accounting_status=incomplete`, 비용 관련 합계를 `null`로 기록한다. API 호출이 없으면 출력 토큰과 비용은 0이다. Main 집계는 Agent가 실행된 row의 API call 수와 완전한 prompt audit을 검증하고 미완전 row를 거부한다.
+Gemini CountTokens는 `context/tokenizer.py`에 연결되어 있고 현재 측정 대상은 `gemini-3.1-flash-lite`이다. 실행 환경에는 `google-genai`와 `GEMINI_API_KEY`가 필요하다. Memory content 비용은 SDK의 content-only CountTokens로 측정하고, 최종 요청 Budget은 Developer API REST의 `generateContentRequest` wrapper로 model·contents·system instruction·설정된 tools를 함께 측정한다. Runner는 `--gemini-token-model`, `GEMINI_TOKEN_MODEL`, 프로젝트 기본값 순으로 모델을 선택한다. 생성기는 `--gemini-token-model`을 명시해야 Gemini counter를 선택하며, 옵션을 생략하면 환경변수와 무관하게 `provisional_token_count`를 사용한다. 사용자 카운터는 `--token-counter module:function`으로 주입한다. 모델 전환 시 기존 Gemini 측정 데이터의 label만 바꾸지 않고 History·Memory·최종 Context를 새 모델로 다시 측정한다. `benchmark/experiment_runtime.py`에는 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 기반 embedder와 초기 환경 기반 Agent factory가 제공된다. `sentence-transformers>=3.0.0`은 표준 설치 의존성이며 모델 가중치는 최초 실행 전에 준비해야 한다. 표준 embedder 실행 시 모델을 timing 전에 preload하고 Hugging Face cache snapshot의 resolved revision을 확인하며, Runner는 이 정보와 Python·platform·주요 package 버전을 `runtime_environment`에 기록한다. `agent/llm_planner.py`의 LLM Planner는 `--config`의 model 설정 또는 `--llm-model`로 활성화한다. 모든 실험 config는 `gemini-3.1-flash-lite`, temperature 0, 출력 한도 2048과 공통 system prompt를 사용한다. CLI는 생성 모델에서 CountTokens 모델 기본값을 가져오며 명시한 측정 모델이나 환경 변수와 다르면 API 호출 전에 중단한다. 프로그램 호출도 GeminiTokenCounter와 LLMRunConfig의 모델 일치를 검사한다. 모델 응답의 prompt usage는 호출별로 보존해 request-aware CountTokens 측정값과 `prompt_token_audit`에서 비교한다. 전체 token 합계와 비용은 모든 API 시도의 accounting이 완전할 때만 기록한다. usage 누락, 잘못된 값 또는 응답 없는 retry 시도가 있으면 부분 합계를 숨기고 `accounting_status=incomplete`, 비용 관련 합계를 `null`로 기록한다. API 호출이 없으면 출력 토큰과 비용은 0이다. Main 집계는 Agent가 실행된 row의 API call 수와 완전한 prompt audit을 검증하고 미완전 row를 거부한다.
 
 ## 15. 본실험 실행 조건
 

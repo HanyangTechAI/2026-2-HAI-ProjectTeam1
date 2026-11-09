@@ -221,7 +221,7 @@ MemoryItem의 content-only 비용은 `google-genai` SDK로 측정한다. Runner�
 
 `benchmark/generated/smoke_gemini`와 `benchmark/generated/pilot_gemini.zip`은 `gemini-3.8-flash`로 실측한 기존 재현성 자료이다. 모델별 token 수와 그에 맞춘 padding이 달라질 수 있으므로 metadata의 모델명만 바꾸어 재사용하지 않는다. `GEMINI_API_KEY`가 준비된 환경에서 위 모델로 다시 생성한 뒤 manifest·scenario의 `token_count_mode`, History 길이, Noise 비율과 독립 재측정을 함께 검증해야 한다.
 
-V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 응답 생성은 config 또는 `--llm-model`로 `gemini-3.1-flash-lite` LLM Planner를 활성화하며, 생성 모델과 CountTokens 모델이 다르면 API 호출 전에 중단한다. freeze config는 temperature 0, 최대 출력 512 token, thinking level `LOW`를 고정한다.
+V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`로 확정하며, 호출 경로는 `benchmark.experiment_runtime:multilingual_embedder`이다. 두 식별자는 모든 freeze 설정에서 검증되고 `experiment.json`의 config metadata에 기록된다. 본실험에서는 실제 가중치 revision과 실행 환경도 함께 기록하고 같은 embedder와 TokenCounter를 비교 전략 전체에 사용해야 한다. 실제 응답 생성은 config 또는 `--llm-model`로 `gemini-3.1-flash-lite` LLM Planner를 활성화하며, 생성 모델과 CountTokens 모델이 다르면 API 호출 전에 중단한다. freeze config는 temperature 0, 최대 출력 2048 token, thinking level `LOW`를 고정한다.
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 
@@ -232,6 +232,21 @@ python -m unittest discover -s tests -v
 GitHub Actions의 `Python CI`도 `main` push·pull request와 수동 실행에서 같은 전체 테스트를 수행한다. Ubuntu 24.04와 Python 3.12를 사용하고 CPU 전용 PyTorch 및 `requirements.txt`를 설치한 뒤 `pip check`, 주요 Python 패키지의 `compileall`, 단위 테스트 순서로 검증한다. 실제 Gemini smoke 호출은 CI에서 `GEMINI_API_KEY`를 비워 두므로 건너뛴다.
 
 `tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter의 현재 ACTIVE State 복원을 검증하고, `tests/test_pipeline_adapter.py`는 과거 버전, Protected/Required-State 예산 실패, formatting overflow, 네 전략 공정성, Ablation 공통 schema와 Runner 기록을 검증한다. `tests/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/test_tokenizer.py`는 Gemini counter의 입력 검증, 메모리·SQLite 캐시, 재시도와 격리를 fake client로 검증한다.
+
+### 출력 상한 변경과 결과 구분 (freeze 1.0.3)
+
+2026-11-09부터 공통 출력 상한은 **2048 token**이다. 512 상한에서 관측한
+`MAX_TOKENS` 및 미완성 JSON 문제를 줄이기 위한 통제 설정 변경이며,
+입력 Context Budget 1K/2K/4K/8K와 구분한다. 실제 출력 사용량은
+thinking token을 포함해 비용과 함께 측정한다. 응답별 종료 사유와 출력 사용량은
+`runs.jsonl`의 `run_result.llm_usage.response_diagnostics`에 기록한다.
+
+512 상한 결과와 2048 상한 결과는 별도 결과군이다. 새 디렉터리에서 실행하며,
+이전 설정으로 만든 checkpoint에는 `--resume`하지 않는다. 기존 Gemini 입력
+ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기준은
+[freeze 변경 내역](docs/architecture_parameter_freeze_v1.md#patch-note---v103)을 따른다.
+변경 후 동일 입력 10개를 전략별 실행한 결과는
+[2048 출력 상한 검증](docs/output_limit_2048_validation_20261109.md)에 정리한다.
 
 ## 기술 스택 후보
 

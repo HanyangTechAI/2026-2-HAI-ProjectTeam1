@@ -1,10 +1,10 @@
-# Architecture / Parameter Freeze v1.0.2
+# Architecture / Parameter Freeze v1.0.3
 
 - 상태: **FROZEN**
-- 기준일: 2026-11-07 (Asia/Seoul)
+- 기준일: 2026-11-09 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.2"`
-- 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`
+- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.3"`
+- 이전 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`; v1.0.3 변경은 각 실행의 `git_commit`, `git_dirty`, `resume_identity.code`와 함께 추적한다.
 
 ## Patch note - v1.0.1
 
@@ -42,6 +42,27 @@ V1.0.2는 Context Budget의 token counting 범위를 실제 Gemini request 입�
   prompts 및 Planner behavior는 변경하지 않는다.
 - 따라서 알고리즘의 Memory 선택 원칙은 동일하며, Context Budget B의
   측정 범위만 실제 Agent input semantics와 일치시킨다.
+
+## Patch note - V1.0.3
+
+2026-11-09의 실제 API 진단에서 출력 상한 512의 문제 조건 5개가 모두
+`finish_reason=MAX_TOKENS`로 끝나 미완성 행동 JSON을 반환했다. 같은 조건을
+출력 상한 2048로 한 번씩 재실행했을 때 10개 응답이 모두 `STOP`으로 종료되고
+5개 작업 모두 성공했다. 이는 예비 점검이며 전체 grid의 안정성을 보장하지 않는다.
+
+- 모든 전략의 공통 `max_output_tokens`를 **512에서 2048로 변경**한다.
+  출력 상한은 통제변인이며 별도 sweep 축이 아니다. 실제 출력 사용량은 측정값이다.
+- 모델, temperature 0, thinking LOW, 입력 Budget/Horizon grid, 프롬프트,
+  메모리 알고리즘, 입력의 정답 및 평가 성공 기준은 유지한다.
+- 응답별 `finish_reasons`, candidate/thoughts token 수를
+  `run_result.llm_usage.response_diagnostics`에 기록한다. 출력 잘림은 입력
+  Context Budget 부족과 구분해 분석하며, 행동 성공과 함께 별도 보고한다.
+- 512 상한의 기존 pilot/점검 결과를 2048 상한 결과에 합치거나 덮어쓰지 않는다.
+  새 output 경로에서 실행하고 이전 checkpoint에 `--resume`하지 않는다.
+- 기존 Gemini 입력 ZIP의 생성 freeze는 1.0.1일 수 있다. 이번 변경은 출력
+  상한만 바꾸며 모델·입력 문자열·content token counter는 유지하므로 입력을
+  재생성하거나 기존 manifest의 버전을 바꿀 필요가 없다. 원래 ZIP과 검증 보고서의
+  provenance는 보존하고 실행 결과에는 실제 1.0.3 설정을 기록한다.
 
 ## 1. Frozen architecture
 
@@ -97,7 +118,7 @@ V1 interface 목록과 필드 계약은 [interfaces.md](interfaces.md)의 “Int
 |---|---|
 | LLM provider/model | Google / `gemini-3.1-flash-lite` |
 | Temperature | `0` |
-| Max output tokens | `512` |
+| Max output tokens | `2048` |
 | Thinking level | `LOW` |
 | LLM retry | 최대 `2`, base `0.5s`, exponential backoff |
 | LLM timeout | `60000ms` |

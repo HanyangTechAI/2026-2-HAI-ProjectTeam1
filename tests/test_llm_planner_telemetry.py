@@ -1,4 +1,6 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from agent.llm_planner import (
     LLMPlanner,
@@ -48,6 +50,29 @@ class FakeClient:
 
 
 class LLMPlannerTelemetryTests(unittest.TestCase):
+    def test_truncated_response_retains_finish_reason_and_per_call_usage(self):
+        response = SimpleNamespace(
+            candidates=[SimpleNamespace(finish_reason=SimpleNamespace(value="MAX_TOKENS"))],
+            usage_metadata=SimpleNamespace(
+                prompt_token_count=100,
+                candidates_token_count=8,
+                thoughts_token_count=488,
+            ),
+            parsed=None,
+            text='{"tool_name":',
+        )
+        client = FakeClient()
+        planner = LLMPlanner(client=client)
+        with patch.object(client.models, "generate_content", return_value=response):
+            action = planner.plan("test context")
+        self.assertEqual(action.text_response, "모델 응답을 행동으로 읽지 못했습니다.")
+        self.assertEqual(planner.telemetry().to_dict()["response_diagnostics"], [{
+            "response_index": 1,
+            "finish_reasons": ["MAX_TOKENS"],
+            "candidate_tokens": 8,
+            "thoughts_tokens": 488,
+        }])
+
     def test_usage_metadata_is_accumulated(self):
         planner = LLMPlanner(
             client=FakeClient(),

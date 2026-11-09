@@ -187,6 +187,7 @@ class PlannerTelemetry:
     
     planning_latency_ms: float
     estimated_cost_usd: float | None
+    response_diagnostics: tuple[dict[str, Any], ...] = ()
     
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -217,6 +218,7 @@ class PlannerTelemetry:
             
             "planning_latency_ms": self.planning_latency_ms,
             "estimated_cost_usd": self.estimated_cost_usd,
+            "response_diagnostics": list(self.response_diagnostics),
             
             "pricing": {
                 "currency": "USD",
@@ -248,7 +250,7 @@ class LLMPlanner:
         api_key: str | None = None,
         temperature: float = 0,
         system_instruction: str = SYSTEM_INSTRUCTION,
-        max_output_tokens: int = 512,
+        max_output_tokens: int = 2048,
         thinking_level: str = "LOW",
         max_retries: int = 2,
         retry_base_seconds: float = 0.5,
@@ -291,6 +293,7 @@ class LLMPlanner:
         self._api_calls = 0
         
         self._successful_response_calls = 0
+        self._response_diagnostics: list[dict[str, Any]] = []
         
         self._usage_metadata_calls = 0
         
@@ -386,6 +389,16 @@ class LLMPlanner:
     def _record_usage_metadata(self, response: Any) -> None:
         self._successful_response_calls += 1
         usage = getattr(response, "usage_metadata", None)
+        self._response_diagnostics.append({
+            "response_index": self._successful_response_calls,
+            "finish_reasons": [
+                str(getattr(reason, "value", reason)) if reason is not None else None
+                for candidate in (getattr(response, "candidates", None) or [])
+                for reason in [getattr(candidate, "finish_reason", None)]
+            ],
+            "candidate_tokens": getattr(usage, "candidates_token_count", None),
+            "thoughts_tokens": getattr(usage, "thoughts_token_count", None),
+        })
         
         if usage is None:
             self._prompt_tokens_per_call.append(None)
@@ -537,6 +550,7 @@ class LLMPlanner:
             
             planning_latency_ms=self._planning_latency_ms,
             estimated_cost_usd=estimated_cost_usd,
+            response_diagnostics=tuple(self._response_diagnostics),
         )
 
 def shared_system_instruction(system_prompt: str) -> str:
@@ -562,7 +576,7 @@ class LLMRunConfig:
     model: str = DEFAULT_MODEL
     temperature: float = 0
     system_instruction: str = SYSTEM_INSTRUCTION
-    max_output_tokens: int = 512
+    max_output_tokens: int = 2048
     thinking_level: str = "LOW"
     max_retries: int = 2
     retry_base_seconds: float = 0.5
