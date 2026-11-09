@@ -3,8 +3,35 @@
 평가 입력·출력 계약은 [Evaluator Interface](interfaces.md#22-evaluator-interface), 생성 설정과 Runner 연결은 [생성기 사용법](generator_usage.md)을 따른다.
 `benchmark/evaluator.py`는 전달받은 Scenario/실행 snapshot의 deterministic 평가,
 JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다.
-실험 설정은 `experiments/configs/`에 있으며, 실제 Agent 호출과 데이터 생성은
-각 담당 모듈에서 연결해야 한다.
+실험 설정은 `experiments/configs/`에 있으며 Generator, Runner와 실제 Gemini Planner가
+연결되어 있다. 현재 실행 기준은 freeze 1.0.3, 공통 출력 상한 2048 token이다.
+2026-11-09에 완료한 1차 H50·2차 H10의 관측 결과는
+[16절](#16-2026-11-09-실행-현황과-12차-관측-결과)에 별도로 기록한다.
+H100까지 포함한 12셀·3840회의 최종 결과는
+[17절](#17-전체-main-최종-결과-2026-11-09)과
+[최종 분석 보고서](main_final_analysis_20261109.md)에 기록한다.
+
+## 실행 완료 및 결과 요약
+
+**필수 Main 12셀·3840회 실행과 정규 집계를 완료했다.** 셀별 40개 공통 과제 ×
+네 전략 × 두 반복을 실행했으며, 전략·셀당 80회다. 아래의 묶인 조건은 각 셀의
+관측값이 같음을 뜻한다. 상세 결과와 통계의 기준은 17절이다.
+
+| 입력 Budget | Horizon | Proposed | Sliding Window | Vector Top-k | Utility-per-Token |
+|---|---|---:|---:|---:|---:|
+| 1K | 10 / 50 / 100 | 0% | 0% | 0% | 0% |
+| 2K | 10 | 97.5% | 82.5% | 87.5% | 87.5% |
+| 2K | 50 / 100 | 97.5% | 72.5% | 87.5% | 87.5% |
+| 4K / 8K | 10 / 50 / 100 | 97.5% | 100% | 87.5% | 87.5% |
+
+2K의 필수 상태·제약 보존 이점과 큰 예산에서의 성능·비용 절충이 관측됐다.
+Proposed의 2K 이상 실패는 동일 기본 과제의 `attachment` 인자 누락이며,
+모든 실패를 메모리 선택 문제로 보지 않는다. 강한 일반적 Horizon 효과나
+전 조건의 Proposed 우위는 주장하지 않는다. H100·2K의 비용 불완전 3개 실행을
+성공률에서 빼거나 비용을 0으로 처리하지 않는다.
+
+1~15절은 설계·실행·평가 계약, 16절은 1·2차 당시의 중간 분석 기록,
+17절은 전체 완료 후 최종 결과다. 원본 실행과 평가 기준은 유지했다.
 
 ## 1. Experiment Objective
 
@@ -255,21 +282,27 @@ Recall@k, Precision@k, Hit@k, MRR은 전체 target 중 `applicable_constraint_id
 
 ### 4.5 Temporal Version Accuracy
 
-State update가 존재하는 sample에서는 retrieval 이후 실제 LLM context에 포함된 Memory가 해당 시점에 유효한 버전인지 평가한다.
+State update가 존재하는 sample에서는 Context에 포함된 버전과 실제 Tool 행동에
+사용한 버전을 구분한다. 아래 설명은 현재 Evaluator의 기록 의미를 명확히 한 것이며
+1·2차 결과를 위해 평가 코드를 변경한 것은 아니다.
 
 각 sample에 대해 다음 값을 기록한다.
 
 * `selected_memory_ids`: retrieval 이후 temporal resolution 및 budget selection을 거쳐 실제 LLM context에 포함된 Memory ID
 * `temporal_version_required`: 해당 sample에서 동일 State의 여러 버전 중 올바른 버전을 선택해야 하는지 여부
-* `temporal_version_correct`: 필요한 temporal version을 올바르게 선택했는지 여부
+* `temporal_context_correct`: 필요한 State Memory를 최종 Context에 포함하고 잘못된 버전 Memory를 포함하지 않았는지 여부
+* `temporal_version_correct`: 필요한 시점의 State 값을 실제 Tool 인자에 올바르게 사용하고 누락·stale·기타 State 오류가 없는지 여부
 * `stale_selected_memory_count`: 최종 선택된 Memory 가운데 Task가 요구한 버전에 부합하지 않는 `wrong_version_memory_ids`의 수. 과거 요청에서는 최신 버전도 포함될 수 있으며, superseded 여부만으로 판정하지 않는다.
 
 Temporal Version Accuracy (TVA)는 temporal version 판단이 필요한 sample만 대상으로 다음과 같이 계산한다.
 
-TVA = 올바른 temporal version을 선택한 sample 수 / temporal version 판단이 필요한 sample 수
+TVA = 필요한 시점의 State를 행동에 올바르게 사용한 sample 수 / temporal version 판단이 필요한 sample 수
 
 `temporal_version_correct=false`이면 `temporal_failure`를 기록한다. 이 값만으로
-검색, 버전 해석, 예산 선택 중 어느 단계가 원인인지 확정하지 않는다.
+검색, 버전 해석, 예산 선택, 모델의 Tool 인자 누락 중 어느 단계가 원인인지 확정하지 않는다.
+예를 들어 Context에 정답 파일이 있어도 `attachment` 인자가 없으면 행동 지표는
+false일 수 있다. 반대로 과거·현재 버전이 함께 Context에 있어 Context 지표가 false여도
+모델이 요청 시점의 파일을 올바르게 사용해 작업은 성공할 수 있다.
 
 ---
 
@@ -829,4 +862,197 @@ python3 -m benchmark.generator --config experiments/configs/smoke.json --gemini-
 python3 -m benchmark.generator --config experiments/configs/pilot.json --gemini-token-model gemini-3.1-flash-lite --archive --output benchmark/generated/pilot_gemini_3_1_flash_lite.zip
 ```
 
-Runner의 `--config`는 model 블록을 읽는다. Top-k, repeats, bootstrap 설정과 strategy 목록은 실행할 config에 맞춰 CLI로 별도 지정한다. 예를 들어 pilot은 `--top-k 5 --repeats 1 --bootstrap-iterations 2000 --seed 42`를 사용한다. 실제 모델 smoke 검증은 재생성한 3.1 데이터와 동일 모델의 CountTokens를 사용하며 토큰 측정 방식을 임의로 바꾸지 않는다.
+Runner의 `--config`는 model뿐 아니라 runtime, strategies, repeats, evaluation 설정도 읽는다.
+정규 Main에서는 이 값을 그대로 사용하며 CLI override는 `experiment.json`에 기록한다.
+`pilot.json`은 현재 `generation_only`이므로 정규 실행 config로 전달하지 않는다.
+실제 모델 smoke 검증은 3.1 데이터와 동일 모델의 CountTokens를 사용하며 토큰 측정
+방식을 임의로 바꾸지 않는다.
+
+## 16. 2026-11-09 실행 현황과 1·2차 관측 결과
+
+### 16.1 완료 범위와 공통 설정
+
+아래는 2026-11-09의 1·2차 완료 당시 기록이다.
+3차 H100까지 완료한 최종 상태와 전체 집계는 17절을 따른다.
+
+| 차수 | Horizon | 대상 셀 | 실행 수 | 상태 |
+|---|---:|---|---:|---|
+| 1차 | 50 | 1K / 2K / 4K / 8K | 1280/1280 | 완료·분석 완료 |
+| 2차 | 10 | 1K / 2K / 4K / 8K | 1280/1280 | 완료·분석 완료 |
+
+이 중간 시점에는 Main 전체 12셀 중 **8셀, 2560/3840회**가 완료됐다. 각 셀은 공통 기본 과제
+40개 × 네 전략 × 두 반복 = 320회다. 각 전략/셀의 80회는 독립 과제 80개가 아니라
+같은 과제 40개의 두 반복이다. Horizon과 Budget 간에도 기본 과제 identity를 공유한다.
+
+이 절의 성공률 표는 당시 완료된 1·2차 결과만 포함한다. 이후 동일 commit/freeze와
+기존 실패 처리 기준으로 수행한 3차 H100은 19:53:40에 완료됐다. 3차 완료 기록은
+`experiments/results/main_phase3_h100_20261109_1747/phase_progress.json`에 보존했다.
+
+1·2차 모두 commit `5d00c6d5a8c3c9348ed872a9899d107b027c0196`의 clean detached
+worktree, freeze 1.0.3, Gemini 3.1 Flash-Lite, temperature 0, thinking LOW,
+max output 2048, top-k 5, max_steps 8, safety margin 32를 사용했다.
+반복 수는 canonical Main의 2회를 유지했고 CLI override는 결과 경로뿐이다.
+원래 생성 freeze 1.0.1의 Gemini 입력 ZIP은 provenance와 해시를 유지해 재사용했다.
+
+셀별 예상 run key와 입력 SHA-256, 중복·누락 없음, model/config/prompt/embedding
+revision 일치를 검증했다. H10/H50 사이에서도 query, 정답 State, 기대 Tool 호출,
+초기 environment와 memory ID별 content가 같음을 확인했다. Memory 위치는 Horizon에
+따라 달라진다. 이 절의 중간 분석과 H100까지 포함한 17절의 정규 최종 집계를 구분한다.
+
+### 16.2 관측 Action-Level Task Success
+
+각 칸은 성공/80회와 성공률이다. H50은 1차, H10은 2차다.
+
+| Horizon | Budget | Proposed | Sliding Window | Vector Top-k | Utility-per-Token |
+|---|---|---:|---:|---:|---:|
+| H50 | 1K | 0/80 (0%) | 0/80 (0%) | 0/80 (0%) | 0/80 (0%) |
+| H50 | 2K | 78/80 (97.5%) | 58/80 (72.5%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H50 | 4K | 78/80 (97.5%) | 80/80 (100%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H50 | 8K | 78/80 (97.5%) | 80/80 (100%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H10 | 1K | 0/80 (0%) | 0/80 (0%) | 0/80 (0%) | 0/80 (0%) |
+| H10 | 2K | 78/80 (97.5%) | 66/80 (82.5%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H10 | 4K | 78/80 (97.5%) | 80/80 (100%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H10 | 8K | 78/80 (97.5%) | 80/80 (100%) | 70/80 (87.5%) | 70/80 (87.5%) |
+
+1K에서는 Proposed가 각 Horizon의 80회 모두 필수 Memory 예산 초과로 모델 호출 전에
+중단했다. 다른 전략도 실행 후 실패했다. 이 조건은 입력 형식·합성 Memory 비용에 따른
+실행 가능성 한계로 남기며 비교에 유리하게 결과에서 제외하지 않는다.
+
+2K에서는 두 Horizon 모두 Proposed가 가장 높지만, 4K·8K에서는 Sliding Window가
+가장 높았다. 큰 예산에서는 압축 Memory snapshot을 충분히 전달할 수 있어,
+모든 조건에서 Proposed의 성공률 우위가 유지된다는 결론은 지지되지 않는다.
+
+### 16.3 2K의 실패 분해와 Horizon 비교
+
+| 지표 | H50 | H10 | 분모·의미 |
+|---|---:|---:|---|
+| Sliding 과거 파일 조회 성공 | 2/20 (10%) | 12/20 (60%) | 과거 조회 20회 |
+| Sliding 승인 전 Task 성공 | 16/20 (80%) | 14/20 (70%) | 승인 전 20회 |
+| Sliding 승인 제약 위반 | 4/40 (10%) | 6/40 (15%) | 제약 적용 40회 |
+| Proposed 승인 제약 위반 | 0/40 (0%) | 0/40 (0%) | 제약 적용 40회 |
+
+- Sliding의 H10 전체 성공률은 H50보다 10pp 높지만, 승인 제약 결과는 반대 방향이다.
+  Horizon 단축이 모든 행동 신뢰성 지표를 개선한다고 결론 내리지 않는다.
+- Proposed의 2K 이상 실패는 두 Horizon 모두 동일한 기본 과제
+  `seed43_approval_014_pending`의 두 반복이다. 정답 Memory와 제약을 포함했지만
+  `request_approval`의 `attachment` 인자가 없어 State omission으로 실패했다.
+  Retrieval나 시간 해석의 오류만으로 설명하지 않는다.
+- Vector/Utility는 같은 기본 과제 5개에서 최신 v3가 Top-5 후보에서 빠져 v2를
+  행동에 사용했다. 2K 이상 실패는 각 셀 10회이며, 입력 예산만 늘려도 검색 후보의
+  누락은 복구되지 않았다.
+- H50 Sliding에는 정답 파일 조회를 8회 반복하다 max_steps로 종료한 2회도 있었다.
+  정답 Tool 호출이 있다는 이유로 성공으로 바꾸지 않고 기존 목표 완료 기준을 유지했다.
+
+### 16.4 불확실성과 해석 한계
+
+동일 sample_id/repeat_id를 pair하고 기본 과제 40개를 cluster로 묶어 두 반복을
+함께 bootstrap했다(2000회, seed 42). 아래는 percentage point 단위다.
+
+| 비교 | 관측 차이 | 95% paired sample-cluster bootstrap CI |
+|---|---:|---|
+| H50·2K: Proposed−Sliding | +25pp | [+12.5, +40.0]pp |
+| H10·2K: Proposed−Sliding | +15pp | [+5.0, +27.5]pp |
+| 2K Sliding: H10−H50 | +10pp | [0.0, +22.5]pp |
+
+H10/H50 사이에 관측 차이는 있지만 구간은 0에 닿는다. H100이 없는 상태에서
+일반적인 Horizon 효과를 확정하지 않는다. Vector/Utility 대비 Proposed의 차이는
+두 Horizon에서 +10pp지만 구간이 0에 닿거나 포함하므로 확정적 우위로 표현하지 않는다.
+다중 비교 보정은 하지 않은 탐색적 해석이다. 각 Budget/전략/기본 과제의 두 반복은
+성공 판정이 같았지만 독립 관측 수가 두 배가 된 것은 아니다. 전부 성공·실패한 셀의
+bootstrap 구간이 폭 0이더라도 모집단 불확실성까지 0이라는 뜻은 아니다.
+
+### 16.5 출력·입력 예산과 비용 기록
+
+저장된 1·2차 생성 응답 합계 4952개는 모두 `STOP`이다. `MAX_TOKENS`,
+응답 해석 실패, 실제 입력 예산 초과, live prompt audit 누락은 모두 0건이다.
+단일 응답 최대 출력(thinking 포함)은 H50에서 1288, H10에서 1116 token이다.
+출력 상한 2048은 두 차수의 입력에서는 충분했지만 H100까지 보장하지 않는다.
+
+완료 run에 기록된 생성 비용 추정은 H50 $2.182800, H10 $2.175945,
+합계 $4.358745다. 중단 직전 미저장 호출, 실패 시도의 청구 여부, 재개로 중복된
+호출과 CountTokens 관련 비용을 완전히 포함하지 않아 실제 전체 청구액은 아니다.
+H50의 4K/8K에서 Proposed는 Sliding보다 누적 입력 약 40.3%·기록된 생성 비용 약
+36.2%가 낮았지만 성공률도 2.5pp 낮았다. 같은 성능에서의 비용 절감으로 표현하지 않는다.
+
+### 16.6 증거와 남은 범위
+
+- [1차 H50 상세 분석](main_phase1_h50_analysis_20261109.md)
+- [2차 H10 상세 분석과 H10/H50 비교](main_phase2_h10_analysis_20261109.md)
+- 1차 원본: `experiments/results/main_phase1_h50_20261109_0918/`
+- 2차 원본: `experiments/results/main_phase2_h10_20261109_1332/`
+- 각 차수의 `analysis/analysis.json`, `analysis/failure_cases.json`, 2차의
+  `analysis/horizon_comparison.json`에 집계·CI·실패 사례·pair 감사를 저장했다.
+
+원본 run과 평가 기준은 변경하지 않았다. 당시 남은 범위였던 3차 H100의 완료와
+전체 12셀 provenance 감사·Main 집계 결과는 17절에 반영했다. 파서·인자 처리·
+프롬프트·검색 방식을 바꿔 개선하려면 새 freeze와 별도 결과군으로 관리한다.
+
+## 17. 전체 Main 최종 결과 (2026-11-09)
+
+### 17.1 전체 완료와 감사
+
+1차 H50, 2차 H10, 3차 H100의 네 Budget 셀이 모두 완료돼 **12/12셀, 3840/3840회**가 갖춰졌다. 3차는 19:53:40(Asia/Seoul)에 완료됐다. 16절은 당시의 중간 관측 기록이며 이 절을 최종 집계로 사용한다.
+
+모든 차수는 clean commit `5d00c6d5a8c3c9348ed872a9899d107b027c0196`, freeze 1.0.3, output cap 2048, temperature 0, thinking LOW, top-k 5, max_steps 8, safety margin 32, 두 반복을 유지했다. 코드·prompt·embedding revision·입력 해시와 예상 실행 키를 검증했다. 원본 run의 저장 평가를 고정 커밋 Evaluator로 재평가해 3840개 모두 일치함을 확인했다.
+
+정규 Main Evaluator를 `--experiment-root`로 12셀 metadata와 연결해 집계했다. `provenance_audit.json`은 pass, 전략/셀별 summary는 48개, Proposed−Baseline 비교는 36개다. 기본 과제는 40개이며 3840개의 독립 과제로 취급하지 않는다.
+
+### 17.2 최종 Action-Level 성공률
+
+각 칸은 동일 기본 과제 40개 × 두 반복의 성공/80회다.
+
+| Horizon | Budget | Proposed | Sliding Window | Vector Top-k | Utility-per-Token |
+|---|---|---:|---:|---:|---:|
+| H10 | 1024 | 0/80 (0.0%) | 0/80 (0.0%) | 0/80 (0.0%) | 0/80 (0.0%) |
+| H10 | 2048 | 78/80 (97.5%) | 66/80 (82.5%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H10 | 4096 | 78/80 (97.5%) | 80/80 (100.0%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H10 | 8192 | 78/80 (97.5%) | 80/80 (100.0%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H50 | 1024 | 0/80 (0.0%) | 0/80 (0.0%) | 0/80 (0.0%) | 0/80 (0.0%) |
+| H50 | 2048 | 78/80 (97.5%) | 58/80 (72.5%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H50 | 4096 | 78/80 (97.5%) | 80/80 (100.0%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H50 | 8192 | 78/80 (97.5%) | 80/80 (100.0%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H100 | 1024 | 0/80 (0.0%) | 0/80 (0.0%) | 0/80 (0.0%) | 0/80 (0.0%) |
+| H100 | 2048 | 78/80 (97.5%) | 58/80 (72.5%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H100 | 4096 | 78/80 (97.5%) | 80/80 (100.0%) | 70/80 (87.5%) | 70/80 (87.5%) |
+| H100 | 8192 | 78/80 (97.5%) | 80/80 (100.0%) | 70/80 (87.5%) | 70/80 (87.5%) |
+
+1K는 전 전략 0%다. Proposed 240회는 필수 기억 예산 부족으로 호출 전에 안전 중단했다. 2K에서는 Proposed가 가장 높고, 4K·8K에서는 Sliding이 100%로 가장 높다. 모든 예산에서 Proposed가 우월하다는 결론은 지지하지 않는다.
+
+### 17.3 불확실성과 Horizon 해석
+
+동일 sample/repeat를 pair하고 40개 기본 과제를 cluster로 두 반복을 함께 bootstrap했다(2000회, seed 42). 2K의 Proposed−Sliding 차이는 H10 +15pp(CI [+5.0, +27.5]pp), H50/H100 +25pp(CI [+12.5, +37.5]pp)다. 이는 정규 전체 집계의 CI이며 차수별 중간 집계와는 난수 재표집 순서로 끝점이 소폭 달라질 수 있다.
+
+2K의 Vector/Utility 대비 차이 +10pp의 구간은 [0.0, +22.5]pp이고, 4K·8K의 Sliding 대비 −2.5pp 구간은 [−7.5, 0.0]pp다. 구간이 0에 닿는 결과를 확정적 우위·열위·동등성으로 표현하지 않는다. 다중 비교 보정은 하지 않았다.
+
+Horizon 간 성공률 변화는 주로 2K Sliding에서 나타났다. H10은 H50/H100보다 +10pp이나 paired CI는 [0.0, +22.5]pp다. H50과 H100은 과제별 성공 판정도 같았다. H10 Sliding의 과거 조회는 12/20, H50/H100은 2/20이지만 승인 제약 위반은 각각 6/40, 4/40, 4/40으로 반대 방향이다. 따라서 강한 일반적 Horizon 효과로 단정하지 않는다.
+
+이 데이터는 Memory content와 후보 수를 보존한 채 위치·turn 거리를 조절하며, 압축 Memory snapshot을 입력한다. 주어진 snapshot에서 선택한 기억과 행동을 평가한 결과를 일반적인 장기 대화의 기억 추출·망각 문제 해결로 확장하지 않는다.
+
+### 17.4 실패 원인과 신뢰성
+
+- Proposed의 2K 이상 실패 18회는 같은 기본 과제 하나의 3 Horizon × 3 Budget × 두 반복이다. 정답 Memory·제약은 모두 있었지만 승인 요청의 attachment 인자가 없었다. 메모리 선택 결함으로 단정하지 않고 기존 평가 기준에 따라 행동 인자 누락으로 보고한다.
+- Sliding의 2K 실패는 H10 14회, H50/H100 각 22회다. 과거 State 누락, 승인 전 발송 시도, 반복 파일 조회 후 max_steps 종료가 원인이다. 높은 Budget에서는 실패가 사라졌다.
+- Vector/Utility는 최신 버전이 Top-5 후보에서 빠진 같은 기본 과제 5개 때문에 각 2K 이상 셀에서 10회 실패했다. Budget 확대만으로 해결되지 않는 후보 검색 병목이다.
+- 입력 Budget 실패·검색/선택 실패·행동 인자 누락·목표 미완료를 분리한다. temporal_version_correct는 실제 행동의 State 사용도 반영하므로 temporal_failure만으로 시간 해석 모듈을 원인으로 확정하지 않는다.
+- 2K의 Proposed RSA는 모든 Horizon 97.5%, CVR·SSUR은 0%다. Sliding RSA는 H10/H50/H100에서 90/80/82.5%, CVR은 15/10/10%, SSUR은 0%다. Vector/Utility RSA는 87.5%, CVR 0%, SSUR 16.7%다. RSA 분모는 80회, 적용 CVR은 40회, 현재 State SSUR은 60회다. 전체 지표·분모와 CI는 최종 보고서 및 정규 summary에 보존했다.
+
+### 17.5 출력 진단과 비용 완전성
+
+실제 LLM 실행 3600회에서 기록된 생성 API 시도는 7453회, 응답 객체는 7450개이며 응답의 finish_reason은 모두 STOP이다. MAX_TOKENS·응답 해석 오류·실제 입력 예산 초과·live prompt audit 누락은 0건이다. 최대 단일 출력은 thinking 포함 1288 token이었다.
+
+H100·2K의 Sliding 2개 및 Utility 1개 실행은 내부 API 재시도 후 작업에는 성공했지만 응답 없는 시도의 청구 여부가 불확실해 비용이 null이다. 이 3개 결과는 성공률에 포함하고 비용을 0으로 처리하지 않는다. 모든 저장 run의 완전한 총비용은 계산할 수 없다.
+
+알려진 비용 3837개 run의 추정 부분합은 $6.5465375다. 미저장·중단·재개 호출 및 CountTokens 관련 비용도 완전히 포함하지 않아 실제 전체 청구액이 아니다. H100·2K의 해당 전략 평균·합계에는 비용 누락과 유효 표본 수를 표시해야 한다.
+
+비용 누락이 없는 4K·8K에서는 Proposed가 Sliding보다 누적 입력 약 40.3%, 기록된 완료-run 생성 비용 약 36%를 덜 사용했지만 성공률도 2.5pp 낮았다. 동일 성능의 비용 절감으로 표현하지 않는다.
+
+### 17.6 최종 해석과 증거
+
+이 실험은 제한 예산에서 필수 상태·제약 보존의 행동상 이점을 보여준다. 충분한 예산에서는 단순한 최근 기억 방식도 높은 성능을 보이며, 기억의 보존이 올바른 Tool 인자 사용까지 보장하지 않는다는 한계도 확인됐다. 현재 기준 실험은 보존하고 인터페이스·프롬프트·후보 검색을 개선하려면 새 freeze/결과군으로 분리한다.
+
+- [전체 Main 최종 분석](main_final_analysis_20261109.md)
+- 최종 원본·집계: `experiments/results/main_final_20261109/`
+- `source_audit.json`, `pairing_audit.json`, `aggregate/provenance_audit.json`: 입력·코드·재현성 감사.
+- `aggregate/summary.json`, `aggregate/deltas.json`, `analysis.json`: 주요 결과·CI·진단.
+- `failure_cases.json`, `cost_unknown_cases.json`: 실패 1216개 실행과 비용 불완전 3개 실행.
+- `budget_horizon_success.png`와 `.svg`: 전체 Horizon/Budget 결과 그림.

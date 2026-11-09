@@ -6,7 +6,7 @@
 
 장기간 동작하는 LLM Agent가 제한된 Context 안에서도 반드시 지켜야 하는 제약과 현재 Task에 필요한 상태를 유지하도록 하는 Memory Architecture를 연구한다. Calendar, Email, File, Task 등의 가상 Tool을 사용하는 자체 Testbed를 구축하고, 메모리 선택이 실제 Agent의 행동과 작업 성공률에 미치는 영향을 평가한다.
 
-> 현재는 연구 설계와 V1 파이프라인 검증 단계이다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Gemini LLM Planner, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector·Runner 통합 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기와 Gemini CountTokens의 메모리·SQLite 캐시, 재시도, 실행별 캐시 격리도 제공한다. LLM 실행에서는 출력 토큰·비용·planning latency를 누적 기록한다. 과거 State와 현재 행동 Constraint를 동시에 요구하는 복합 경로의 전용 통합 검증은 아직 남아 있다.
+> V1 실행 파이프라인 구현과 필수 Main 12셀 실험을 완료했다. 인메모리 Memory Store와 State Versioning, 공용 semantic retrieval, 규칙 기반 Query Analyzer, Version/Temporal/Protected/Required-State Resolution과 예산 기반 Proposed Selector, 세 Baseline, Context 조립·최종 Budget Validation, 결정적 규칙 Planner와 Gemini LLM Planner, 다단계 Orchestrator, PipelineAdapter 기반 Benchmark Runner와 Evaluator가 구현되어 있다. Proposed 전략과 네 가지 구성 요소 Ablation preset도 Snapshot Memory Store를 통해 Runner에 연결되어 있으며 Selector·Runner 통합 테스트를 제공한다. 실험 설정 기반 temporal_update/approval 생성기와 Gemini CountTokens의 메모리·SQLite 캐시, 재시도, 실행별 캐시 격리도 제공한다. LLM 실행에서는 출력 토큰·비용·planning latency를 누적 기록한다. 과거 State와 현재 행동 Constraint를 동시에 요구하는 복합 경로의 전용 통합 검증은 아직 남아 있다.
 
 ## 배경과 목표
 
@@ -19,7 +19,40 @@
 - Full Context 대비 Token 사용량과 비용의 관계 분석
 - 실제 Tool 호출 결과를 통한 행동 수준의 메모리 평가
 
-성능 개선 여부는 비교 실험으로 검증하며, 아직 실험 결과는 없다.
+## 본실험 결과 (2026-11-09)
+
+Freeze **1.0.3**으로 Horizon **10/50/100 × 입력 Budget 1K/2K/4K/8K**의
+12셀·**3,840회** 비교 실험을 완료했다. 셀마다 공통 과제 40개 × 네 전략 × 두 반복을
+실행했으며, 각 전략·셀의 성공률은 80회 기준이다. 아래에서 묶어 표시한 조건도
+각각 같은 결과였다는 뜻이며, 독립 표본을 합쳐 센 것이 아니다.
+
+| 입력 Budget | Horizon | Proposed | Sliding Window | Vector Top-k | Utility-per-Token |
+|---|---|---:|---:|---:|---:|
+| 1K | 10 / 50 / 100 | 0% | 0% | 0% | 0% |
+| 2K | 10 | **97.5%** | 82.5% | 87.5% | 87.5% |
+| 2K | 50 / 100 | **97.5%** | 72.5% | 87.5% | 87.5% |
+| 4K / 8K | 10 / 50 / 100 | 97.5% | **100%** | 87.5% | 87.5% |
+
+- **제한 예산에서의 이점:** 2K에서 Proposed는 Sliding보다 15~25%p 높았다.
+  동일 과제를 묶은 paired bootstrap 95% 구간도 이 비교에서는 0을 포함하지 않았다.
+- **큰 예산에서의 성능·비용 절충:** 4K·8K에서는 Sliding이 더 높았다.
+  Proposed는 실행당 누적 입력을 약 40% 적게 사용했지만 성공률도 2.5%p 낮았다.
+  전 조건의 우월성이나 같은 성능에서의 비용 절감으로 해석하지 않는다.
+- **실패 원인:** 1K의 Proposed 240회는 필수 기억 예산 부족으로 안전 중단했다.
+  2K 이상 실패 18회는 같은 기본 과제 하나에서 정답 기억을 보존했지만
+  승인 요청의 `attachment` 인자를 빠뜨린 사례다. Vector/Utility는 같은 기본 과제
+  5개에서 최신 버전이 검색 후보에 없어 이전 파일을 사용했다.
+- **Horizon 해석:** 성공률 변화는 주로 2K Sliding에 나타났으며 H50/H100은 같았다.
+  주어진 합성 Memory snapshot에서의 결과를 일반적인 장기 대화 기억 능력으로 확장하지 않는다.
+- **기록 품질과 비용 한계:** 생성 응답 7,450개는 모두 `STOP`이었고 출력 잘림·해석 오류·
+  실제 입력 예산 초과는 0건이었다. H100·2K의 3개 실행은 재시도 후 비용이 `null`이다.
+  알려진 비용의 부분합을 전체 실험 청구액으로 보고하지 않는다.
+
+모든 차수는 같은 commit `5d00c6d`에서 Gemini 3.1 Flash-Lite, temperature 0,
+thinking LOW, 출력 상한 2,048, top-k 5, max_steps 8, 입력 safety margin 32를 유지했다.
+기본 과제는 40개이며 3,840개의 독립 과제를 평가한 것은 아니다.
+12셀 전체 표·신뢰구간·실패 사례는 [Experiment Plan의 최종 결과](docs/experiment_plan.md#17-전체-main-최종-결과-2026-11-09)와
+[최종 분석 보고서](docs/main_final_analysis_20261109.md)를 따른다.
 
 ## 제안 메모리 구조
 
@@ -273,6 +306,8 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 
 ## 관련 문서
 
+- [Main 12셀 최종 결과 분석](docs/main_final_analysis_20261109.md)
+- [실험 계획과 실행 결과](docs/experiment_plan.md)
 - [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/Constraint-Preserving%20Budget-Aware%20Memory.docx)
 - [연구 질문 및 평가 방향](docs/research_questions.md)
