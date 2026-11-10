@@ -151,3 +151,7 @@ Builder를 점검했다. 초기 retrieval에서 Mode 1은 4건, Mode 2는 8건�
 miss가 있었지만 모두 최종 Context에서 복구됐다. 단계별 결과와 제한은
 [Horizon Narrative Final Context Audit](narrative_final_context_audit_20261111.md)을 따른다.
 
+동일 paired 과제의 후속 Gemini Agent/Tool 실행은
+[Narrative Mode 1/2 LLM 실행 보고서](narrative_llm_execution_audit_20261111.md)에
+별도로 기록했다. Factorial retrieval 결과와 실제 Agent TSR을 합산하지 않는다.
+

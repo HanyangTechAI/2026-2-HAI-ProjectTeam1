@@ -73,6 +73,12 @@ Mode 2의 초기 Required State hit가 80%(Mode 1: 90%)였지만, 두 모드 모
 확장 뒤 정답 State와 적용 제약을 최종 Context에 100% 포함했다. 이는 LLM 호출 전 단계
 검증으로 TSR 결과가 아니다. [Final Context Audit 보고서](docs/narrative_final_context_audit_20261111.md)에
 단계별 수치와 제한을 기록했다.
+
+이어 같은 Mode 1/2 paired 과제에서 Gemini Agent를 실행한 결과 Proposed TSR은 각각
+97.5%(39/40), 100%(40/40), Vector Top-k는 87.5%(35/40), 80%(32/40)였다. 적용 승인
+과제의 Constraint Violation은 모두 0/20이었다. 이는 실제 Tool 행동을 포함한 단일 실행
+평가이며, 범위와 반복 한계는 [Narrative Mode 1/2 LLM 실행 보고서](docs/narrative_llm_execution_audit_20261111.md)에 기록했다.
+
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조

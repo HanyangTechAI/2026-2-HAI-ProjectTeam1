@@ -19,6 +19,9 @@ Target/Noise padding을 분리한 2×2 후속 audit은
 실제 Proposed 선택·Context Builder 단계별 Mode 1/2 audit은
 [20절](#20-horizon-narrative-final-context-audit-2026-11-11)과
 [Final Context 보고서](narrative_final_context_audit_20261111.md)에 기록한다.
+같은 paired 입력을 실제 Gemini Agent에 실행한 후속 평가는
+[21절](#21-horizon-narrative-mode-12-gemini-agent-execution-2026-11-11)과
+[LLM 실행 보고서](narrative_llm_execution_audit_20261111.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1160,3 +1163,28 @@ paired 데이터에서 최종 Context 누락으로 이어지지 않았다.
 이는 Agent loop 이전의 선택·조립 검증이다. LLM·Tool 행동이나 TSR, 제약 위반 행동률을
 측정하지 않았고 단일 2K/H100 셀의 40개 과제만 포함했다. 상세 단계 추적과 해석은
 [Final Context Audit 보고서](narrative_final_context_audit_20261111.md)를 따른다.
+
+## 21. Horizon Narrative Mode 1/2 Gemini Agent Execution (2026-11-11)
+
+18~20절과 같은 40개 paired scenario에서 반복 문장 Mode 1과 로컬 자연어 Mode 2를 각각
+Gemini 3.1 Flash-Lite Agent에 실행했다. 각 모드에서 Proposed와 Vector Top-k를 과제당 한
+번씩 평가해 총 160회 실제 Agent 실행을 완료했다. 단일 셀은 Budget 2,048, Horizon 100,
+History 25K이며, 40개 과제는 temporal update와 approval 각 20개다.
+
+| 입력 Mode | 전략 | Action-Level TSR | Bootstrap 95% CI |
+|---:|---|---:|---:|
+| 1 | Proposed | 39/40 (97.5%) | 92.5–100% |
+| 1 | Vector Top-k | 35/40 (87.5%) | 75–97.5% |
+| 2 | Proposed | 40/40 (100%) | 100–100% |
+| 2 | Vector Top-k | 32/40 (80.0%) | 65–92.5% |
+
+두 Mode 모두 적용 가능한 approval 20개에서 Constraint Violation은 전략별 0/20이었다.
+Proposed의 stale-state 사용은 0/30, Vector Top-k는 Mode 1에서 5/30, Mode 2에서 8/30으로
+관측됐다. 모든 실행에서 Prompt Audit가 verified였고 Context Budget 초과와 Mandatory
+Memory overflow는 없었다.
+
+이는 이전 절의 LLM 호출 전 Context 조립 audit와 달리 실제 Agent/Tool 동작을 포함한다.
+그러나 각 조건은 40개 과제당 한 번만 실행했고 Mode 3~5·다른 전략·Budget/Horizon 셀은
+포함하지 않았다. CI는 과제 표본 재추출을 나타내며 반복 실행 간 모델 변동을 반영하지
+않는다. paired 설계·토큰/비용 결과와 전체 한계는
+[별도 보고서](narrative_llm_execution_audit_20261111.md)를 따른다.

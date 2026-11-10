@@ -139,3 +139,7 @@ noise padding 교체에서는 관측되지 않았다. 설계, bootstrap 구간�
 포함했다. 자세한 trace는 [Final Context Audit](narrative_final_context_audit_20261111.md)에
 기록했다.
 
+이후 같은 paired 과제에 Gemini Agent와 Tool 환경을 적용한 TSR 평가는 별도
+[Mode 1/2 LLM 실행 보고서](narrative_llm_execution_audit_20261111.md)에 기록했다.
+offline Recall@5와 Action-Level TSR은 서로 다른 평가 단계와 지표다.
+

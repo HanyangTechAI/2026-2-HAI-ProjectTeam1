@@ -325,6 +325,40 @@ Context를 `details.csv`, `paired.csv`, `summary.json`에 기록한다.
 2026-11-11 결과는 [Final Context Audit 보고서](narrative_final_context_audit_20261111.md)에
 기록했다.
 
+### Mode 1/2 실제 Gemini Agent 평가
+
+위 사전 Context audit과 달리, 다음 실행은 실제 Gemini Planner와 Tool 환경을 포함한다.
+Mode 1은 반복 문장(`repeated`), Mode 2는 로컬 자연어(`random_natural`) 입력이다. 두
+manifest의 2K/H100 셀은 같은 paired scenario ID와 정답을 공유한다. 생성 데이터는 이미
+Gemini CountTokens로 측정되어 있어야 하며, 현재 세션에 `GEMINI_API_KEY`가 필요하다.
+실제 Gemini 요청에 따른 비용이 발생할 수 있다.
+
+```powershell
+python -m benchmark.runner `
+  --config experiments/configs/main.json `
+  --scenarios benchmark/generated/narrative_mode1/cell_e5534bba1746.json `
+  --environment-agent-factory benchmark.experiment_runtime:environment_agent `
+  --strategies proposed vector_top_k `
+  --repeats 1 `
+  --checkpoint-interval 1 `
+  --output experiments/results/narrative_llm_mode1_h100_b2048
+
+python -m benchmark.runner `
+  --config experiments/configs/main.json `
+  --scenarios benchmark/generated/narrative_mode2/cell_3ea70c1fbe6b.json `
+  --environment-agent-factory benchmark.experiment_runtime:environment_agent `
+  --strategies proposed vector_top_k `
+  --repeats 1 `
+  --checkpoint-interval 1 `
+  --output experiments/results/narrative_llm_mode2_h100_b2048
+```
+
+각 결과 경로의 `experiment.json`, `progress.json`, `runs.jsonl`, `summary.json`은 설정,
+완료 checkpoint, 실행별 Tool/LLM 결과와 집계를 보존한다. 중단된 실행만 같은 설정과
+코드에서 `--resume`으로 이어가며, 새 재실행에는 별도 결과 경로를 사용한다. 저장된
+2026-11-11 결과는 [Mode 1/2 LLM 실행 보고서](narrative_llm_execution_audit_20261111.md)에
+기록했다.
+
 ## 출력과 sample 배정
 
 ### Pilot 전달용 독립 sample 100개

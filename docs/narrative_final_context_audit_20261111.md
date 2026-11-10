@@ -106,3 +106,7 @@ Token counter metadata에는 request-aware CountTokens API 호출 266회, persis
 189회, retry 0회가 기록돼 있다. 이 카운트는 Token audit API 사용량이며 Agent의 생성
 호출 수나 과금 총액으로 해석하지 않는다.
 
+같은 Mode 1/2 과제의 실제 Agent·Tool 실행 결과는 후속
+[Gemini Agent 실행 보고서](narrative_llm_execution_audit_20261111.md)에 별도로 기록했다.
+이 보고서는 LLM 호출 전 Context 조립 단계만 다룬다.
+
