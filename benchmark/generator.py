@@ -2,7 +2,7 @@
 
 Generate inputs and evaluator ground truth, never execution results. Shared
 sample IDs are written into separate grid-cell files for budget/horizon pairing.
-Run ``python -m benchmark.generator --help`` for the offline CLI.
+Run ``python -m benchmark.generator --help`` for the CLI (LLM modes are opt-in).
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import tempfile
 from typing import Any, Callable
 import zipfile
 
+from benchmark.horizon_filler import HorizonFiller, LLMHorizonFiller
 from context.tokenizer import (
     GeminiTokenCounter, TokenCounter, count_tokens, provisional_token_count,
     TARGET_GEMINI_MODEL, token_count_mode,
@@ -30,6 +31,14 @@ from context.tokenizer import (
 from memory.schema import MemoryItem
 
 
+# Change only this number to select the default for every config without an
+# explicit dataset.horizon_generation_mode: 1=repeated, 2=local, 3=local mix,
+# 4=LLM, 5=LLM mix. Only modes 4/5 can call a text-generation API.
+DEFAULT_HORIZON_MODE = 1
+HORIZON_MODES = {
+    1: "repeated", 2: "random_natural", 3: "mixed",
+    4: "llm_natural", 5: "llm_mixed",
+}
 TASK_TYPES = ("temporal_update", "approval")
 GRID_KEYS = (
     "context_token_budget", "history_length_tokens", "horizon_turns",
@@ -39,13 +48,14 @@ HISTORY_TOLERANCE = 0.01
 NOISE_TOLERANCE = 0.01
 # Padding contains no filenames, addresses, timestamps or approval IDs. The
 # conversation is verbose; the memory snapshot retains its durable summaries.
-NARRATIVE = (
+NARRATIVE_TEXT = (
     "회의에서는 검토 항목을 차례로 확인하고 진행 상황을 기록했습니다. "
     "팀원들은 자료의 구성과 설명 순서를 함께 살펴보았습니다. "
     "작업 노트에는 확인한 내용과 검토 의견을 구분해 정리했습니다. "
     "다음 논의에서는 표현과 가독성을 확인하기로 했습니다. "
     "이번 대화는 업무 진행 배경을 설명하는 보충 기록입니다."
-).split()
+)
+NARRATIVE = NARRATIVE_TEXT.split()
 BASE_TIME = datetime(2026, 1, 1, 9, tzinfo=timezone(timedelta(hours=9)))
 
 
@@ -60,6 +70,23 @@ def _ratio(value: Any) -> float:
             or not 0 <= value < 1):
         raise ValueError("noise_memory_ratio must be finite and in [0, 1)")
     return float(value)
+
+
+def _horizon_mode(value: Any) -> int:
+    if type(value) is not int or value not in HORIZON_MODES:
+        raise ValueError("horizon_generation_mode must be one integer: 1, 2, 3, 4 or 5")
+    return value
+
+
+def _make_llm_source(dataset: Mapping[str, Any]) -> Any:
+    from benchmark.llm_horizon import GeminiHorizonSource
+
+    options = dataset.get("horizon_llm", {})
+    allowed = {"model", "cache_directory", "temperature", "max_output_tokens",
+               "max_retries", "retry_base_seconds", "timeout_ms"}
+    if not isinstance(options, Mapping) or set(options) - allowed:
+        raise ValueError(f"dataset.horizon_llm must be an object with keys from {sorted(allowed)}")
+    return GeminiHorizonSource(**options)
 
 
 def render_history(history: Sequence[Mapping[str, Any]]) -> str:
@@ -80,6 +107,7 @@ def _words(length: int, offset: int = 0) -> str:
 
 def _fit_text(
     build: Callable[[int], str], target: int, counter: TokenCounter, *, tolerance: int,
+    probe_length: int | None = None,
 ) -> tuple[int, int]:
     """Fit actual text, without assuming tokens are additive or words=tokens."""
     base = count_tokens(build(0), counter)
@@ -92,6 +120,20 @@ def _fit_text(
         return 0, base
     low, high = 0, max(1, target - base)
     best = (0, base)
+    if probe_length is not None:
+        measured = count_tokens(build(probe_length), counter)
+        if measured <= base:
+            raise ValueError("token_counter does not measure added narrative text")
+        best = min(best, (probe_length, measured), key=lambda pair: abs(pair[1] - target))
+        if abs(measured - target) <= tolerance:
+            return probe_length, measured
+        if measured >= target:
+            high = probe_length
+        else:
+            low = probe_length
+            # LLM text is generated in chunks. Probe the actual word/token
+            # ratio before requesting a full token target's worth of words.
+            high = max(probe_length + 1, math.ceil((target - base) * probe_length / (measured - base)))
     # Bounded search also rejects counters that cannot measure generated text.
     for _ in range(20):
         if high > max(1024, target * 32):
@@ -124,13 +166,17 @@ def _fit_text(
     return best
 
 
-def _pad_memory(memory: dict[str, Any], target: int, counter: TokenCounter) -> None:
+def _pad_memory(
+    memory: dict[str, Any], target: int, counter: TokenCounter,
+    *, padding: Callable[[int], str] = _words,
+    probe_length: int | None = None,
+) -> None:
     original = memory["content"]
 
     def build(length: int) -> str:
-        return original + (" " + _words(length) if length else "")
+        return original + (" " + padding(length) if length else "")
 
-    length, measured = _fit_text(build, target, counter, tolerance=1)
+    length, measured = _fit_text(build, target, counter, tolerance=1, probe_length=probe_length)
     memory.update(content=build(length), token_count=measured)
 
 
@@ -140,6 +186,8 @@ def _balance_noise(
     noise_notes: list[dict[str, Any]],
     ratio: float,
     counter: TokenCounter,
+    *, padding: Callable[[str, int], str] | None = None,
+    probe_length: int | None = None,
 ) -> float:
     relevant_tokens = sum(m["token_count"] for m in memories if m["memory_id"] in targets)
     
@@ -169,7 +217,11 @@ def _balance_noise(
             
         desired = math.ceil(relevant_tokens * ratio / (1 - ratio))
         memory = noise[-1]
-        _pad_memory(memory, memory["token_count"] + desired - noise_tokens, counter)
+        _pad_memory(
+            memory, memory["token_count"] + desired - noise_tokens, counter,
+            padding=(lambda length: padding(memory["memory_id"], length)) if padding else _words,
+            probe_length=probe_length,
+        )
     raise ValueError("cannot satisfy noise_memory_ratio with this token_counter")
 
 
@@ -194,12 +246,17 @@ def generate_scenario(
     horizon_turns: int = 10, noise_memory_ratio: float = 0.5,
     constraint_count: int = 1, state_update_count: int = 2,
     token_counter: TokenCounter = provisional_token_count,
+    horizon_generation_mode: int | None = None,
+    llm_source: Any | None = None,
 ) -> dict[str, Any]:
-    """Build one fully measured input/ground-truth snapshot without API calls.
+    """Build one fully measured input/ground-truth snapshot.
 
     A custom counter may itself call an API. History length has a 1% tolerance;
     token-weighted snapshot noise has an absolute tolerance of 0.01. Impossible
     combinations raise ValueError instead of recording unmeasured parameters.
+    horizon_generation_mode selects one filler: 1=repeated, 2=offline natural
+    sentences, 3=local 50:50 mix, 4=LLM sentences, 5=LLM 50:50 mix. LLM modes
+    use GEMINI_API_KEY on cache misses, or an injected llm_source for testing.
     """
     for name, value, minimum in (
         ("seed", seed, 0), ("sample_index", sample_index, 0),
@@ -210,6 +267,8 @@ def generate_scenario(
         ("state_update_count", state_update_count, 0),
     ):
         _integer(name, value, minimum)
+    mode = _horizon_mode(DEFAULT_HORIZON_MODE if horizon_generation_mode is None
+                         else horizon_generation_mode)
     ratio = _ratio(noise_memory_ratio)
     if task_type not in TASK_TYPES:
         raise ValueError(f"task_type must be one of {TASK_TYPES}")
@@ -221,10 +280,19 @@ def generate_scenario(
         raise ValueError("approval tasks require at least one approval constraint")
     if not callable(token_counter):
         raise TypeError("token_counter must be callable")
-    # No generation decision depends on budget, horizon, strategy or repeat.
+    # Task identity and memory content do not depend on budget/horizon/strategy/repeat.
     scope = state_scope if task_type == "temporal_update" else "current"
     variant = scope if task_type == "temporal_update" else approval_status
     sample_id = f"seed{seed}_{task_type}_{sample_index:03d}_{variant}"
+    if mode in (4, 5):
+        source = _make_llm_source({}) if llm_source is None else llm_source
+        filler = LLMHorizonFiller(sample_id, mode, NARRATIVE_TEXT, source)
+    else:
+        filler = HorizonFiller(sample_id, mode, NARRATIVE_TEXT) if mode != 1 else None
+
+    def padding(length: int, *, key: str, offset: int = 0) -> str:
+        return filler.words(length, key=key) if filler else _words(length, offset)
+
     digest = hashlib.sha256(sample_id.encode()).hexdigest()[:10]
     project = f"HAI-{digest}"
     session = f"session_{sample_id}"
@@ -362,33 +430,57 @@ def generate_scenario(
     # for all ratios, then change only irrelevant notes. At main ratio=0.5 the
     # pool exceeds 1K, so the smallest budget exercises actual selection.
     relevant_target = max(640, relevant_tokens)
-    _pad_memory(target, target["token_count"] + max(0, relevant_target - relevant_tokens), token_counter)
+    _pad_memory(
+        target, target["token_count"] + max(0, relevant_target - relevant_tokens), token_counter,
+        padding=lambda length: padding(length, key=target["memory_id"]),
+        probe_length=64 if mode in (4, 5) else None,
+    )
     if not ratio:
         memories = [item for item in memories if item not in noise_notes]
-    actual_noise = _balance_noise(memories, essential, noise_notes, ratio, token_counter)
+    actual_noise = _balance_noise(
+        memories, essential, noise_notes, ratio, token_counter,
+        padding=lambda key, length: padding(length, key=key),
+        probe_length=64 if mode in (4, 5) else None,
+    )
 
     # Every past turn exists. Verbose conversation is measured separately from
     # its compact, deterministic memory summaries (no extraction model needed).
     by_turn = {item["turn_id"]: item for item in memories}
     history = []
+    background_index = 0
     for turn in range(1, current_turn):
         timestamp = _timestamp_for_turn(turn, events, current_turn, current_time).isoformat()
+        if turn in by_turn:
+            content = by_turn[turn]["content"]
+        else:
+            content = "" if mode in (4, 5) else "진행 내용을 기록했습니다."
+            if mode in (2, 3) and (mode == 2 or background_index % 2):
+                content = filler.sentence(key="background_base", index=background_index)
+            background_index += 1
         history.append(dict(
             session_id=session, turn_id=turn, timestamp=timestamp, source="user",
-            content=by_turn[turn]["content"] if turn in by_turn else "진행 내용을 기록했습니다.",
+            content=content,
         ))
     originals = [entry["content"] for entry in history]
 
     def build_history(length: int) -> str:
+        if isinstance(filler, LLMHorizonFiller):
+            segments = filler.history_segments(length, turn_count=len(history))
+            for index, entry in enumerate(history):
+                entry["content"] = " ".join(part for part in (originals[index], segments[index]) if part)
+            return render_history(history)
         per_turn, extra = divmod(length, len(history))
         for index, entry in enumerate(history):
             words = per_turn + (index < extra)
-            entry["content"] = originals[index] + (" " + _words(words, index) if words else "")
+            entry["content"] = originals[index] + (
+                " " + padding(words, key=f"history_padding_{index}", offset=index) if words else ""
+            )
         return render_history(history)
 
     length, measured_history = _fit_text(
         build_history, history_length_tokens, token_counter,
         tolerance=max(1, math.floor(history_length_tokens * HISTORY_TOLERANCE)),
+        probe_length=256 if mode in (4, 5) else None,
     )
     build_history(length)
     for item in memories:
@@ -441,6 +533,12 @@ def generate_scenario(
                                 for index, filename in enumerate(filenames)},
                          valid_approval_ids=granted_ids),
         metadata=dict(
+            horizon_generation_mode=mode,
+            horizon_generation_name=HORIZON_MODES[mode],
+            horizon_natural_language_backend=("gemini_llm_v1" if mode in (4, 5) else
+                                             "local_sentence_composition_v1" if filler else None),
+            horizon_mix_basis="filler_sentence_pairs" if mode in (3, 5) else None,
+            **({"horizon_llm": filler.provenance()} if isinstance(filler, LLMHorizonFiller) else {}),
             seed=seed, sample_index=sample_index, task_type=task_type, state_scope=scope,
             approval_status=variant if task_type == "approval" else None,
             context_token_budget=context_budget,
@@ -470,6 +568,8 @@ def _sequence(name: str, value: Any) -> list[Any]:
 
 def generate_dataset(
     config: Mapping[str, Any], *, token_counter: TokenCounter = provisional_token_count,
+    horizon_generation_mode: int | None = None,
+    llm_source: Any | None = None,
 ) -> dict[str, Any]:
     """Expand data seeds/grid cells, leaving strategies and repeats to runner."""
     if not isinstance(config, Mapping):
@@ -480,6 +580,10 @@ def generate_dataset(
         raise ValueError("config requires dataset and grid objects")
     if dataset.get("source") != "synthetic":
         raise ValueError("dataset.source must be synthetic")
+    mode = _horizon_mode(
+        dataset.get("horizon_generation_mode", DEFAULT_HORIZON_MODE)
+        if horizon_generation_mode is None else horizon_generation_mode
+    )
     samples = _integer("samples_per_cell", dataset.get("samples_per_cell"), 1)
     tasks = _sequence("dataset.task_types", dataset.get("task_types"))
     if any(task not in TASK_TYPES for task in tasks):
@@ -496,6 +600,8 @@ def generate_dataset(
                 _ratio(value)
             else:
                 _integer(key, value, 0 if key in ("constraint_count", "state_update_count") else 1)
+    if mode in (4, 5) and llm_source is None:
+        llm_source = _make_llm_source(dataset)
     temporal_count = (samples + 1) // 2 if len(tasks) == 2 else (samples if tasks[0] == "temporal_update" else 0)
     current_count = (temporal_count + 1) // 2
     cells = []
@@ -522,18 +628,24 @@ def generate_dataset(
                         constraint_count=parameters["constraint_count"],
                         state_update_count=parameters["state_update_count"],
                         token_counter=token_counter,
+                        horizon_generation_mode=mode,
+                        llm_source=llm_source,
                     )
                 scenario = copy.deepcopy(source_cache[source_key])
                 scenario["context_budget"] = parameters["context_token_budget"]
                 scenario["metadata"]["context_token_budget"] = parameters["context_token_budget"]
                 scenarios.append(scenario)
+        identity = parameters if mode == 1 else dict(parameters, horizon_generation_mode=mode)
         cell_id = "cell_" + hashlib.sha256(
-            json.dumps(parameters, sort_keys=True, allow_nan=False).encode()
+            json.dumps(identity, sort_keys=True, allow_nan=False).encode()
         ).hexdigest()[:12]
         cells.append(dict(cell_id=cell_id, parameters=parameters, scenarios=scenarios))
+    effective_config = copy.deepcopy(dict(config))
+    effective_config["dataset"]["horizon_generation_mode"] = mode
     return dict(
         schema_version="1.0", generator="benchmark.generator",
-        config=copy.deepcopy(dict(config)), token_count_mode=token_count_mode(token_counter),
+        config=effective_config, token_count_mode=token_count_mode(token_counter),
+        horizon_generation_mode=mode,
         description="Synthetic inputs and ground truth; not model performance measurements.",
         cells=cells,
     )
@@ -556,6 +668,7 @@ def write_dataset(payload: Mapping[str, Any], output_directory: str | Path) -> d
             schema_version=payload["schema_version"], generator=payload["generator"],
             token_count_mode=payload["token_count_mode"], parameters=cell["parameters"],
             scenarios=cell["scenarios"],
+            horizon_generation_mode=payload["horizon_generation_mode"],
         )
         files.append((filename, json.dumps(record, ensure_ascii=False, indent=2, allow_nan=False) + "\n"))
         cell_records.append(dict(cell_id=cell_id, path=filename, parameters=cell["parameters"],
@@ -565,6 +678,7 @@ def write_dataset(payload: Mapping[str, Any], output_directory: str | Path) -> d
         config=payload["config"], token_count_mode=payload["token_count_mode"],
         n_cells=len(cell_records), n_scenarios=sum(cell["n_scenarios"] for cell in cell_records),
         cells=cell_records,
+        horizon_generation_mode=payload["horizon_generation_mode"],
     )
     manifest_text = json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     # Validate/serialize everything before replacing any existing dataset file.
@@ -609,8 +723,19 @@ def _import_counter(spec: str) -> TokenCounter:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="experiments/configs/smoke.json")
-    parser.add_argument("--output", help="Default: benchmark/generated/<config name>")
+    parser.add_argument(
+        "--output", help="Default: benchmark/generated/<config name>; modes 2-5 append "
+                         "_horizon<N>; --archive adds .zip",
+    )
     parser.add_argument("--archive", action="store_true", help="Write a deterministic .zip; extract before running")
+    parser.add_argument(
+        "--horizon-mode", type=int, choices=tuple(HORIZON_MODES),
+        help="Select one filler method: 1=repeated, 2=offline random natural language, "
+             "3=local 50:50 mix, 4=LLM natural language, 5=LLM 50:50 mix. "
+             "Overrides dataset.horizon_generation_mode and DEFAULT_HORIZON_MODE.",
+    )
+    parser.add_argument("--horizon-llm-model", help="Text-generation model for modes 4/5")
+    parser.add_argument("--horizon-llm-cache", help="Persistent LLM sentence cache for modes 4/5")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--token-counter", help="module:function for the shared TokenCounter")
     group.add_argument(
@@ -623,12 +748,34 @@ def main() -> None:
     parser.add_argument("--gemini-token-retry-base-seconds", type=float, default=0.5)
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+    dataset = config.get("dataset", {})
+    if not isinstance(dataset, Mapping):
+        parser.error("config.dataset must be an object")
+    try:
+        mode = _horizon_mode(dataset.get("horizon_generation_mode", DEFAULT_HORIZON_MODE)
+                             if args.horizon_mode is None else args.horizon_mode)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.horizon_llm_model is not None or args.horizon_llm_cache is not None:
+        if mode not in (4, 5):
+            parser.error("--horizon-llm-model/cache require --horizon-mode 4 or 5")
+        options = dataset.get("horizon_llm", {})
+        if not isinstance(options, Mapping):
+            parser.error("config.dataset.horizon_llm must be an object")
+        options = dict(options)
+        if args.horizon_llm_model is not None:
+            options["model"] = args.horizon_llm_model
+        if args.horizon_llm_cache is not None:
+            options["cache_directory"] = args.horizon_llm_cache
+        config["dataset"]["horizon_llm"] = options
     if args.output:
         output = Path(args.output)
     else:
         name = config.get("name", "dataset")
         if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             parser.error("config name must contain only letters, digits, _ or -; or pass --output")
+        if mode != 1:
+            name += f"_horizon{mode}"
         output = Path("benchmark/generated") / (name + ".zip" if args.archive else name)
     counter = (
         GeminiTokenCounter(
@@ -640,11 +787,12 @@ def main() -> None:
         )
         if args.gemini_token_model else _import_counter(args.token_counter) if args.token_counter else provisional_token_count
     )
-    payload = generate_dataset(config, token_counter=counter)
+    payload = generate_dataset(config, token_counter=counter, horizon_generation_mode=mode)
     manifest = (write_dataset_archive(payload, output) if args.archive else write_dataset(payload, output))
     print(json.dumps(dict(output=str(output),
                           manifest="manifest.json inside archive" if args.archive else str(output / "manifest.json"),
                           n_cells=manifest["n_cells"], n_scenarios=manifest["n_scenarios"],
+                          horizon_generation_mode=mode, horizon_generation_name=HORIZON_MODES[mode],
                           token_count_mode=manifest["token_count_mode"]), ensure_ascii=False, indent=2))
 
 

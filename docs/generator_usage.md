@@ -64,6 +64,188 @@ write_dataset(payload, "benchmark/generated/smoke")
 
 `generate_scenario(...)`는 단일 시나리오를 생성하는 keyword 기반 API이다. 직접 호출할 때도 `history_length_tokens=10000`처럼 충분한 이력 길이를 지정한다. `render_history(history)`는 생성기가 History 길이를 측정하는 동일한 문자열 표현을 반환하므로, JSON 직렬화 길이나 Memory token 합계를 History token 수로 대신 사용하지 않는다.
 
+## Horizon 채움 방식 선택: 1 / 2 / 3 / 4 / 5
+
+Horizon의 turn 거리와 정답 사건 배치는 유지하면서, 그 사이를 채우는 대화와 Memory padding을 다섯 가지 방식 중 하나로 생성한다. **한 번 실행할 때 선택한 방식 하나만 사용한다.** 선택 번호는 Budget/Horizon grid에 추가되는 실험 축이 아니다. 다섯 데이터셋을 비교하려면 번호와 출력 경로를 바꾸어 각각 실행한다.
+
+| 선택 번호 | 채움 방식 | 자연어 생성 방법 |
+|---|---|---|
+| `1` | 현상 유지 | 기존 고정 문장과 순환 padding을 그대로 사용한다. |
+| `2` | LLM 없는 자연어 | 주제·표현 템플릿을 로컬 난수로 조합한다. |
+| `3` | 기존 50% + LLM 없는 자연어 50% | 기존 문장과 로컬 조합 문장을 짝지어 사용한다. |
+| `4` | LLM 자연어 | Gemini가 한 주제의 문맥이 이어지는 배경 대화를 생성한다. |
+| `5` | 기존 50% + LLM 자연어 50% | 기존 문장과 Gemini가 생성한 문장을 짝지어 사용한다. |
+
+`2`는 자연스러운 개별 문장을 만드는 로컬 템플릿 조합 방식이다. 여러 turn의 문맥을 LLM처럼 새로 구성하는 방식은 아니다. 같은 `sample_id`와 역할에서 같은 문장을 만들도록 난수 seed를 고정하므로 같은 설정과 counter로 재실행하면 같은 생성물을 얻는다. `4`는 샘플별 대화 주제를 정하고 이전에 생성한 문맥을 이어 쓰도록 LLM을 호출한다. 생성한 문장열은 저장한 뒤 순서를 유지해 사용한다.
+
+`3`과 `5`의 50:50은 **각 채움 흐름의 문장 수 기준**이며 tokenizer가 측정하는 token 비중이 정확히 절반이라는 뜻은 아니다. `3`은 History turn별 추가 padding을 별도로 조합한다. `5`는 LLM의 앞뒤 문맥을 유지하도록 History 전체를 한 문장열로 구성하고 문장 경계에서 turn으로 나눈다. 각 Memory의 추가 padding은 별도의 흐름이다. 기존 문장과 해당 방식의 자연어 문장을 번갈아 사용하며, 한 흐름에서 문장 수가 홀수이거나 목표 길이에 맞추며 마지막 문장을 일부만 사용하면 두 종류의 문장 수가 최대 하나 차이 날 수 있다. 이 차이는 흐름별로 생기므로 전체 데이터셋을 합산한 차이가 최대 하나라는 뜻은 아니다. 정답 사건 자체는 혼합 비율에 포함하지 않는다.
+
+선택 방식은 History의 채움 대화와 추가 padding, target Memory와 synthetic noise Memory의 추가 padding에 적용된다. 정답 State, 제약, 승인 기록, 버전 관계, 기대 Tool 호출과 Memory 후보 수는 유지한다. 현재 Runner는 원본 History 대신 `memory_snapshot`을 입력으로 사용하므로 Memory padding에도 같은 선택 방식을 적용한다.
+
+### 가장 간단한 선택: 코드에서 숫자 하나 변경
+
+[`benchmark/generator.py`](../benchmark/generator.py)의 기본값에서 숫자 하나를 바꾼다.
+
+```python
+DEFAULT_HORIZON_MODE = 1  # 1: 기존, 2: 로컬, 3: 기존+로컬, 4: LLM, 5: 기존+LLM
+```
+
+LLM 자연어를 기본으로 사용하려면 `4`, 기존과 LLM 자연어를 섞으려면 `5`로 변경하고 평소 생성 명령을 실행한다. `4`와 `5`는 아래 LLM 준비 절차도 필요하다.
+
+```powershell
+python -m benchmark.generator --config experiments/configs/smoke.json
+```
+
+선택 우선순위는 **명시한 CLI/API 인자 → 설정 파일의 `dataset.horizon_generation_mode` → 코드의 `DEFAULT_HORIZON_MODE`**이다. 코드 숫자 하나로 전환하려면 설정 파일에서 `dataset.horizon_generation_mode`를 생략하고 `--horizon-mode`도 전달하지 않는다.
+
+### 코드를 수정하지 않고 CLI에서 선택
+
+아래 명령 중 원하는 하나를 실행한다. `4`와 `5`는 캐시에 필요한 문장이 없으면 실제 Gemini 생성 호출을 수행한다.
+
+```powershell
+python -m benchmark.generator --config experiments/configs/smoke.json --horizon-mode 1
+python -m benchmark.generator --config experiments/configs/smoke.json --horizon-mode 2
+python -m benchmark.generator --config experiments/configs/smoke.json --horizon-mode 3
+python -m benchmark.generator --config experiments/configs/smoke.json --horizon-mode 4
+python -m benchmark.generator --config experiments/configs/smoke.json --horizon-mode 5
+```
+
+`--output`을 생략하면 선택 번호에 따라 기본 저장 위치가 구분된다.
+
+| 선택 번호 | smoke 디렉터리 출력 | main ZIP 출력 (`--archive`) |
+|---|---|---|
+| `1` | `benchmark/generated/smoke/` | `benchmark/generated/main.zip` |
+| `2` | `benchmark/generated/smoke_horizon2/` | `benchmark/generated/main_horizon2.zip` |
+| `3` | `benchmark/generated/smoke_horizon3/` | `benchmark/generated/main_horizon3.zip` |
+| `4` | `benchmark/generated/smoke_horizon4/` | `benchmark/generated/main_horizon4.zip` |
+| `5` | `benchmark/generated/smoke_horizon5/` | `benchmark/generated/main_horizon5.zip` |
+
+`--output`을 명시하면 해당 경로를 그대로 사용하며 모드 suffix를 자동으로 붙이지 않는다. 같은 경로로 재실행하면 해당 데이터셋 파일을 다시 쓴다. 기존 생성물을 보존하려면 새 경로를 지정한다.
+
+### LLM 방식의 준비와 main 실행
+
+기존 `requirements.txt`의 `google-genai`를 설치하고 현재 PowerShell 세션에 `GEMINI_API_KEY`를 설정한다. CLI는 `.env` 파일을 자동으로 읽지 않는다. API key를 설정 파일, 생성 데이터나 Git에 기록하지 않는다.
+
+```powershell
+python -m pip install -r requirements.txt
+if (-not $env:GEMINI_API_KEY) { throw "현재 PowerShell 세션에 GEMINI_API_KEY를 설정하세요." }
+```
+
+LLM 자연어로 main을 생성하고, History 길이도 실제 Gemini token으로 맞추려면 다음과 같이 실행한다.
+
+```powershell
+python -m benchmark.generator `
+  --config experiments/configs/main.json `
+  --horizon-mode 4 `
+  --horizon-llm-model gemini-3.1-flash-lite `
+  --horizon-llm-cache .cache/horizon_llm `
+  --gemini-token-model gemini-3.1-flash-lite `
+  --archive `
+  --output benchmark/generated/main_horizon4_gemini.zip
+```
+
+기존 50% + LLM 자연어 50%로 생성하려면 `--horizon-mode 5`로 바꾸고 출력 파일 이름을 구분한다. 같은 LLM 모델·생성 설정·캐시 경로를 사용하면 방식 `4`에서 저장한 문장을 방식 `5`에서도 재사용한다.
+
+```powershell
+python -m benchmark.generator `
+  --config experiments/configs/main.json `
+  --horizon-mode 5 `
+  --horizon-llm-model gemini-3.1-flash-lite `
+  --horizon-llm-cache .cache/horizon_llm `
+  --gemini-token-model gemini-3.1-flash-lite `
+  --archive `
+  --output benchmark/generated/main_horizon5_gemini.zip
+```
+
+`--horizon-llm-model`은 **배경 대화를 작성하는 모델**, `--gemini-token-model`은 **완성된 입력의 길이를 측정하는 모델**이다. Agent 성능 평가에 쓰는 `config.model`과도 별도 설정이다. 생성 방식 번호만 `4`로 바꾸고 `--gemini-token-model`을 생략하면 자연어는 LLM으로 생성하지만 길이는 여전히 공백 기준 개발용 counter로 측정한다.
+
+### 설정 파일 또는 Python API에서 선택
+
+기존 설정 파일의 `dataset` 객체에 선택 번호와 선택적인 LLM 설정을 넣을 수 있다. 다음은 smoke 설정의 예시다.
+
+```json
+"dataset": {
+  "source": "synthetic",
+  "samples_per_cell": 5,
+  "task_types": ["temporal_update", "approval"],
+  "horizon_generation_mode": 4,
+  "horizon_llm": {
+    "model": "gemini-3.1-flash-lite",
+    "cache_directory": ".cache/horizon_llm",
+    "temperature": 0.7,
+    "max_output_tokens": 8192,
+    "max_retries": 2,
+    "retry_base_seconds": 0.5,
+    "timeout_ms": 60000
+  }
+}
+```
+
+`--horizon-llm-model`과 `--horizon-llm-cache`는 각각 설정 파일의 `model`, `cache_directory`보다 우선하며 방식 `4`와 `5`에서만 지정할 수 있다. LLM 설정을 생략하면 위 기본값을 사용한다. `max_output_tokens`는 자연어 생성의 **호출당 출력 상한**이며 전체 History 길이 목표가 아니다. 긴 대화는 문맥을 이어 쓰는 여러 생성 요청으로 확보한다.
+
+Python에서도 숫자로 선택한다. 명시한 API 인자는 설정 파일의 선택보다 우선하며, 같은 LLM source 객체를 여러 호출에 재사용할 수 있다.
+
+```python
+from benchmark.evaluator import load_config
+from benchmark.generator import generate_dataset, generate_scenario, write_dataset
+from benchmark.llm_horizon import GeminiHorizonSource
+
+config = load_config("experiments/configs/smoke.json")
+source = GeminiHorizonSource(
+    model="gemini-3.1-flash-lite",
+    cache_directory=".cache/horizon_llm",
+)
+payload = generate_dataset(config, horizon_generation_mode=4, llm_source=source)
+write_dataset(payload, "benchmark/generated/smoke_llm_example")
+
+scenario = generate_scenario(horizon_generation_mode=5, llm_source=source)
+```
+
+위 Python 예시는 counter를 생략하므로 공백 기준으로 길이를 맞춘다. 실제 Gemini token 기준이 필요하면 기존 API와 같이 `token_counter=GeminiTokenCounter(model="gemini-3.1-flash-lite")`를 전달한다. 선택 번호는 정수 `1`부터 `5`까지만 허용하며 리스트, Python의 `True`, 소수, 문자열은 허용하지 않는다.
+
+### LLM 문장 캐시, 재현성과 비용
+
+LLM 방식은 기본 과제의 `sample_id`, 모델과 생성 설정을 기준으로 문장열을 캐시에 저장한다. Budget, Horizon, 전략, 반복, 방식 `4`와 `5`는 같은 과제의 자연어를 공유한다. 길이 조정 함수가 같은 후보 길이를 여러 번 측정해도 이미 확보한 문장열을 재사용한다. 필요한 분량이 부족할 때만 앞서 생성한 문맥을 이어 추가 생성하고 기존 prefix는 유지한다.
+
+LLM은 중립적인 업무 배경 대화를 생성한다. 정답 파일명, 수신 주소, 승인 ID, 정답 State와 제약 같은 과제 내용을 LLM에 전달하지 않는다. 응답 형식과 문장 내용을 검사하며, API 오류·생성 중단·유효성 검사 실패가 발생하면 오류로 중단한다. 실패한 LLM 생성을 로컬 문장으로 바꾸어 성공한 것처럼 저장하지 않는다. 손상된 캐시도 명시적인 오류로 알리므로 확인 없이 유료 재생성을 시작하지 않는다.
+
+캐시에 충분한 문장이 있으면 생성 API key 없이도 저장된 원문을 재사용할 수 있다. 단, 별도로 Gemini CountTokens를 선택했다면 token 측정용 API 연결은 여전히 필요하다. 필요한 문장이 부족하면 API key와 정상적인 Gemini 연결이 필요하다. LLM 출력 자체가 새 실행마다 같다고 가정하지 않으며, 같은 데이터를 재현할 때는 생성한 캐시를 함께 보존한다. 의도적으로 새로운 문장열을 만들려면 새 캐시 경로를 지정한다.
+
+방식 `1`~`3`에는 자연어 생성 API 비용이 없다. 방식 `4`와 `5`는 첫 생성과 캐시 부족분을 추가할 때 생성 비용이 발생한다. 이전의 main 비용 추정 약 1.5~2달러는 **기본 과제 40개마다 실제 모델 기준 약 25,000 output token을 생성해 조건별로 재사용하는 가정**이었다. 기본 counter의 25K는 공백 단어 25K이므로 실제 모델 token 25K와 다르며, 같은 금액으로 확정할 수 없다. 실제 청구량은 생성 응답의 token 사용량, thinking, 재시도와 추가 생성 분량을 기준으로 확인한다. CountTokens 측정 호출과 Agent 벤치마크 실행도 자연어 생성 호출과 구분한다.
+
+### 결과 확인과 변경 위치
+
+실제로 선택한 번호는 CLI 결과, `manifest.json`, 각 셀 JSON의 `horizon_generation_mode`, 각 시나리오의 `metadata.horizon_generation_mode`에서 확인한다. manifest의 `config.dataset.horizon_generation_mode`에도 최종 선택값을 기록한다. 방식 `2`~`5`의 셀 ID는 방식 번호를 포함해 구분하고 같은 기본 과제의 `sample_id`는 유지한다.
+
+방식 `4`와 `5`는 `metadata.horizon_natural_language_backend`가 `gemini_llm_v1`이며, 생성 출처는 각 시나리오의 `metadata.horizon_llm`에 기록한다. `model`, `prompt_version`, `cache_key`, `corpus_sha256`, `used_sentence_count`, `used_prefix_sha256`, `api_calls_this_run`, `cache_hit`, `usage_records`, `usage_totals` 등을 확인할 수 있다. `corpus_sha256`은 해당 시점에 확보한 전체 원문을, `used_prefix_sha256`은 채움 과정에서 조회한 원문의 prefix를 식별한다. 캐시를 더 늘리면 전체 원문 해시는 바뀔 수 있지만 이미 생성한 prefix는 유지한다.
+
+예를 들어 위의 smoke 디렉터리 명령으로 만든 방식 `4` 결과는 다음과 같이 확인한다. main ZIP으로 생성했다면 먼저 압축을 풀고 `$output`을 압축 해제 디렉터리로 바꾼다.
+
+```powershell
+$output = "benchmark/generated/smoke_horizon4"
+$manifest = Get-Content -LiteralPath "$output/manifest.json" -Encoding UTF8 -Raw | ConvertFrom-Json
+$cellPath = Join-Path $output $manifest.cells[0].path
+$cell = Get-Content -LiteralPath $cellPath -Encoding UTF8 -Raw | ConvertFrom-Json
+$scenario = $cell.scenarios[0]
+$manifest | Select-Object horizon_generation_mode, n_cells, n_scenarios
+$scenario.metadata | Select-Object horizon_generation_mode, horizon_natural_language_backend, horizon_mix_basis
+$scenario.metadata.horizon_llm | Select-Object model, prompt_version, cache_hit, api_calls_this_run, used_sentence_count, used_prefix_sha256
+$scenario.metadata.horizon_llm.usage_totals
+```
+
+`usage_totals`는 해당 원문 캐시에 쌓인 생성 사용량이다. 같은 기본 과제를 여러 Budget/Horizon 셀에서 재사용하므로 셀마다 기록된 값을 모두 합쳐 새로운 생성 비용으로 계산하지 않는다. `api_calls_this_run`과 `cache_hit`도 함께 확인해 이번 실행의 호출과 기존 원문 재사용을 구분한다.
+
+| 변경 파일 | 역할 |
+|---|---|
+| [`benchmark/generator.py`](../benchmark/generator.py) | 번호 `1`~`5` 선택, CLI·설정·API 연결, 모드별 출력 경로와 생성 metadata 기록 |
+| [`benchmark/horizon_filler.py`](../benchmark/horizon_filler.py) | 로컬 자연어와 저장된 LLM 문장열을 채움에 사용하고 문장 수 기준으로 혼합 |
+| [`benchmark/llm_horizon.py`](../benchmark/llm_horizon.py) | Gemini 생성 연결, 이어쓰기, 응답 검증, 지속 캐시와 생성 출처 관리 |
+| [`tests/test_generator_modes.py`](../tests/test_generator_modes.py), [`tests/test_llm_horizon.py`](../tests/test_llm_horizon.py) | 기존 방식 보존, 다섯 방식 선택과 LLM 생성·캐시 계약 검증 |
+
+5모드 확장의 자동 검증은 fake Gemini client/source로 수행했다. **이 코드 변경을 검증하기 위한 실제 LLM 생성 API 호출은 하지 않았다.** 위 명령은 사용법 예시이며 유료 생성 성공 기록이 아니다. 실제 생성은 사용자가 방식 `4` 또는 `5`로 명령을 실행하고 캐시에 필요한 문장이 없을 때 시작된다.
+
+방식을 바꾸면 Memory의 문장과 검색 유사도가 달라질 수 있으므로 새 데이터셋에서 모든 전략을 다시 평가한다. 기존 생성물과 결과는 그대로 보관하고 서로 다른 방식의 실행 결과를 동일 조건의 반복 측정처럼 합치지 않는다. 코드를 수정하는 것만으로 기존 JSON이나 ZIP이 자동으로 변경되지는 않는다.
+
 ## 출력과 sample 배정
 
 ### Pilot 전달용 독립 sample 100개
