@@ -101,10 +101,12 @@ Memory token 비율도 약 `5.78`로 유지됐다.
 
 1. 현재 Main 결과는 Mode 1 데이터에 대한 결과로 그대로 보존한다.
 2. Mode 2~5 데이터의 실행 결과를 Main의 추가 repeat로 합치지 않는다.
-3. 자연스러운 Horizon에 대한 후속 행동 실험은 모드별 새 결과군에서 네 전략을 모두
-   다시 실행해야 한다.
-4. 후속 우선순위는 Mode 2·3의 Agent/TSR 실행, 그다음 Mode 4·5 데이터 생성과 같은
-   audit의 반복이다.
+3. Mode 2의 Agent/TSR은 40개 paired scenario에서 Proposed와 Vector Top-k로 후속
+   실행했지만 Sliding Window와 Utility-per-Token은 아직 포함되지 않았다. 네 전략 전체의
+   mode 비교는 별도 결과군에서 수행해야 한다.
+4. 실패 승인 과제 한 건의 Mode 1·2 반복 재점검도 수행했다. 이는
+   [별도 보고서](attachment_recheck_audit_20261111.md)에 기록했으며 일반 Mode 효과가 아니다.
+   다음 우선순위는 Mode 3 Agent/TSR 실행과 Mode 4·5 데이터 생성·audit이다.
 5. 생성 모드별 보고에서는 retrieval, selection, Context Builder, Agent 행동 효과를
    분리한다. 이번 audit은 첫 번째 단계만 측정했다.
 

@@ -79,6 +79,11 @@ Mode 2의 초기 Required State hit가 80%(Mode 1: 90%)였지만, 두 모드 모
 과제의 Constraint Violation은 모두 0/20이었다. 이는 실제 Tool 행동을 포함한 단일 실행
 평가이며, 범위와 반복 한계는 [Narrative Mode 1/2 LLM 실행 보고서](docs/narrative_llm_execution_audit_20261111.md)에 기록했다.
 
+별도 attachment 재점검에서는 같은 승인 과제 하나를 Mode별 5회 실행했다. Mode 1은 검색·선택된
+정답 상태가 Context에 있었지만 `request_approval`의 `attachment`를 5회 모두 생략했고,
+Mode 2는 5회 모두 올바른 파일을 첨부했다. 이는 단일 과제 진단으로 일반적인 Mode 효과를
+뜻하지 않는다. [재점검 보고서](docs/attachment_recheck_audit_20261111.md)를 참고한다.
+
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조

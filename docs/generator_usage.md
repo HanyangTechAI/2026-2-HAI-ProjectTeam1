@@ -359,6 +359,38 @@ python -m benchmark.runner `
 2026-11-11 결과는 [Mode 1/2 LLM 실행 보고서](narrative_llm_execution_audit_20261111.md)에
 기록했다.
 
+### 승인 과제 `attachment` 반복 재점검
+
+Mode 1 Proposed에서 `attachment`가 누락된 승인 사례를 같은 paired task의 Mode 1·2 입력으로
+각각 5회 반복하려면 Scenario ID를 고정한다. 아래 명령은 실제 Gemini 요청을 보내므로 API
+key가 필요하고 비용이 발생한다. 이미 사용한 결과 경로가 있으면 덮어쓰지 말고 새 경로를
+지정한다. `--resume`은 동일 설정의 미완료 실행에만 사용한다.
+
+```powershell
+python -m benchmark.runner `
+  --config experiments/configs/main.json `
+  --scenarios benchmark/generated/narrative_mode1/cell_e5534bba1746.json `
+  --scenario-ids seed43_approval_014_pending `
+  --environment-agent-factory benchmark.experiment_runtime:environment_agent `
+  --strategies proposed `
+  --repeats 5 `
+  --checkpoint-interval 1 `
+  --output experiments/results/attachment_recheck_mode1
+
+python -m benchmark.runner `
+  --config experiments/configs/main.json `
+  --scenarios benchmark/generated/narrative_mode2/cell_3ea70c1fbe6b.json `
+  --scenario-ids seed43_approval_014_pending `
+  --environment-agent-factory benchmark.experiment_runtime:environment_agent `
+  --strategies proposed `
+  --repeats 5 `
+  --checkpoint-interval 1 `
+  --output experiments/results/attachment_recheck_mode2
+```
+
+2026-11-11 재점검은 Mode 1에서 0/5, Mode 2에서 5/5 성공했다. 범위와 Tool-call trace는
+[Attachment 재점검 보고서](attachment_recheck_audit_20261111.md)에 기록했다.
+
 ## 출력과 sample 배정
 
 ### Pilot 전달용 독립 sample 100개

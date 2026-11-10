@@ -58,6 +58,6 @@
     "group_by": ["strategy", "context_token_budget", "horizon_turns"],
     "delta_group_by": ["context_token_budget", "horizon_turns"]
   },
-  "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget"},
+  "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget", "request_token_safety_margin": 32},
   "output_directory": "experiments/results/ablation"
 }

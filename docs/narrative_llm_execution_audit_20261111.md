@@ -109,3 +109,7 @@ Main 반복으로 합산하지 않는다.
 양쪽 실행은 commit `f4df73e`의 동일 코드와 prompt checksum으로 기록됐다. 최종 Context
 단계 검증은 [Final Context audit](narrative_final_context_audit_20261111.md)을 함께
 참고하되, 사전 선택·조립 성공과 실제 Task Success는 별도 지표로 유지한다.
+
+Mode 1 Proposed에서 `attachment`가 누락된 단일 실패를 각 서술 Mode에서 다섯 번 재실행한
+후속 진단은 [Approval Attachment 재점검 보고서](attachment_recheck_audit_20261111.md)에
+기록했다. 이 집중 재점검은 40개 과제 성능 추정치와 분리한다.

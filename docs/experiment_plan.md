@@ -22,6 +22,9 @@ Target/Noise padding을 분리한 2×2 후속 audit은
 같은 paired 입력을 실제 Gemini Agent에 실행한 후속 평가는
 [21절](#21-horizon-narrative-mode-12-gemini-agent-execution-2026-11-11)과
 [LLM 실행 보고서](narrative_llm_execution_audit_20261111.md)에 기록한다.
+실패한 승인 과제 한 건의 반복 재점검은
+[22절](#22-approval-attachment-단일-과제-반복-재점검-2026-11-11)과
+[Attachment 재점검 보고서](attachment_recheck_audit_20261111.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1188,3 +1191,23 @@ Memory overflow는 없었다.
 포함하지 않았다. CI는 과제 표본 재추출을 나타내며 반복 실행 간 모델 변동을 반영하지
 않는다. paired 설계·토큰/비용 결과와 전체 한계는
 [별도 보고서](narrative_llm_execution_audit_20261111.md)를 따른다.
+
+## 22. Approval Attachment 단일 과제 반복 재점검 (2026-11-11)
+
+21절 Mode 1 Proposed 실행에서 실패한 `seed43_approval_014_pending` 한 건을 같은 freeze와
+Gemini 설정으로 Mode 1·2 각각 5회 다시 실행했다. 두 Mode는 동일 query, 정답 파일,
+Required State와 승인 제약을 사용했다.
+
+| 입력 Mode | 성공 | `request_approval` 첨부 인자 | Target 검색·선택 | Prompt Audit |
+|---|---:|---|---:|---|
+| 1 (`repeated`) | 0/5 | 정답 `attachment` 5회 모두 누락 | 5/5 hit·선택 | 5/5 verified |
+| 2 (`random_natural`) | 5/5 | 정답 `attachment` 5회 모두 포함 | 5/5 hit·선택 | 5/5 verified |
+
+Mode 1 실패에서는 본문에 파일명이 있었지만 Tool arguments의 `attachment`가 빠져 평가상
+`state_omission`과 `temporal_failure`로 기록됐다. Mode 2의 다섯 요청은 동일한 정답 파일을
+첨부했고 모두 승인 요청 접수로 끝났으며 실제 발송은 하지 않았다. 양쪽 모두 Constraint
+Violation, Budget 초과, Prompt Audit 실패는 0회였다.
+
+반복 일관성은 이 한 과제와 두 서술 snapshot에서만 관찰됐다. Mode 일반 효과를 확정하거나
+Main 결과에 추가 반복으로 합산하지 않는다. 토큰·비용 및 실행별 증거는
+[Attachment 재점검 보고서](attachment_recheck_audit_20261111.md)를 따른다.
