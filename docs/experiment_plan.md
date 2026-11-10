@@ -13,6 +13,9 @@ H100까지 포함한 12셀·3840회의 최종 결과는
 Horizon 채움 방식 1·2·3의 offline retrieval 민감도 audit은
 [18절](#18-horizon-narrative-retrieval-bias-audit-2026-11-10)과
 [별도 보고서](narrative_bias_audit_20261110.md)에 기록한다.
+Target/Noise padding을 분리한 2×2 후속 audit은
+[19절](#19-narrative-padding-2×2-factorial-audit-2026-11-11)과
+[factorial 보고서](narrative_factorial_audit_20261111.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1107,3 +1110,25 @@ repeat로 합치지 않는다.
 Agent/Tool/LLM은 실행하지 않았고 Mode 4·5도 포함하지 않았으므로 TSR, 제약 위반 또는
 일반적인 자연어 우수성의 증거로 사용하지 않는다. 상세 task별 결과, paired 변화,
 무결성 해시와 후속 결정은 [별도 보고서](narrative_bias_audit_20261110.md)를 따른다.
+
+## 19. Narrative Padding 2×2 Factorial Audit (2026-11-11)
+
+Mode 1→2 변화의 원인을 분리하기 위해 required State target padding(`T`)과 synthetic
+noise padding(`N`)을 각각 Mode 1/2로 교체한 네 조건 `T1/N1`, `T2/N1`, `T1/N2`,
+`T2/N2`를 구성했다. 18절과 같은 2K/H100 paired scenario 40개, Top-k 5와 frozen
+embedder를 사용했다.
+
+| Pool | T1/N1 | T2/N1 | T1/N2 | T2/N2 | Target 효과 | Noise 효과 | Interaction |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| baseline | 87.5% | 80.0% | 87.5% | 80.0% | −7.5%p | 0.0%p | 0.0%p |
+| Proposed 후보군 | 90.0% | 80.0% | 90.0% | 80.0% | −10.0%p | 0.0%p | 0.0%p |
+
+Target 효과의 paired bootstrap 95% 구간은 baseline `[−20.0,+5.0]%p`, Proposed
+후보군 `[−22.5,0.0]%p`다. Noise 교체는 40개 모두에서 hit, target rank와 Top-5 ID를
+바꾸지 않았고 interaction도 0이었다. 따라서 현재 조건의 Mode 1→2 Recall 차이는
+target State 서술 변화와 연결되며 noise 서술 효과는 관측되지 않았다.
+
+이 결론은 단일 셀·40개 과제의 offline retrieval에 한정한다. Noise의 일반적 무효성,
+통계적으로 확정적인 target 효과 또는 Agent 행동 효과를 주장하지 않는다. 전체 CI,
+task별 결과, integrity 조건과 후속 결정은
+[factorial 보고서](narrative_factorial_audit_20261111.md)를 따른다.

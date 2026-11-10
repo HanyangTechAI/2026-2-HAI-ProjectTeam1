@@ -127,3 +127,10 @@ Memory token 비율도 약 `5.78`로 유지됐다.
 - 집계: `summary.csv`, `pairwise_summary.csv`
 - 실행 코드: [`benchmark/narrative_bias_audit.py`](../benchmark/narrative_bias_audit.py)
 
+## 10. 후속 요인 분리 분석
+
+2026-11-11에는 required State padding과 synthetic noise padding을 독립적으로 교체한
+2×2 audit를 수행했다. Mode 1→2 Recall 차이는 target padding 교체에서 재현됐지만
+noise padding 교체에서는 관측되지 않았다. 설계, bootstrap 구간과 제한 사항은
+[Narrative Padding 2×2 Factorial Audit](narrative_factorial_audit_20261111.md)을 따른다.
+

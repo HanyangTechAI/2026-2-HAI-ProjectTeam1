@@ -2009,6 +2009,12 @@ Recall@k, rank, similarity, Top-k Jaccard를 기록하지만 Agent/TSR을 평가
 Audit 계약과 실행 예시는 [generator_usage.md](generator_usage.md#mode-13-retrieval-bias-audit)를
 따른다.
 
+`benchmark/narrative_factorial_audit.py`는 Mode 1·2의 required State target padding과
+synthetic noise padding을 독립적으로 교체한 2×2 offline retrieval 조건을 만든다.
+scenario·Memory 불변 필드와 정답 content를 검증한 뒤 paired Recall@k의 Target 효과,
+Noise 효과, interaction과 bootstrap 구간을 출력한다. 이는 Agent/TSR 평가가 아니며
+[factorial 실행 계약](generator_usage.md#target--noise-22-factorial-audit)을 따른다.
+
 추가 실험 변수의 코드상 이름:
 
 ```text

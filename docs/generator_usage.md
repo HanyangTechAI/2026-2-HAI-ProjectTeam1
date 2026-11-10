@@ -273,6 +273,31 @@ Proposed Selector와 Context Budget 조립은 실행하지 않는다. 이 결과
 [Horizon Narrative Retrieval Bias Audit](narrative_bias_audit_20261110.md)에 보존했다.
 Mode 4·5는 이 audit 결과에 포함되지 않았으며, 데이터 생성 후 별도 비교가 필요하다.
 
+### Target × Noise 2×2 factorial audit
+
+Mode 1→2에서 target State padding과 synthetic noise padding의 영향을 분리하려면 다음
+offline factorial audit를 실행한다.
+
+```powershell
+python -m benchmark.narrative_factorial_audit `
+  --mode1 benchmark/generated/narrative_mode1 `
+  --mode2 benchmark/generated/narrative_mode2 `
+  --budget 2048 `
+  --horizon 100 `
+  --top-k 5 `
+  --output experiments/results/narrative_factorial_h100_b2048
+```
+
+Mode 1 snapshot을 기준으로 required State(`T`)와 synthetic noise(`N`)의 content와
+token count만 독립적으로 Mode 2 값으로 교체해 `T1/N1`, `T2/N1`, `T1/N2`,
+`T2/N2`를 만든다. query·정답·제약·version 구조와 나머지 Memory가 다르면 중단한다.
+결과는 paired sample별 Target 효과, Noise 효과, `D−B−C+A` interaction과 4,000회
+bootstrap 95% 구간을 기록한다.
+
+이 audit도 offline retrieval 전용이며 전체 Proposed Selector나 Agent 행동을 실행하지
+않는다. 2026-11-11 결과는
+[Narrative Padding 2×2 Factorial Audit](narrative_factorial_audit_20261111.md)에 기록했다.
+
 ## 출력과 sample 배정
 
 ### Pilot 전달용 독립 sample 100개

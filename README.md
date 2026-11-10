@@ -60,6 +60,13 @@ Horizon 100의 paired scenario 40개에서 기존 반복 Mode 1, 로컬 자연�
 `87.5%→80.0%`, Proposed 일반 후보군에서 `90.0%→80.0%`로 변했다. 이는 offline
 retrieval audit이며 Agent TSR 결과가 아니다. 범위와 한계는
 [Horizon Narrative Retrieval Bias Audit](docs/narrative_bias_audit_20261110.md)에 기록한다.
+
+2026-11-11의 후속 2×2 factorial audit에서는 required State padding과 synthetic noise
+padding을 독립적으로 교체했다. 관측된 Recall 차이는 target padding 교체에서만
+나타났고(baseline −7.5%p, Proposed 일반 후보군 −10.0%p), noise 교체와 interaction은
+0이었다. 두 target 효과의 bootstrap 구간은 0을 포함하거나 경계에 닿으므로 확정적
+일반 효과로 표현하지 않는다. 자세한 설계와 해석은
+[Narrative Padding 2×2 Factorial Audit](docs/narrative_factorial_audit_20261111.md)을 따른다.
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조
