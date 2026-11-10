@@ -1,7 +1,11 @@
 {
   "freeze": {"version": "1.0.3", "kind": "architecture_parameter_freeze"},
   "scope": "smoke",
-  
+  "status": "executable",
+  "executable": true,
+  "name": "smoke",
+  "description": "Small integration grid for the frozen Gemini 3.1 Flash-Lite runtime.",
+  "model": {
     "provider": "google",
     "name": "gemini-3.1-flash-lite",
     "temperature": 0,
