@@ -2015,6 +2015,12 @@ scenario·Memory 불변 필드와 정답 content를 검증한 뒤 paired Recall@
 Noise 효과, interaction과 bootstrap 구간을 출력한다. 이는 Agent/TSR 평가가 아니며
 [factorial 실행 계약](generator_usage.md#target--noise-22-factorial-audit)을 따른다.
 
+`benchmark/proposed_context_audit.py`는 Mode 1/2 paired 입력에서 Proposed의 실제
+retrieval부터 Context Builder까지 단계별 결과를 감사한다. Main freeze/config와 두 입력의
+동일성을 검사하고, initial miss 복구·최종 Required State 및 적용 Constraint·실효 Budget을
+기록한다. Agent/LLM 동작은 실행하지 않는다. CLI와 산출물 계약은
+[Final Context audit 실행 설명](generator_usage.md#proposed-최종-context-단계별-audit)을 따른다.
+
 추가 실험 변수의 코드상 이름:
 
 ```text

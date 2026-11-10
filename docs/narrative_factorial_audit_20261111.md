@@ -144,3 +144,10 @@ cutoff 포함 여부에 영향을 준 것으로 해석하는 편이 관측값에
 - 전체·task별 집계와 CI: `factorial_summary.csv`
 - 실행 코드: [`benchmark/narrative_factorial_audit.py`](../benchmark/narrative_factorial_audit.py)
 
+## 11. 후속 최종 Context 단계 분석
+
+Factorial audit 뒤 같은 Mode 1/2 paired 입력에서 실제 Proposed selector와 Context
+Builder를 점검했다. 초기 retrieval에서 Mode 1은 4건, Mode 2는 8건의 Required State
+miss가 있었지만 모두 최종 Context에서 복구됐다. 단계별 결과와 제한은
+[Horizon Narrative Final Context Audit](narrative_final_context_audit_20261111.md)을 따른다.
+

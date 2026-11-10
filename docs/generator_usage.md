@@ -298,6 +298,33 @@ bootstrap 95% 구간을 기록한다.
 않는다. 2026-11-11 결과는
 [Narrative Padding 2×2 Factorial Audit](narrative_factorial_audit_20261111.md)에 기록했다.
 
+### Proposed 최종 Context 단계별 audit
+
+Mode 1/2의 초기 retrieval 차이가 Proposed의 version/temporal 처리와 최종 Context에
+어떻게 이어지는지 다음 명령으로 단계별 확인한다. Gemini CountTokens용 API key와
+frozen embedder 환경이 필요하다.
+
+```powershell
+python -m benchmark.proposed_context_audit `
+  --mode1 benchmark/generated/narrative_mode1 `
+  --mode2 benchmark/generated/narrative_mode2 `
+  --config experiments/configs/main.json `
+  --budget 2048 `
+  --horizon 100 `
+  --output experiments/results/narrative_final_context_h100_b2048
+```
+
+Audit는 Freeze v1.0.3, Gemini 3.1 Flash-Lite, top-k 5, Safety Margin 32와 utility
+weights `0.6/0.3/0.1`을 검증하고, 두 입력의 ground truth와 허용된 Memory content 변경을
+확인한다. 실제 selector와 Context Builder의 stage trace가 서로 맞는지 검사하고 initial
+retrieval, chain expansion, temporal/required-state resolution, selected set과 final
+Context를 `details.csv`, `paired.csv`, `summary.json`에 기록한다.
+
+이 도구는 Agent loop 전에 끝나므로 LLM 행동, Tool 실행이나 TSR을 측정하지 않는다.
+실행이 중단되면 같은 입력·설정 fingerprint가 일치할 때 `--resume`으로 이어갈 수 있다.
+2026-11-11 결과는 [Final Context Audit 보고서](narrative_final_context_audit_20261111.md)에
+기록했다.
+
 ## 출력과 sample 배정
 
 ### Pilot 전달용 독립 sample 100개

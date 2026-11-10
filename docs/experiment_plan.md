@@ -16,6 +16,9 @@ Horizon 채움 방식 1·2·3의 offline retrieval 민감도 audit은
 Target/Noise padding을 분리한 2×2 후속 audit은
 [19절](#19-narrative-padding-2×2-factorial-audit-2026-11-11)과
 [factorial 보고서](narrative_factorial_audit_20261111.md)에 기록한다.
+실제 Proposed 선택·Context Builder 단계별 Mode 1/2 audit은
+[20절](#20-horizon-narrative-final-context-audit-2026-11-11)과
+[Final Context 보고서](narrative_final_context_audit_20261111.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1132,3 +1135,28 @@ target State 서술 변화와 연결되며 noise 서술 효과는 관측되지 �
 통계적으로 확정적인 target 효과 또는 Agent 행동 효과를 주장하지 않는다. 전체 CI,
 task별 결과, integrity 조건과 후속 결정은
 [factorial 보고서](narrative_factorial_audit_20261111.md)를 따른다.
+
+## 20. Horizon Narrative Final Context Audit (2026-11-11)
+
+18·19절의 Mode 1/2 paired 입력 40개를 Proposed의 실제 retrieval, version-chain
+expansion, temporal resolution, Required State, protected constraint, budget selection과
+Context Builder까지 통과시켰다. Main Freeze v1.0.3 설정에서 명목 Budget 2,048,
+Safety Margin 32, 실효 Budget 2,016, top-k 5를 사용했다.
+
+| 단계 | Mode 1 | Mode 2 |
+|---|---:|---:|
+| Initial Required State 완전 | 36/40 (90%) | 32/40 (80%) |
+| Version chain expansion 이후 | 40/40 | 40/40 |
+| Final Context Required State 완전 | 40/40 | 40/40 |
+| Context 정상 조립 | 40/40 | 40/40 |
+| 최종 Context 내 잘못된 버전 | 0 | 0 |
+| 승인 조건에서 적용 Constraint 완전 | 20/20 | 20/20 |
+| 실효 Budget 초과 | 0 | 0 |
+
+Mode 1의 초기 State miss 4건과 Mode 2의 8건은 모두 최종 Context에 복구됐다. 평균
+최종 Context는 각각 1,356.05와 1,358.30 tokens였다. 관측된 초기 검색 차이는 이
+paired 데이터에서 최종 Context 누락으로 이어지지 않았다.
+
+이는 Agent loop 이전의 선택·조립 검증이다. LLM·Tool 행동이나 TSR, 제약 위반 행동률을
+측정하지 않았고 단일 2K/H100 셀의 40개 과제만 포함했다. 상세 단계 추적과 해석은
+[Final Context Audit 보고서](narrative_final_context_audit_20261111.md)를 따른다.

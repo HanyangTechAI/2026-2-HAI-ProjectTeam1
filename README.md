@@ -67,6 +67,12 @@ padding을 독립적으로 교체했다. 관측된 Recall 차이는 target paddi
 0이었다. 두 target 효과의 bootstrap 구간은 0을 포함하거나 경계에 닿으므로 확정적
 일반 효과로 표현하지 않는다. 자세한 설계와 해석은
 [Narrative Padding 2×2 Factorial Audit](docs/narrative_factorial_audit_20261111.md)을 따른다.
+
+같은 입력의 Mode 1/2를 실제 Proposed 선택기와 Context Builder까지 확인한 후속 audit에서는
+Mode 2의 초기 Required State hit가 80%(Mode 1: 90%)였지만, 두 모드 모두 version chain
+확장 뒤 정답 State와 적용 제약을 최종 Context에 100% 포함했다. 이는 LLM 호출 전 단계
+검증으로 TSR 결과가 아니다. [Final Context Audit 보고서](docs/narrative_final_context_audit_20261111.md)에
+단계별 수치와 제한을 기록했다.
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조

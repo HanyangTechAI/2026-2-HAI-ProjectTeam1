@@ -134,3 +134,8 @@ Memory token 비율도 약 `5.78`로 유지됐다.
 noise padding 교체에서는 관측되지 않았다. 설계, bootstrap 구간과 제한 사항은
 [Narrative Padding 2×2 Factorial Audit](narrative_factorial_audit_20261111.md)을 따른다.
 
+이후 같은 Mode 1/2 입력을 Proposed의 실제 단계와 Context Builder에 통과시켰다. 초기
+검색 miss는 Mode 1 4건, Mode 2 8건이었지만 40개 모두 최종 Context에서 Required State를
+포함했다. 자세한 trace는 [Final Context Audit](narrative_final_context_audit_20261111.md)에
+기록했다.
+
