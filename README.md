@@ -53,6 +53,13 @@ thinking LOW, 출력 상한 2,048, top-k 5, max_steps 8, 입력 safety margin 32
 기본 과제는 40개이며 3,840개의 독립 과제를 평가한 것은 아니다.
 12셀 전체 표·신뢰구간·실패 사례는 [Experiment Plan의 최종 결과](docs/experiment_plan.md#17-전체-main-최종-결과-2026-11-09)와
 [최종 분석 보고서](docs/main_final_analysis_20261109.md)를 따른다.
+
+2026-11-10에는 Horizon 채움 문체의 retrieval 민감도를 별도로 점검했다. Budget 2K,
+Horizon 100의 paired scenario 40개에서 기존 반복 Mode 1, 로컬 자연어 Mode 2,
+50:50 혼합 Mode 3을 비교한 결과, Mode 1→2의 State Recall@5는 baseline에서
+`87.5%→80.0%`, Proposed 일반 후보군에서 `90.0%→80.0%`로 변했다. 이는 offline
+retrieval audit이며 Agent TSR 결과가 아니다. 범위와 한계는
+[Horizon Narrative Retrieval Bias Audit](docs/narrative_bias_audit_20261110.md)에 기록한다.
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조
@@ -220,7 +227,7 @@ Provider usage 회계는 완전성 우선이다. 모든 API 시도와 성공 응
 
 `memory/ablation.py`는 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing` preset을 제공한다. Runner의 `--proposed-ablations`로 하나 이상을 선택하며, 변형 실행은 `proposed/<preset>` 전략명과 설정 snapshot을 결과에 기록한다. `no_temporal`은 Required State 강제 선택도 함께 끈다.
 
-`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
+`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
 

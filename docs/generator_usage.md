@@ -246,6 +246,33 @@ $scenario.metadata.horizon_llm.usage_totals
 
 방식을 바꾸면 Memory의 문장과 검색 유사도가 달라질 수 있으므로 새 데이터셋에서 모든 전략을 다시 평가한다. 기존 생성물과 결과는 그대로 보관하고 서로 다른 방식의 실행 결과를 동일 조건의 반복 측정처럼 합치지 않는다. 코드를 수정하는 것만으로 기존 JSON이나 ZIP이 자동으로 변경되지는 않는다.
 
+### Mode 1~3 retrieval bias audit
+
+같은 grid cell로 생성한 Mode 1~3 데이터의 offline Top-k 민감도는 다음처럼 비교한다.
+세 경로의 manifest에서 `--budget`과 `--horizon`에 맞는 cell이 정확히 하나씩 있어야 한다.
+
+```powershell
+python -m benchmark.narrative_bias_audit `
+  --mode1 benchmark/generated/narrative_mode1 `
+  --mode2 benchmark/generated/narrative_mode2 `
+  --mode3 benchmark/generated/narrative_mode3 `
+  --budget 2048 `
+  --horizon 100 `
+  --top-k 5 `
+  --output experiments/results/narrative_bias_h100_b2048
+```
+
+Audit는 먼저 scenario identity, query·정답·제약·환경, Memory 구조, token counter와
+cell parameter의 일치를 검사한다. 그 뒤 전체 일반 후보군인 `baseline`과 활성 protected
+constraint를 제외한 `proposed` 일반 후보군에서 State/General Recall@k, target rank,
+similarity와 모드 간 Top-k Jaccard를 계산한다. `--selection-fixed-tokens`를 생략하면
+Proposed Selector와 Context Budget 조립은 실행하지 않는다. 이 결과를 Agent TSR이나
+전체 Proposed 성능으로 보고하지 않는다.
+
+2026-11-10의 2K/H100·40 paired scenario 결과와 해석은
+[Horizon Narrative Retrieval Bias Audit](narrative_bias_audit_20261110.md)에 보존했다.
+Mode 4·5는 이 audit 결과에 포함되지 않았으며, 데이터 생성 후 별도 비교가 필요하다.
+
 ## 출력과 sample 배정
 
 ### Pilot 전달용 독립 sample 100개

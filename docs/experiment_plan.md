@@ -10,6 +10,9 @@ JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다
 H100까지 포함한 12셀·3840회의 최종 결과는
 [17절](#17-전체-main-최종-결과-2026-11-09)과
 [최종 분석 보고서](main_final_analysis_20261109.md)에 기록한다.
+Horizon 채움 방식 1·2·3의 offline retrieval 민감도 audit은
+[18절](#18-horizon-narrative-retrieval-bias-audit-2026-11-10)과
+[별도 보고서](narrative_bias_audit_20261110.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1081,3 +1084,26 @@ H100·2K의 Sliding 2개 및 Utility 1개 실행은 내부 API 재시도 후 작
 - `aggregate/summary.json`, `aggregate/deltas.json`, `analysis.json`: 주요 결과·CI·진단.
 - `failure_cases.json`, `cost_unknown_cases.json`: 실패 1216개 실행과 비용 불완전 3개 실행.
 - `budget_horizon_success.png`와 `.svg`: 전체 Horizon/Budget 결과 그림.
+
+## 18. Horizon Narrative Retrieval Bias Audit (2026-11-10)
+
+기존 반복 문장(Mode 1), 로컬 자연어(Mode 2), 50:50 혼합(Mode 3)이 semantic
+retrieval 후보에 미치는 영향을 Budget 2048·Horizon 100의 paired scenario 40개에서
+점검했다. query·정답·Memory 구조와 실험 조건은 고정하고 Memory content만 모드에 맞게
+바뀌었으며, 세 데이터셋 모두 Gemini 3.1 Flash-Lite CountTokens로 측정됐다.
+
+| Mode | Baseline State Recall@5 | Proposed 후보군 State Recall@5 | 평균 target similarity |
+|---:|---:|---:|---:|
+| 1 | 87.5% | 90.0% | 0.6000 |
+| 2 | 80.0% | 80.0% | 0.5988 |
+| 3 | 82.5% | 87.5% | 0.6119 |
+
+Mode 1→2에서 Top-5는 baseline 17/40, Proposed 일반 후보군 11/40 과제에서 바뀌었고
+State Recall은 각각 −7.5%p, −10.0%p였다. Mode 3은 Mode 2 대비 각각 +2.5%p,
++7.5%p 회복했다. 채움 문체가 cutoff 후보에 영향을 주므로 모드가 다른 결과를 같은
+repeat로 합치지 않는다.
+
+이 audit은 Top-k 5의 offline retrieval만 측정했다. Proposed Selector·Context Builder와
+Agent/Tool/LLM은 실행하지 않았고 Mode 4·5도 포함하지 않았으므로 TSR, 제약 위반 또는
+일반적인 자연어 우수성의 증거로 사용하지 않는다. 상세 task별 결과, paired 변화,
+무결성 해시와 후속 결정은 [별도 보고서](narrative_bias_audit_20261110.md)를 따른다.

@@ -1986,13 +1986,28 @@ metadata
 
 `required_state_ids`와 `required_states[*].memory_id`, `applicable_constraint_ids`와 `constraint_rules[*].constraint_id`는 각각 정확히 일치해야 한다.
 
-생성 API는 `generate_scenario(...)`, `generate_dataset(config, token_counter=...)`,
+생성 API는 `generate_scenario(..., horizon_generation_mode=None, llm_source=None)`,
+`generate_dataset(config, token_counter=..., horizon_generation_mode=None, llm_source=None)`,
 `write_dataset(payload, output_directory)`, `write_dataset_archive(payload, archive_path)`이다.
 `render_history(history)`로 turn/role/timestamp를 포함한 전체 이력을 측정한다.
 `metadata.history_length_tokens`와 `noise_memory_ratio`는 실험 셀의 요청값을 유지하고,
 `actual_history_length_tokens`와 `actual_noise_memory_ratio`에 실측값을 기록한다.
 Budget/Horizon 간 공유된 ID를 보존하므로 Runner에는 셀 JSON 하나씩 전달한다.
 세부 계약과 CLI는 [generator_usage.md](generator_usage.md)를 따른다.
+
+`horizon_generation_mode`는 정수 `1`~`5` 중 하나다. `1`은 기존 반복 문장, `2`는
+결정적 로컬 자연어, `3`은 둘의 50:50 혼합, `4`는 LLM 자연어, `5`는 기존 문장과
+LLM 자연어의 50:50 혼합이다. 명시적 API/CLI 값, config의
+`dataset.horizon_generation_mode`, `DEFAULT_HORIZON_MODE` 순으로 선택한다. Mode 4·5는
+주입한 `llm_source` 또는 `dataset.horizon_llm`으로 만든 Gemini source를 사용하며,
+cache miss의 생성 실패를 로컬 문장으로 대체하지 않는다. 선택한 mode는 manifest, cell,
+effective config와 scenario metadata에 기록한다.
+
+`benchmark/narrative_bias_audit.py`는 같은 scenario와 cell 조건을 가진 Mode 1~3
+데이터의 offline retrieval을 paired 비교한다. 전체 후보군과 Proposed 일반 후보군의
+Recall@k, rank, similarity, Top-k Jaccard를 기록하지만 Agent/TSR을 평가하지 않는다.
+Audit 계약과 실행 예시는 [generator_usage.md](generator_usage.md#mode-13-retrieval-bias-audit)를
+따른다.
 
 추가 실험 변수의 코드상 이름:
 

@@ -167,27 +167,43 @@ def _fit_text(
 
 
 def _pad_memory(
-    memory: dict[str, Any], target: int, counter: TokenCounter,
-    *, padding: Callable[[int], str] = _words,
+    memory: dict[str, Any],
+    target: int,
+    counter: TokenCounter,
+    *,
+    padding: Callable[[int], str] = _words,
     probe_length: int | None = None,
+    tolerance: int = 1,
 ) -> None:
     original = memory["content"]
 
     def build(length: int) -> str:
         return original + (" " + padding(length) if length else "")
 
-    length, measured = _fit_text(build, target, counter, tolerance=1, probe_length=probe_length)
-    memory.update(content=build(length), token_count=measured)
+    length, measured = _fit_text(
+        build,
+        target,
+        counter,
+        tolerance=tolerance,
+        probe_length=probe_length,
+    )
+
+    memory.update(
+        content=build(length),
+        token_count=measured,
+    )
 
 
 def _balance_noise(
-    memories: list[dict[str, Any]], 
-    targets: set[str], 
+    memories: list[dict[str, Any]],
+    targets: set[str],
     noise_notes: list[dict[str, Any]],
     ratio: float,
     counter: TokenCounter,
-    *, padding: Callable[[str, int], str] | None = None,
+    *,
+    padding: Callable[[str, int], str] | None = None,
     probe_length: int | None = None,
+    pad_tolerance: int = 1,
 ) -> float:
     relevant_tokens = sum(m["token_count"] for m in memories if m["memory_id"] in targets)
     
@@ -218,9 +234,15 @@ def _balance_noise(
         desired = math.ceil(relevant_tokens * ratio / (1 - ratio))
         memory = noise[-1]
         _pad_memory(
-            memory, memory["token_count"] + desired - noise_tokens, counter,
-            padding=(lambda length: padding(memory["memory_id"], length)) if padding else _words,
+            memory,
+            memory["token_count"] + desired - noise_tokens,
+            counter,
+            padding=(
+                lambda length: padding(memory["memory_id"], length)
+                if padding else _words(length)
+            ),
             probe_length=probe_length,
+            tolerance=pad_tolerance,
         )
     raise ValueError("cannot satisfy noise_memory_ratio with this token_counter")
 
@@ -267,8 +289,15 @@ def generate_scenario(
         ("state_update_count", state_update_count, 0),
     ):
         _integer(name, value, minimum)
-    mode = _horizon_mode(DEFAULT_HORIZON_MODE if horizon_generation_mode is None
-                         else horizon_generation_mode)
+    mode = _horizon_mode(
+        DEFAULT_HORIZON_MODE
+        if horizon_generation_mode is None
+        else horizon_generation_mode
+    )
+
+    # Mode 1은 기존 Main 생성 동작을 보존한다.
+    # 새 자연어 생성 모드는 토큰화의 불연속성을 허용한다.
+    padding_tolerance = 1 if mode == 1 else 8
     ratio = _ratio(noise_memory_ratio)
     if task_type not in TASK_TYPES:
         raise ValueError(f"task_type must be one of {TASK_TYPES}")
@@ -431,16 +460,33 @@ def generate_scenario(
     # pool exceeds 1K, so the smallest budget exercises actual selection.
     relevant_target = max(640, relevant_tokens)
     _pad_memory(
-        target, target["token_count"] + max(0, relevant_target - relevant_tokens), token_counter,
-        padding=lambda length: padding(length, key=target["memory_id"]),
+        target,
+        target["token_count"] + max(
+            0,
+            relevant_target - relevant_tokens,
+        ),
+        token_counter,
+        padding=lambda length: padding(
+            length,
+            key=target["memory_id"],
+        ),
         probe_length=64 if mode in (4, 5) else None,
+        tolerance=padding_tolerance,
     )
     if not ratio:
         memories = [item for item in memories if item not in noise_notes]
     actual_noise = _balance_noise(
-        memories, essential, noise_notes, ratio, token_counter,
-        padding=lambda key, length: padding(length, key=key),
+        memories,
+        essential,
+        noise_notes,
+        ratio,
+        token_counter,
+        padding=lambda key, length: padding(
+            length,
+            key=key,
+        ),
         probe_length=64 if mode in (4, 5) else None,
+        pad_tolerance=padding_tolerance,
     )
 
     # Every past turn exists. Verbose conversation is measured separately from
