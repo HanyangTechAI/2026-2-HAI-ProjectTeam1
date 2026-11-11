@@ -1611,7 +1611,8 @@ no_constraint_preservation
 → Protected 별도 검색과 Mandatory 보존을 끄고 활성 Constraint를 일반 후보에 남김
 
 no_temporal
-→ Version Chain Expansion과 Temporal Resolution을 끄며 Required State Mandatory도 함께 끔
+→ Version Chain Expansion과 Temporal Resolution만 끄고 Required State Mandatory는 유지
+→ 검색된 관련 State 후보는 시간 판별 없이 필수 보존하며 같은 key의 여러 버전도 그대로 보존
 
 no_state_mandatory
 → Temporal Resolution은 유지하고 Required State의 Mandatory 승격만 끔

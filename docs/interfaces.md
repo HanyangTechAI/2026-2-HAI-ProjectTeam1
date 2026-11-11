@@ -1312,7 +1312,7 @@ def select_memory(
 
 `make_pipeline_adapter(strategy, **options)`는 `sliding_window`, `vector_top_k`, `utility_per_token`, `proposed`를 공통 `PipelineAdapter`로 연결하는 공개 factory다. Proposed는 `make_proposed_pipeline_adapter`, 나머지는 `make_baseline_pipeline_adapter`로 위임한다.
 
-`SelectorAblationConfig`는 `constraint_preservation`, `temporal_resolution`, `mandatory_state`, `token_aware_packing` 네 boolean 축을 가진다. `mandatory_state=True`는 `temporal_resolution=True`를 요구한다. 제공 preset은 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing`이며 Runner는 변형 결과의 전략명을 `proposed/<preset>`으로 기록하고 설정 dict도 실행 레코드에 보존한다.
+`SelectorAblationConfig`는 `constraint_preservation`, `temporal_resolution`, `mandatory_state`, `token_aware_packing` 네 boolean 축을 가진다. 두 축은 독립적이다. Temporal Resolution이 꺼져도 Mandatory State는 유지할 수 있으며, 이 경우 검색된 관련 State 후보를 버전 판별 없이 모두 필수 보존한다. 제공 preset은 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing`이며 Runner는 변형 결과의 전략명을 `proposed/<preset>`으로 기록하고 설정 dict도 실행 레코드에 보존한다.
 
 처리 순서:
 

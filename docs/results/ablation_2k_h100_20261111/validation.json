@@ -1,0 +1,18 @@
+{
+  "source_run_directory": "experiments/results/ablation/2k_h100_20261111",
+  "git_commit": "2f5e6bc599ade6ba4286a7f3513fd2603de9e450",
+  "dataset_cell": "benchmark/generated/main_gemini_3_1_flash_lite/cell_e5534bba1746.json",
+  "dataset_cell_sha256": "d26d015af2a8ab060a95b027f0e142eacaecd9c33af4dcc7ef5585d1b254dcec",
+  "runs_jsonl_sha256": "d7864bb9ea11f07ab38e36bf8aa586406cd9e74635bd6a95fb9f58b9e33baf5d",
+  "expected_runs": 400,
+  "saved_runs": 400,
+  "unique_run_keys": 400,
+  "completed_runs": 400,
+  "verified_prompt_audits": 400,
+  "actual_budget_exceeded": 0,
+  "max_actual_prompt_tokens": 1823,
+  "accounting_complete_runs": 400,
+  "llm_api_calls": 834,
+  "estimated_llm_cost_usd": 0.665266,
+  "progress_state": "completed"
+}

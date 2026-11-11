@@ -258,7 +258,7 @@ class AblationConfigTests(
                 "unknown"
             )
 
-    def test_no_temporal_disables_state_mandatory(
+    def test_no_temporal_keeps_state_mandatory(
         self,
     ):
         config = get_ablation_config(
@@ -269,21 +269,22 @@ class AblationConfigTests(
             config.temporal_resolution
         )
 
-        self.assertFalse(
+        self.assertTrue(
             config.mandatory_state
         )
 
-    def test_invalid_temporal_state_combination_is_rejected(
+    def test_temporal_and_mandatory_flags_are_independent(
         self,
     ):
-        with self.assertRaises(
-            ValueError
-        ):
-            SelectorAblationConfig(
-                name="invalid",
-                temporal_resolution=False,
-                mandatory_state=True,
-            )
+        for temporal in (False, True):
+            for mandatory in (False, True):
+                with self.subTest(temporal=temporal, mandatory=mandatory):
+                    config = SelectorAblationConfig(
+                        temporal_resolution=temporal,
+                        mandatory_state=mandatory,
+                    )
+                    self.assertEqual(config.temporal_resolution, temporal)
+                    self.assertEqual(config.mandatory_state, mandatory)
 
     def test_to_dict_is_serializable_shape(
         self,
@@ -774,17 +775,51 @@ class SelectorAblationIntegrationTests(
         )
 
         self.assertEqual(
-            result.states,
-            (),
+            tuple(memory.memory_id for memory in result.states),
+            ("report_final",),
         )
 
-        # no_temporal에서는 initial retrieval 결과를
-        # 그대로 사용하므로 version-chain mandatory
-        # resolution이 발생하지 않는다.
+        # Initial retrieval remains unchanged, but relevant State is mandatory.
         self.assertEqual(
             set(result.selected_memory_ids),
             set(result.retrieved_memory_ids),
         )
+
+    def test_no_temporal_keeps_retrieved_old_version_mandatory_without_expansion(self):
+        def old_version_embedder(text):
+            return (1.0, 0.0) if "report_final.pdf" not in text else (0.0, 1.0)
+
+        result = select_memory(
+            query="현재 보고서 찾아줘", session_id=SESSION,
+            memory_store=self.store, total_budget=100, fixed_tokens=10,
+            current_turn=100, current_time=NOW, embedder=old_version_embedder,
+            top_k=1, ablation=get_ablation_config("no_temporal"),
+        )
+        self.assertEqual(result.status, PipelineStatus.OK)
+        self.assertEqual(result.retrieved_memory_ids, ("report_v1",))
+        self.assertEqual(tuple(m.memory_id for m in result.states), ("report_v1",))
+        self.assertNotIn("report_final", result.selected_memory_ids)
+
+    def test_no_temporal_preserves_multiple_retrieved_versions_as_mandatory(self):
+        result = select_memory(
+            query="현재 보고서 찾아줘", session_id=SESSION,
+            memory_store=self.store, total_budget=100, fixed_tokens=10,
+            current_turn=100, current_time=NOW, embedder=fake_embedder,
+            top_k=2, ablation=get_ablation_config("no_temporal"),
+        )
+        self.assertEqual(result.status, PipelineStatus.OK)
+        self.assertEqual({m.memory_id for m in result.states}, {"report_v1", "report_final"})
+        self.assertFalse(result.flexible)
+
+    def test_no_temporal_stops_when_mandatory_versions_exceed_budget(self):
+        result = select_memory(
+            query="현재 보고서 찾아줘", session_id=SESSION,
+            memory_store=self.store, total_budget=11, fixed_tokens=10,
+            current_turn=100, current_time=NOW, embedder=fake_embedder,
+            top_k=2, ablation=get_ablation_config("no_temporal"),
+        )
+        self.assertEqual(result.status, PipelineStatus.INSUFFICIENT_CONTEXT_BUDGET)
+        self.assertEqual({m.memory_id for m in result.states}, {"report_v1", "report_final"})
 
 
 # ============================================================
@@ -795,6 +830,22 @@ class SelectorAblationIntegrationTests(
 class AblationIndependenceTests(
     unittest.TestCase,
 ):
+
+    def test_each_preset_changes_exactly_one_component(self):
+        expected = {
+            "no_constraint_preservation": "constraint_preservation",
+            "no_temporal": "temporal_resolution",
+            "no_state_mandatory": "mandatory_state",
+            "no_budget_aware_packing": "token_aware_packing",
+        }
+        full = FULL_ABLATION.to_dict()
+        for name, changed_flag in expected.items():
+            with self.subTest(preset=name):
+                variant = get_ablation_config(name).to_dict()
+                self.assertEqual(
+                    {key for key in full if key != "name" and full[key] != variant[key]},
+                    {changed_flag},
+                )
 
     def test_no_constraint_changes_only_constraint_flag(
         self,

@@ -1,0 +1,977 @@
+[
+  {
+    "strategy": "proposed",
+    "context_token_budget": 2048,
+    "n_runs": 80,
+    "n_samples": 40,
+    "metrics": {
+      "task_success": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "constraint_violation_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "required_state_accuracy": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "general_retrieval_miss": {
+        "mean": 0.1,
+        "ci95": [
+          0.025,
+          0.2
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 60,
+        "n_samples": 30
+      },
+      "temporal_version_correct": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "temporal_context_correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "recall_at_k": {
+        "mean": 0.925,
+        "ci95": [
+          0.8375,
+          0.9875
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_omission_rate": {
+        "mean": 0.025,
+        "ci95": [
+          0.0,
+          0.075
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "precision_at_k": {
+        "mean": 0.23000000000000004,
+        "ci95": [
+          0.2,
+          0.26
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "mrr": {
+        "mean": 0.48125,
+        "ci95": [
+          0.3875,
+          0.5770833333333333
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "input_tokens": {
+        "mean": 1469.975,
+        "ci95": [
+          1445.275,
+          1493.775
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "output_tokens": {
+        "mean": 558.575,
+        "ci95": [
+          503.475,
+          615.8
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "planning_latency_ms": {
+        "mean": 3378.6378234421136,
+        "ci95": [
+          3165.693403025216,
+          3598.5078427227563
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "total_llm_cost": {
+        "mean": 0.0015626250000000002,
+        "ci95": [
+          0.001465125,
+          0.001665975
+        ],
+        "n": 80,
+        "n_samples": 40
+      }
+    },
+    "failure_counts": {
+      "temporal_failure": 2,
+      "state_omission": 2
+    }
+  },
+  {
+    "strategy": "proposed/no_constraint_preservation",
+    "context_token_budget": 2048,
+    "n_runs": 80,
+    "n_samples": 40,
+    "metrics": {
+      "task_success": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "constraint_violation_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "required_state_accuracy": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "general_retrieval_miss": {
+        "mean": 0.125,
+        "ci95": [
+          0.025,
+          0.25
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "selection_failure": {
+        "mean": 0.05,
+        "ci95": [
+          0.0,
+          0.125
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 60,
+        "n_samples": 30
+      },
+      "temporal_version_correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "temporal_context_correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "recall_at_k": {
+        "mean": 0.9,
+        "ci95": [
+          0.8125,
+          0.975
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_omission_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "precision_at_k": {
+        "mean": 0.225,
+        "ci95": [
+          0.195,
+          0.26
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "mrr": {
+        "mean": 0.44833333333333336,
+        "ci95": [
+          0.3491666666666667,
+          0.5545833333333333
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": 0.9,
+        "ci95": [
+          0.75,
+          1.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "input_tokens": {
+        "mean": 1473.95,
+        "ci95": [
+          1453.625,
+          1494.425
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "output_tokens": {
+        "mean": 549.05,
+        "ci95": [
+          499.525,
+          599.7
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "planning_latency_ms": {
+        "mean": 3270.7845181954326,
+        "ci95": [
+          3132.805000405642,
+          3428.624356702494
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "total_llm_cost": {
+        "mean": 0.0015667437499999998,
+        "ci95": [
+          0.0014724375,
+          0.00167956875
+        ],
+        "n": 80,
+        "n_samples": 40
+      }
+    },
+    "failure_counts": {
+      "selection_failure": 4
+    }
+  },
+  {
+    "strategy": "proposed/no_temporal",
+    "context_token_budget": 2048,
+    "n_runs": 80,
+    "n_samples": 40,
+    "metrics": {
+      "task_success": {
+        "mean": 0.9,
+        "ci95": [
+          0.8,
+          0.975
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "constraint_violation_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "required_state_accuracy": {
+        "mean": 0.9,
+        "ci95": [
+          0.8,
+          0.975
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "general_retrieval_miss": {
+        "mean": 0.1,
+        "ci95": [
+          0.025,
+          0.2
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "selection_failure": {
+        "mean": 0.1,
+        "ci95": [
+          0.025,
+          0.2
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.13333333333333333,
+        "ci95": [
+          0.03333333333333333,
+          0.26666666666666666
+        ],
+        "n": 60,
+        "n_samples": 30
+      },
+      "temporal_version_correct": {
+        "mean": 0.9,
+        "ci95": [
+          0.8,
+          0.975
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "temporal_context_correct": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "recall_at_k": {
+        "mean": 0.925,
+        "ci95": [
+          0.8375,
+          0.9875
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_omission_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "precision_at_k": {
+        "mean": 0.23000000000000004,
+        "ci95": [
+          0.2,
+          0.26
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "mrr": {
+        "mean": 0.48125,
+        "ci95": [
+          0.3895833333333333,
+          0.5791666666666667
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "input_tokens": {
+        "mean": 1633.325,
+        "ci95": [
+          1573.7,
+          1688.25
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "output_tokens": {
+        "mean": 808.175,
+        "ci95": [
+          708.75,
+          922.675
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "planning_latency_ms": {
+        "mean": 3989.9804473971017,
+        "ci95": [
+          3611.9983821568894,
+          4425.752800966438
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "total_llm_cost": {
+        "mean": 0.00207000625,
+        "ci95": [
+          0.00187869375,
+          0.0022791625
+        ],
+        "n": 80,
+        "n_samples": 40
+      }
+    },
+    "failure_counts": {
+      "selection_failure": 8,
+      "temporal_failure": 8,
+      "stale_state_usage": 8
+    }
+  },
+  {
+    "strategy": "proposed/no_state_mandatory",
+    "context_token_budget": 2048,
+    "n_runs": 80,
+    "n_samples": 40,
+    "metrics": {
+      "task_success": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "constraint_violation_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "required_state_accuracy": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "general_retrieval_miss": {
+        "mean": 0.1,
+        "ci95": [
+          0.025,
+          0.2
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 60,
+        "n_samples": 30
+      },
+      "temporal_version_correct": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "temporal_context_correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "recall_at_k": {
+        "mean": 0.925,
+        "ci95": [
+          0.85,
+          0.9875
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_omission_rate": {
+        "mean": 0.025,
+        "ci95": [
+          0.0,
+          0.075
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "precision_at_k": {
+        "mean": 0.23000000000000004,
+        "ci95": [
+          0.2,
+          0.26
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "mrr": {
+        "mean": 0.48125,
+        "ci95": [
+          0.38541666666666663,
+          0.5791666666666667
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "input_tokens": {
+        "mean": 1469.975,
+        "ci95": [
+          1445.525,
+          1492.625
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "output_tokens": {
+        "mean": 558.575,
+        "ci95": [
+          505.425,
+          613.825
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "planning_latency_ms": {
+        "mean": 3272.0304015412694,
+        "ci95": [
+          3076.0564849202638,
+          3484.845177049283
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "total_llm_cost": {
+        "mean": 0.0015626250000000002,
+        "ci95": [
+          0.0014684625,
+          0.0016690187500000002
+        ],
+        "n": 80,
+        "n_samples": 40
+      }
+    },
+    "failure_counts": {
+      "temporal_failure": 2,
+      "state_omission": 2
+    }
+  },
+  {
+    "strategy": "proposed/no_budget_aware_packing",
+    "context_token_budget": 2048,
+    "n_runs": 80,
+    "n_samples": 40,
+    "metrics": {
+      "task_success": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "constraint_violation_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "required_state_accuracy": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "general_retrieval_miss": {
+        "mean": 0.1,
+        "ci95": [
+          0.025,
+          0.2
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "budget_selection_failure": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "stale_state_usage_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 60,
+        "n_samples": 30
+      },
+      "temporal_version_correct": {
+        "mean": 0.975,
+        "ci95": [
+          0.925,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "temporal_context_correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "recall_at_k": {
+        "mean": 0.925,
+        "ci95": [
+          0.8375,
+          0.9875
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_omission_rate": {
+        "mean": 0.025,
+        "ci95": [
+          0.0,
+          0.075
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "state_error_rate": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "precision_at_k": {
+        "mean": 0.23000000000000004,
+        "ci95": [
+          0.2,
+          0.26
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "mrr": {
+        "mean": 0.48125,
+        "ci95": [
+          0.3895833333333333,
+          0.575
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "answer_normalized_exact_match": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "answer_f1": {
+        "mean": null,
+        "ci95": null,
+        "n": 0,
+        "n_samples": 0
+      },
+      "applicable_protected_recall": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 40,
+        "n_samples": 20
+      },
+      "input_tokens": {
+        "mean": 1470.025,
+        "ci95": [
+          1445.625,
+          1493.775
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "output_tokens": {
+        "mean": 552.7,
+        "ci95": [
+          500.7,
+          609.55
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "planning_latency_ms": {
+        "mean": 3316.1471484272624,
+        "ci95": [
+          3080.957834875153,
+          3576.8850020351238
+        ],
+        "n": 80,
+        "n_samples": 40
+      },
+      "total_llm_cost": {
+        "mean": 0.001553825,
+        "ci95": [
+          0.00146485625,
+          0.00165875625
+        ],
+        "n": 80,
+        "n_samples": 40
+      }
+    },
+    "failure_counts": {
+      "temporal_failure": 2,
+      "state_omission": 2
+    }
+  }
+]

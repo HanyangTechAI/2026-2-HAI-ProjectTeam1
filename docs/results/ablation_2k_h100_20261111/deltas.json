@@ -1,0 +1,70 @@
+[
+  {
+    "context_token_budget": 2048,
+    "horizon_turns": 100,
+    "baseline": "proposed/no_constraint_preservation",
+    "delta_success": {
+      "mean": -0.025,
+      "ci95": [
+        -0.075,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "horizon_turns": 100,
+    "baseline": "proposed/no_temporal",
+    "delta_success": {
+      "mean": 0.075,
+      "ci95": [
+        -0.025,
+        0.2
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "horizon_turns": 100,
+    "baseline": "proposed/no_state_mandatory",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  },
+  {
+    "context_token_budget": 2048,
+    "horizon_turns": 100,
+    "baseline": "proposed/no_budget_aware_packing",
+    "delta_success": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 80,
+      "n_samples": 40
+    },
+    "n_pairs": 80,
+    "unmatched_proposed": 0,
+    "unmatched_baseline": 0
+  }
+]

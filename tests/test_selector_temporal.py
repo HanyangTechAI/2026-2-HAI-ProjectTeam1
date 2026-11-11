@@ -131,6 +131,10 @@ class TemporalSelectionTests(unittest.TestCase):
         rows = candidates([item("report"), item("meeting", key="meeting.start", content="월요일 회의")])
         self.assertEqual(ids(resolve_required_states(rows, query("보고서 파일 찾아줘"))), ["report"])
 
+    def test_required_states_reject_multiple_versions_by_default(self):
+        with self.assertRaises(MemoryStoreConsistencyError):
+            resolve_required_states(candidates(versions()), query("보고서 파일 찾아줘"))
+
     def test_constraint_applies_to_action_not_unrelated_query(self):
         constraint = item("approval", kind="constraint", key="email.approval",
                           content="외부 이메일은 승인 후 발송한다.", protected=True)

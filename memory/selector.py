@@ -315,8 +315,10 @@ def _constraint_actions(text: str) -> tuple[str, ...]:
 def resolve_required_states(
     candidates: Sequence[MemoryCandidate],
     query_context: QueryContext,
+    *,
+    allow_multiple_versions: bool = False,
 ) -> list[MemoryItem]:
-    """Select states required by the current task."""
+    """Select required states; temporal ablation preserves retrieved versions as-is."""
     states = []
     seen = set()
     for candidate in candidates:
@@ -347,7 +349,7 @@ def resolve_required_states(
         if not relevant:
             continue
         key = (memory.session_id, memory.memory_key)
-        if key in seen:
+        if key in seen and not allow_multiple_versions:
             raise MemoryStoreConsistencyError("required states contain multiple versions for one key")
         seen.add(key)
         candidate.is_applicable = True
@@ -644,6 +646,7 @@ def select_memory(
         states = resolve_required_states(
             candidates=resolved,
             query_context=query_context,
+            allow_multiple_versions=not ablation.temporal_resolution,
         )
 
         states = _retokenize_memories(

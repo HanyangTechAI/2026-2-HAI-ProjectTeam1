@@ -1,10 +1,12 @@
 # 2K / H100 Ablation 실험 보고서 — 2026-11-11
 
+**조건 정정:** 이 보고서는 수정 전 freeze 1.0.3 결과다. 당시 `no_temporal`은 Temporal Resolution과 Mandatory State를 함께 껐다. freeze 1.0.4에서 두 축을 분리했으며, 수정된 Temporal 단독 제거 조건은 아직 재실행하지 않았다.
+
 ## 요약
 
 첨부된 `2k_h100_20261111.zip`의 실행 메타데이터, 진행 파일, 집계 결과와 개별 실행 로그를 대조했다. 실험은 2,048-token 입력 예산과 Horizon 100 조건에서 Proposed 전체 설정 및 네 가지 구성요소 제거 변형을 비교했다. 총 40개 시나리오를 두 번 반복해 변형당 80회, 전체 400회 실행했으며 모두 정상 완료됐다.
 
-기본 Proposed는 78/80회(97.5%) 성공했다. Temporal Resolution을 제거한 변형은 72/80회(90.0%)로 가장 낮았고, stale-state 사용률은 해당 지표가 적용되는 실행 중 13.3%였다. 반면 Constraint Preservation 제거 변형은 task success가 100%였지만 applicable protected recall이 90%로 낮아졌다. 따라서 task success만으로 제약 보존 성능을 판정하면 안 된다. 입력 프롬프트 예산 감사는 400/400회 검증됐고 실제 초과는 없었다.
+기본 Proposed는 78/80회(97.5%) 성공했다. Temporal Resolution과 Mandatory State를 함께 제거한 변형은 72/80회(90.0%)로 가장 낮았고, stale-state 사용률은 해당 지표가 적용되는 실행 중 13.3%였다. 반면 Constraint Preservation 제거 변형은 task success가 100%였지만 applicable protected recall이 90%로 낮아졌다. 따라서 task success만으로 제약 보존 성능을 판정하면 안 된다. 입력 프롬프트 예산 감사는 400/400회 검증됐고 실제 초과는 없었다.
 
 ## 실험 범위 및 재현 정보
 
@@ -64,7 +66,7 @@ Task success는 변형별 80개 run을 분모로 한다. CI는 2,000회 bootstra
 
 ## 해석 및 한계
 
-이번 결과에서 가장 일관된 신호는 temporal 기능 제거의 손실이다. 기본 Proposed 대비 task success가 7.5%p 낮고, stale-state 사용이 새로 관측됐으며, 평균 입력량은 약 11.1%, 출력량은 약 44.7%, planning latency는 약 18.1%, 기록 비용은 약 32.5% 증가했다. 이는 테스트한 2K/Horizon 100 조건에서 temporal 처리의 유용성을 지지하지만, 40개 시나리오의 합성 데이터 결과이므로 다른 모델·예산·실사용 분포로 일반화할 수는 없다.
+이번 결과에서는 Temporal Resolution과 Mandatory State를 함께 제거했을 때 성능 저하가 관측됐다. 기본 Proposed 대비 task success가 7.5%p 낮고, stale-state 사용이 새로 관측됐으며, 평균 입력량은 약 11.1%, 출력량은 약 44.7%, planning latency는 약 18.1%, 기록 비용은 약 32.5% 증가했다. 두 기능의 효과가 섞여 있어 Temporal Resolution 단독 기여도로 해석할 수 없다. 짝지은 성공률 차이의 95% 신뢰구간도 [−2.5, +20.0]pp로 0을 포함하며, 40개 시나리오의 합성 데이터 결과이므로 다른 모델·예산·실사용 분포로 일반화할 수는 없다.
 
 또한 변형별 차이가 작거나 없는 지표는 동등성의 증명이 아니다. 표본 규모가 제한되어 있고 task success CI도 서로 겹친다. 특히 no-constraint 변형의 100% 성공률만 근거로 우수성을 주장해서는 안 되며, protected recall의 하락을 함께 봐야 한다. 후속 검증에서는 더 많은 시나리오와 seed를 사용하고, 보호 기억 회수와 실제 제약 위반을 별도 핵심 결과로 보고하는 것이 적절하다.
 
