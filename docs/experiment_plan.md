@@ -1247,3 +1247,17 @@ verified였다. 입력 Budget 초과와 비용 추정 불완전은 양쪽 모두
 예산 차이로 해석하지 않는다. 디렉터리의 H100은 100-turn horizon을 뜻하며 GPU 모델은
 런타임 기록에서 확인되지 않았다. 상세 지표·실패 분해·방법 한계는
 [Ablation 실험 보고서](ablation_2k_h100_analysis_20261111.md)를 따른다.
+
+### Freeze 1.0.4 Full-only 재검증
+
+추가 디렉터리 `experiments/results/ablation/2k_h100_full_v104_20261111/`에는 freeze 1.0.4의
+Full Proposed 80회가 완료 상태로 저장돼 있다. Task success는 78/80 (97.5%, bootstrap 95% CI
+92.5–100%), Constraint violation은 0/40, Prompt Audit는 80/80 verified였다. v1.0.3 2K Full의
+같은 80개 sample/repeat와 응답·도구 호출·선택 기억·성공·토큰·비용 기록이 일치했다. 이 반복은
+새 독립 과제 추가가 아닌 Full 경로 재검증으로만 취급하며, 서로 다른 commit/런타임에서 나온
+planning latency는 직접 비교하지 않는다.
+
+이 디렉터리는 `full` preset만 실행했다. v1.0.4에서 `no_temporal`의 제거 범위를 Temporal-only로
+수정한 뒤의 해당 Ablation 변형은 이 실행에 포함되지 않았으므로, 1.0.3의 2K/4K 변형 결과와
+혼합 해석하지 않는다. 재검증 수치와 세부 한계는
+[Ablation 실험 보고서](ablation_2k_h100_analysis_20261111.md)를 따른다.

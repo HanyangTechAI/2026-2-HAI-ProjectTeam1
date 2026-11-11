@@ -262,6 +262,9 @@ Provider usage 회계는 완전성 우선이다. 모든 API 시도와 성공 응
 `memory/ablation.py`는 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing` preset을 제공한다. Runner의 `--proposed-ablations`로 하나 이상을 선택하며, 변형 실행은 `proposed/<preset>` 전략명과 설정 snapshot을 결과에 기록한다. `no_temporal`은 Version Chain Expansion과 Temporal Resolution만 끄고 Required State 강제 선택은 유지한다. 시간 판별 없이 검색된 관련 State 후보들을 필수 보존하며, 같은 key의 여러 버전도 그대로 보존한다.
 
 수정 전 v1.0.3의 2K·H100 5개 조건, 400회 실행 결과는 [Ablation Test 보고서](docs/ablation_2k_h100_20261111.md)에 기록했다.
+2K/4K 두 Budget의 800회 비교와 v1.0.4 Full-only 80회 재검증은
+[후속 Ablation 보고서](docs/ablation_2k_h100_analysis_20261111.md)에 정리했다. v1.0.4 재검증은
+Full Proposed만 포함하며, 수정된 `no_temporal` preset의 재실행 결과로 해석하지 않는다.
 
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
 

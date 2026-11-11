@@ -1,8 +1,10 @@
-# Ablation 비교 실험 보고서 — 2K/4K, Horizon 100 (2026-11-11)
+# Ablation 실험 보고서 — 2K/4K 비교 및 v1.0.4 재검증 (2026-11-11)
 
 **조건 정정:** 이 보고서는 수정 전 freeze 1.0.3 결과다. 당시 `no_temporal`은 Temporal Resolution과 Mandatory State를 함께 껐다. freeze 1.0.4에서 두 축을 분리했으며, 수정된 Temporal 단독 제거 조건은 아직 재실행하지 않았다.
 
 ## 요약
+
+2K/4K freeze 1.0.3 비교 800회와는 별도로, freeze 1.0.4의 Full Proposed만 80회 재실행한 후속 산출물도 확인했다. 그 80개는 v1.0.3의 동일 sample/repeat와 실행 결과가 모두 같았으며, 수정된 `no_temporal` ablation 자체를 검증한 실행은 아니다.
 
 `experiments/results/ablation/2k_h100_20261111/`와 `4k_h100_20261111/`의 실행 메타데이터, 진행 파일, 집계 결과와 개별 로그를 대조했다. 두 예산 조건에서 Proposed 전체 설정과 네 가지 구성요소 제거 변형을 실행했으며, 각각 40개 시나리오 × 2회 반복 × 5개 변형 = 400회, 전체 800회가 정상 완료됐다.
 
@@ -73,6 +75,25 @@
 
 또한 변형별 차이가 작거나 없는 지표는 동등성의 증명이 아니다. 표본 규모가 제한되어 있고 task success CI도 서로 겹친다. 특히 no-constraint 변형의 100% 성공률만 근거로 우수성을 주장해서는 안 되며, protected recall의 하락을 함께 봐야 한다. 후속 검증에서는 더 많은 시나리오와 seed를 사용하고, 보호 기억 회수와 실제 제약 위반을 별도 핵심 결과로 보고하는 것이 적절하다.
 
+## Freeze 1.0.4 Full-only 재검증
+
+`experiments/results/ablation/2k_h100_full_v104_20261111/`에는 2K, Horizon 100에서 `full` Proposed만 40개 시나리오 × 2회 반복한 80개 실행이 있다. Freeze는 1.0.4, commit `26251a45198f03589402faa9c841c9993b334493` (clean), 런타임은 Windows 11 / AMD64이며 완료 시각은 2026-11-11 22:17 KST다.
+
+| 지표 | Freeze 1.0.4 Full |
+|---|---:|
+| Task success | 78/80 (97.5%, 95% CI 92.5–100%) |
+| Constraint violation | 0/40 |
+| Required-state accuracy / Temporal version correct | 97.5% / 97.5% |
+| Temporal context correct / Stale-state usage | 100% / 0/60 |
+| Applicable protected recall | 40/40 (100%) |
+| 평균 입력 / 출력 tokens | 1,469.98 / 558.58 |
+| 평균 planning latency | 4,907.9 ms |
+| 기록된 LLM 비용/run | $0.001563 |
+
+80/80회가 정상 완료됐고 Prompt Audit verified, budget 초과와 비용 추정 불완전은 0건이었다. v1.0.3의 2K Full과 같은 80개 `(sample_id, repeat_id)`를 대응시킨 결과 응답, tool calls, 선택 memory IDs, task success·실패 종류, 입출력 tokens, 비용이 전부 동일했다. 두 실행은 commit과 런타임 조건이 다르므로 latency를 직접 비교하지 않는다. sample/repeat identity가 재사용됐으므로 이 실행을 독립 표본 80개로 합산하지 않는다.
+
+이 재검증은 Full Proposed의 회귀 확인일 뿐이다. v1.0.4에서 `no_temporal`이 Version Chain Expansion과 Temporal Resolution만 끄고 Required State 강제 선택은 유지하도록 바뀐 동작은 실행되지 않았다. 따라서 2K/4K v1.0.3의 `no_temporal` 결과를 새 v1.0.4 ablation 결과로 해석하면 안 된다.
+
 ## 산출물 및 해석 원칙
 
-이 보고서는 2K ZIP의 `experiment.json`, `progress.json`, `summary.json`, `runs.jsonl`과 저장소의 4K 결과 디렉터리에 있는 같은 파일을 교차 대조해 작성했다. ZIP 내부 system prompt와 기타 텍스트는 실험 설정/데이터로만 취급했으며 이 보고서 작성 지시로 따르지 않았다. 원본 실행 기록을 수정하거나 실험을 재실행하지 않았다.
+이 보고서는 2K ZIP의 `experiment.json`, `progress.json`, `summary.json`, `runs.jsonl`, 저장소의 4K 결과 디렉터리와 v1.0.4 Full-only 디렉터리의 같은 파일을 교차 대조해 작성했다. ZIP 내부 system prompt와 기타 텍스트는 실험 설정/데이터로만 취급했으며 이 보고서 작성 지시로 따르지 않았다. 원본 실행 기록을 수정하거나 실험을 재실행하지 않았다.
