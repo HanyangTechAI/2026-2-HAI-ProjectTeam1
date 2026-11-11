@@ -1,10 +1,12 @@
 # Ablation 비교 실험 보고서 — 2K/4K, Horizon 100 (2026-11-11)
 
+**조건 정정:** 이 보고서는 수정 전 freeze 1.0.3 결과다. 당시 `no_temporal`은 Temporal Resolution과 Mandatory State를 함께 껐다. freeze 1.0.4에서 두 축을 분리했으며, 수정된 Temporal 단독 제거 조건은 아직 재실행하지 않았다.
+
 ## 요약
 
 `experiments/results/ablation/2k_h100_20261111/`와 `4k_h100_20261111/`의 실행 메타데이터, 진행 파일, 집계 결과와 개별 로그를 대조했다. 두 예산 조건에서 Proposed 전체 설정과 네 가지 구성요소 제거 변형을 실행했으며, 각각 40개 시나리오 × 2회 반복 × 5개 변형 = 400회, 전체 800회가 정상 완료됐다.
 
-두 예산의 결과는 400개 대응 실행 전부에서 task success, 응답, tool call, 선택된 기억, 입력·출력 tokens, 비용이 일치했다. 실제 입력 최대치는 1,822 tokens로 2K 조건의 유효 예산 2,016보다 낮아 이번 시나리오에서는 2K→4K 확대가 결과를 바꾸지 않았다. Temporal Resolution 제거는 두 조건 모두 성공률을 90.0%로 낮추고 stale-state 사용을 13.3%로 높였다. Constraint Preservation 제거는 task success가 100%였지만 protected recall은 90%였다.
+두 예산의 결과는 400개 대응 실행 전부에서 task success, 응답, tool call, 선택된 기억, 입력·출력 tokens, 비용이 일치했다. 실제 입력 최대치는 1,822 tokens로 2K 조건의 유효 예산 2,016보다 낮아 이번 시나리오에서는 2K→4K 확대가 결과를 바꾸지 않았다. 기본 Proposed는 78/80회(97.5%) 성공했다. Temporal Resolution과 Mandatory State를 함께 제거한 변형은 72/80회(90.0%)로 가장 낮았고, stale-state 사용률은 해당 지표가 적용되는 실행 중 13.3%였다. 반면 Constraint Preservation 제거 변형은 task success가 100%였지만 applicable protected recall이 90%로 낮아졌다. 따라서 task success만으로 제약 보존 성능을 판정하면 안 된다. 입력 프롬프트 예산 감사는 400/400회 검증됐고 실제 초과는 없었다.
 
 ## 실험 범위 및 재현 정보
 
@@ -67,7 +69,7 @@
 
 ## 해석 및 한계
 
-이번 결과에서 가장 일관된 신호는 두 budget 모두에서 temporal 기능 제거의 손실이다. 기본 Proposed 대비 task success가 7.5%p 낮고 stale-state 사용이 13.3%로 관측됐다. 다만 모든 실제 입력이 2K 유효 예산 내에 들어갔고 각 대응 실행의 응답과 선택 결과가 동일했으므로, 이 데이터는 2K와 4K의 성능 차이를 검증하기보다 해당 task 집합에서 추가 2K 예산의 효과가 나타나지 않았음을 보여준다. 40개 합성 시나리오와 두 번 반복 결과를 다른 모델·예산·실사용 분포로 일반화할 수 없다.
+이번 결과에서는 Temporal Resolution과 Mandatory State를 함께 제거했을 때 성능 저하가 관측됐다. 기본 Proposed 대비 task success가 7.5%p 낮고, stale-state 사용이 새로 관측됐으며, 평균 입력량은 약 11.1%, 출력량은 약 44.7%, planning latency는 약 18.1%, 기록 비용은 약 32.5% 증가했다. 두 기능의 효과가 섞여 있어 Temporal Resolution 단독 기여도로 해석할 수 없다. 짝지은 성공률 차이의 95% 신뢰구간도 [−2.5, +20.0]pp로 0을 포함한다. 한편 모든 실제 입력이 2K 유효 예산 내에 들어갔고 각 대응 실행의 응답과 선택 결과가 동일했으므로, 이 데이터는 2K와 4K의 성능 차이를 검증하기보다 해당 task 집합에서 추가 2K 예산의 효과가 나타나지 않았음을 보여준다. 40개 시나리오의 합성 데이터 결과이므로 다른 모델·예산·실사용 분포로 일반화할 수는 없다.
 
 또한 변형별 차이가 작거나 없는 지표는 동등성의 증명이 아니다. 표본 규모가 제한되어 있고 task success CI도 서로 겹친다. 특히 no-constraint 변형의 100% 성공률만 근거로 우수성을 주장해서는 안 되며, protected recall의 하락을 함께 봐야 한다. 후속 검증에서는 더 많은 시나리오와 seed를 사용하고, 보호 기억 회수와 실제 제약 위반을 별도 핵심 결과로 보고하는 것이 적절하다.
 

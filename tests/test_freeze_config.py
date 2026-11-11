@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from agent.agent import Agent
 from agent.llm_planner import LLMRunConfig, SYSTEM_INSTRUCTION
+from memory.ablation import get_ablation_config
 from benchmark.runner import (
     FREEZE_VERSION,
     FROZEN_ALGORITHM_SHA256,
@@ -75,6 +76,12 @@ class FreezeConfigTests(unittest.TestCase):
             ("full", "no_constraint_preservation", "no_temporal",
              "no_state_mandatory", "no_budget_aware_packing"),
         )
+        for label, options in config["strategy_options"].items():
+            preset = "full" if label == "proposed" else label.split("/", 1)[1]
+            expected = get_ablation_config(preset).to_dict()
+            expected.pop("name")
+            with self.subTest(strategy=label):
+                self.assertEqual(options, expected)
         with self.assertRaisesRegex(ValueError, "unsupported config strategy"):
             _config_strategy_plan(["unknown"])
 

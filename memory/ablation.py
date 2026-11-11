@@ -23,9 +23,6 @@ class SelectorAblationConfig:
             if type(getattr(self, field_name)) is not bool:
                 raise TypeError(f"{field_name} must be bool")
             
-        if not self.temporal_resolution and self.mandatory_state:
-            raise ValueError("mandatory_state requires temporal_resolution")
-        
     def to_dict(self) -> dict[str, object]:
         return {
             "name": self.name,
@@ -48,7 +45,6 @@ ABLATION_PRESETS: dict[str, SelectorAblationConfig] = {
     "no_temporal": SelectorAblationConfig(
         name="no_temporal",
         temporal_resolution=False,
-        mandatory_state=False,
     ),
     "no_state_mandatory": SelectorAblationConfig(
         name="no_state_mandatory",

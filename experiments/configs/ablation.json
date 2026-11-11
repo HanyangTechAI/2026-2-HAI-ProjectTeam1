@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0.3", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.4", "kind": "architecture_parameter_freeze"},
   "scope": "ablation",
   "status": "executable",
   "executable": true,
@@ -37,7 +37,7 @@
   "strategy_options": {
     "proposed": {"constraint_preservation": true, "temporal_resolution": true, "mandatory_state": true, "token_aware_packing": true},
     "proposed/no_constraint_preservation": {"constraint_preservation": false, "temporal_resolution": true, "mandatory_state": true, "token_aware_packing": true},
-    "proposed/no_temporal": {"constraint_preservation": true, "temporal_resolution": false, "mandatory_state": false, "token_aware_packing": true},
+    "proposed/no_temporal": {"constraint_preservation": true, "temporal_resolution": false, "mandatory_state": true, "token_aware_packing": true},
     "proposed/no_state_mandatory": {"constraint_preservation": true, "temporal_resolution": true, "mandatory_state": false, "token_aware_packing": true},
     "proposed/no_budget_aware_packing": {"constraint_preservation": true, "temporal_resolution": true, "mandatory_state": true, "token_aware_packing": false}
   },

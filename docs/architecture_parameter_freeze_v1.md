@@ -1,9 +1,9 @@
-# Architecture / Parameter Freeze v1.0.3
+# Architecture / Parameter Freeze v1.0.4
 
 - 상태: **FROZEN**
-- 기준일: 2026-11-09 (Asia/Seoul)
+- 기준일: 2026-11-11 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.3"`
+- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.4"`
 - 이전 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`; v1.0.3 변경은 각 실행의 `git_commit`, `git_dirty`, `resume_identity.code`와 함께 추적한다.
 
 ## Patch note - v1.0.1
@@ -66,6 +66,18 @@ V1.0.3은 공통 출력 상한을 512에서 2048 token으로 올린 실행 파�
   상한만 바꾸며 모델·입력 문자열·content token counter는 유지하므로 입력을
   재생성하거나 기존 manifest의 버전을 바꿀 필요가 없다. 원래 ZIP과 검증 보고서의
   provenance는 보존하고 실행 결과에는 실제 1.0.3 설정을 기록한다.
+
+## Patch note - v1.0.4
+
+2026-11-11, Ablation의 단일 구성 요소 제거 계약을 수정했다. 기존 `no_temporal`은
+Temporal Resolution과 Mandatory State를 함께 끄고 있었다. 이제 Temporal Resolution과
+Version Chain Expansion만 끄며, Mandatory State는 독립적으로 유지한다. 이때 검색된
+관련 State 후보는 시간 판별 없이 모두 필수 보존하고 같은 key의 여러 버전도 허용한다.
+필수 후보가 예산을 초과하면 기존 정책대로 중단한다. Full과 나머지 preset의 동작은 유지한다.
+
+기존 v1.0.3 실행물과 checkpoint는 그대로 보존한다. 이전 `no_temporal`의 성공률은
+두 기능을 함께 제거한 결과이며 수정된 조건의 결과로 사용하지 않는다. 수정된 조건은
+별도 output 경로에서 실행해야 하며 이전 checkpoint에 resume하지 않는다.
 
 ## 1. Frozen architecture
 
@@ -149,7 +161,7 @@ Algorithm specification, Prompt 및 Planner behavior checksum도 freeze에 포�
 
 | 파일 | SHA-256 |
 |---|---|
-| `docs/algorithm.md` | `f029a473fa91a292e6c6d4ee693546e42787e1f6a41d550c71781668156b05ab` |
+| `docs/algorithm.md` | `4a7dbd4b3664def90015540eff1faf6487a87bc9047adf8f60ce8bbce6fc6870` |
 | `system_v1.txt` | `9ad2e2d481997048ba770648ef1d07050a098a77674f5187c9dd645f75b6fac5` |
 | `tools_v1.txt` | `cc701a57b9aa951060ccfd28d69e74955e37af1e709ca932e04b96d725e61c3` |
 | `agent.llm_planner:SYSTEM_INSTRUCTION` | `aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f` |
@@ -220,7 +232,7 @@ system instruction SHA-256을 기록한다. REST CountTokens도 Token retry 정�
 Full Proposed와 다음 단일 제거 변형을 비교한다.
 
 - `no_constraint_preservation`
-- `no_temporal` — temporal resolution 제거에 따라 mandatory state도 비활성화
+- `no_temporal` — Version Chain Expansion과 Temporal Resolution만 제거하며 Mandatory State는 유지
 - `no_state_mandatory`
 - `no_budget_aware_packing`
 

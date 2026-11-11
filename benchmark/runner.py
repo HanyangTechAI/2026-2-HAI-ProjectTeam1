@@ -53,14 +53,14 @@ from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0.3"
+FREEZE_VERSION = "1.0.4"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
 FROZEN_ALGORITHM_SPEC_FILE = "docs/algorithm.md"
 FROZEN_EMBEDDER = EXPERIMENT_EMBEDDER_SPEC
 FROZEN_EMBEDDING_MODEL = EXPERIMENT_EMBEDDING_MODEL
-FROZEN_ALGORITHM_SHA256 = "f029a473fa91a292e6c6d4ee693546e42787e1f6a41d550c71781668156b05ab"
+FROZEN_ALGORITHM_SHA256 = "4a7dbd4b3664def90015540eff1faf6487a87bc9047adf8f60ce8bbce6fc6870"
 FROZEN_PROMPT_SHA256 = {
     FROZEN_SYSTEM_PROMPT_FILE: (
         "9ad2e2d481997048ba770648ef1d07050a098a77674f5187c9dd645f75b6fac5"
