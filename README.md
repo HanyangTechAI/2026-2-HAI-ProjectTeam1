@@ -84,6 +84,16 @@ Mode 2의 초기 Required State hit가 80%(Mode 1: 90%)였지만, 두 모드 모
 Mode 2는 5회 모두 올바른 파일을 첨부했다. 이는 단일 과제 진단으로 일반적인 Mode 효과를
 뜻하지 않는다. [재점검 보고서](docs/attachment_recheck_audit_20261111.md)를 참고한다.
 
+같은 날 수행한 Ablation은 2K와 4K/Horizon 100의 각 400회, 총 800회 실행이다. 두 예산 결과는
+모든 대응 실행에서 성공률, Agent 응답·도구 호출, 선택 기억, 입력·출력 tokens와 비용이
+일치했다. 실제 입력 최대치가 1,822 tokens로 2K 유효 예산 안에 있어, 이번 과제 집합에서는
+예산을 2K에서 4K로 올려도 관측 결과가 달라지지 않았다. Temporal 기능 제거에서는 성공률
+저하와 stale-state 사용이 나타났고, Constraint Preservation 제거에서는 성공률 100%와 보호
+기억 recall 90%가 함께 관측됐다. 두 실행의 OS와 commit이 달라 latency는 직접 비교하지 않는다.
+상세 결과와 한계는
+[Ablation 보고서](docs/ablation_2k_h100_analysis_20261111.md) 및
+[Experiment Plan 23절](docs/experiment_plan.md#23-ablation-2k-horizon-100-실행-2026-11-11)을 따른다.
+
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
 ## 제안 메모리 구조
@@ -357,6 +367,7 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 ## 관련 문서
 
 - [Main 12셀 최종 결과 분석](docs/main_final_analysis_20261109.md)
+- [2K/Horizon 100 Ablation 실험 보고서](docs/ablation_2k_h100_analysis_20261111.md)
 - [실험 계획과 실행 결과](docs/experiment_plan.md)
 - [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/Constraint-Preserving%20Budget-Aware%20Memory.docx)

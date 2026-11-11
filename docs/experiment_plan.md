@@ -25,6 +25,9 @@ Target/Noise padding을 분리한 2×2 후속 audit은
 실패한 승인 과제 한 건의 반복 재점검은
 [22절](#22-approval-attachment-단일-과제-반복-재점검-2026-11-11)과
 [Attachment 재점검 보고서](attachment_recheck_audit_20261111.md)에 기록한다.
+2K/4K, Horizon 100에서 실행한 Ablation 결과는
+[23절](#23-ablation-2k-horizon-100-실행-2026-11-11)과
+[별도 보고서](ablation_2k_h100_analysis_20261111.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1211,3 +1214,36 @@ Violation, Budget 초과, Prompt Audit 실패는 0회였다.
 반복 일관성은 이 한 과제와 두 서술 snapshot에서만 관찰됐다. Mode 일반 효과를 확정하거나
 Main 결과에 추가 반복으로 합산하지 않는다. 토큰·비용 및 실행별 증거는
 [Attachment 재점검 보고서](attachment_recheck_audit_20261111.md)를 따른다.
+
+## 23. Ablation 2K / Horizon 100 실행 (2026-11-11)
+
+첨부 `2k_h100_20261111.zip`과 저장소의 `4k_h100_20261111/` 산출물의 메타데이터·진행
+파일·집계 결과·개별 JSONL 실행을 대조했다. `experiments/configs/ablation.json`의
+Proposed 전체와 네 Ablation 변형을 2,048-token 및 4,096-token 입력 예산, Horizon 100,
+History 25K 조건에서 각각 실행했다. Seed 42/43의 시나리오 40개를 예산별 두 번 반복해
+변형별 80회, 각 예산 400회, 전체 800회를 완료했다.
+
+| 변형 | Task success (2K / 4K) | Temporal version correct | Protected recall | Stale-state usage | 평균 입력/출력 tokens (두 예산 동일) |
+|---|---:|---:|---:|---:|---:|
+| Proposed | 78/80 (97.5%) / 78/80 (97.5%) | 97.5% | 100% | 0.0% | 1,469.98 / 558.58 |
+| No constraint preservation | 80/80 (100%) / 80/80 (100%) | 100% | 90% | 0.0% | 1,473.95 / 549.05 |
+| No temporal | 72/80 (90.0%) / 72/80 (90.0%) | 90.0% | 100% | 13.3% | 1,633.33 / 808.18 |
+| No state mandatory | 78/80 (97.5%) / 78/80 (97.5%) | 97.5% | 100% | 0.0% | 1,469.98 / 558.58 |
+| No budget-aware packing | 78/80 (97.5%) / 78/80 (97.5%) | 97.5% | 100% | 0.0% | 1,470.03 / 552.70 |
+
+Task success의 bootstrap 95% CI는 두 예산에서 동일하게 각 변형 순서대로 92.5–100%,
+100–100%, 80–97.5%, 92.5–100%, 92.5–100%다. Task success가 가장 낮은 No temporal에서는
+stale-state 사용과 temporal context 오류가 증가했다. No constraint preservation은 task
+success 100%와 별개로 보호 기억 회수율이 90%였으므로 성공률만으로 제약 보존 효과를
+판단하지 않는다. 다섯 변형 모두 action-level Constraint violation은 0건이었다.
+
+두 budget 각각 실행 기록 400개가 모두 정상 완료됐고, Prompt Audit는 예산별 400/400
+verified였다. 입력 Budget 초과와 비용 추정 불완전은 양쪽 모두 0건이다. 유효 입력 예산은
+2K에서 2,016, 4K에서 4,064 tokens이며 실제 입력 최대치는 두 조건 모두 1,822 tokens다.
+대응 JSONL 400쌍에서 응답·도구 호출·선택 기억·성공 여부·토큰 사용량·비용이 전부 일치했다.
+
+두 실행은 서로 다른 clean commit과 OS에서 수행됐지만 algorithm hash 및 prompt checksum은
+같다. 따라서 성공률 등 품질 결과와 실제 LLM 행동은 직접 대조할 수 있으나 planning latency는
+예산 차이로 해석하지 않는다. 디렉터리의 H100은 100-turn horizon을 뜻하며 GPU 모델은
+런타임 기록에서 확인되지 않았다. 상세 지표·실패 분해·방법 한계는
+[Ablation 실험 보고서](ablation_2k_h100_analysis_20261111.md)를 따른다.
