@@ -266,6 +266,12 @@ Provider usage 회계는 완전성 우선이다. 모든 API 시도와 성공 응
 [후속 Ablation 보고서](docs/ablation_2k_h100_analysis_20261111.md)에 정리했다. v1.0.4 재검증은
 Full Proposed만 포함하며, 수정된 `no_temporal` preset의 재실행 결과로 해석하지 않는다.
 
+추가로 첫 action 전 Context 구성만 대상으로 freeze 1.0.4의 budget preflight를 수행했다.
+40개 시나리오의 중간 flexible-budget 수준에서 `full`과 packing 비활성 설정의 선택 차이를
+확인했으나, LLM/Tool 행동은 평가하지 않았다. 방법과 제한은
+[Action-Time Budget Preflight 보고서](docs/action_time_preflight_report_20261111.md)와
+[Experiment Plan 24절](docs/experiment_plan.md#24-action-time-budget-preflight-2026-11-11)에 기록했다.
+
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
@@ -373,6 +379,7 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 
 - [Main 12셀 최종 결과 분석](docs/main_final_analysis_20261109.md)
 - [2K/Horizon 100 Ablation 실험 보고서](docs/ablation_2k_h100_analysis_20261111.md)
+- [Action-Time Budget Preflight 보고서](docs/action_time_preflight_report_20261111.md)
 - [실험 계획과 실행 결과](docs/experiment_plan.md)
 - [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/Constraint-Preserving%20Budget-Aware%20Memory.docx)

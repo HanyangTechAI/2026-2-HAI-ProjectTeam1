@@ -29,6 +29,10 @@ Target/Noise padding을 분리한 2×2 후속 audit은
 [23절](#23-ablation-2k-horizon-100-실행-2026-11-11)과
 [별도 보고서](ablation_2k_h100_analysis_20261111.md)에 기록한다.
 
+Freeze 1.0.4의 첫 action 이전 예산 preflight audit은
+[24절](#24-action-time-budget-preflight-2026-11-11)과
+[별도 보고서](action_time_preflight_report_20261111.md)에 기록한다.
+
 ## 실행 완료 및 결과 요약
 
 **필수 Main 12셀·3840회 실행과 정규 집계를 완료했다.** 셀별 40개 공통 과제 ×
@@ -1261,3 +1265,26 @@ planning latency는 직접 비교하지 않는다.
 수정한 뒤의 해당 Ablation 변형은 이 실행에 포함되지 않았으므로, 1.0.3의 2K/4K 변형 결과와
 혼합 해석하지 않는다. 재검증 수치와 세부 한계는
 [Ablation 실험 보고서](ablation_2k_h100_analysis_20261111.md)를 따른다.
+
+## 24. Action-Time Budget Preflight (2026-11-11)
+
+`experiments/results/action_time_preflight_v104/`의 validation, calibration, paired summary와
+세부 선택 결과를 확인했다. Freeze 1.0.4, commit `7572c1900b7aecf2b05a34627fd52517d3a108bf`에서
+고정 2K/Horizon 100 integration 시나리오 40개를 대상으로 첫 action 이전 Context 구성을
+검증했다. 시나리오별 mandatory floor–all-flexible ceiling 구간을 0/25/50/75/100%로 나누고,
+`full`과 `no_budget_aware_packing`을 같은 유효 예산에서 비교했다. 40 × 5 × 2 = 400개 평가이며,
+양쪽 preset 모두 모든 평가에서 정상 완료, mandatory memory 보존, 예산 준수를 기록했다.
+
+| Flexible 예산 수준 | 정상 paired cases | 선택 집합 차이 | Full 유연 기억 회수율 | Packing 비활성 회수율 |
+|---:|---:|---:|---:|---:|
+| 0% | 40/40 | 0 | 0.0% | 0.0% |
+| 25% | 40/40 | 0 | 1.7% | 1.7% |
+| 50% | 40/40 | 2 | 15.0% | 11.7% |
+| 75% | 40/40 | 10 | 51.7% | 40.0% |
+| 100% | 40/40 | 0 | 100.0% | 100.0% |
+
+중간 예산에서 선택 차이가 관찰됐지만 critical flexible 기억 라벨이 없고 LLM generation/Tool 실행이
+없었으므로, 회수율은 reference flexible pool 대비 선택 비율일 뿐 정답률이나 Agent 성능이 아니다.
+시나리오별 budget 구간은 floor 1,262–1,325, ceiling 1,334–1,390 tokens로 서로 다르다.
+따라서 고정 절대예산 sweep이나 행동 수준 실험으로 해석하지 않는다. 상세 방법·한계·재현 메타데이터는
+[Action-Time Budget Preflight 보고서](action_time_preflight_report_20261111.md)를 따른다.
