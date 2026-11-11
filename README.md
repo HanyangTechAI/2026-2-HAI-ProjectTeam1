@@ -266,6 +266,13 @@ Provider usage 회계는 완전성 우선이다. 모든 API 시도와 성공 응
 [후속 Ablation 보고서](docs/ablation_2k_h100_analysis_20261111.md)에 정리했다. v1.0.4 재검증은
 Full Proposed만 포함하며, 수정된 `no_temporal` preset의 재실행 결과로 해석하지 않는다.
 
+이와 별도로 수행한 [Temporal 단독 제거 재실행](docs/no_temporal_v104_2k_h100_20261111.md)은
+Mandatory State를 유지한 80회에서 90.0% 성공했다. [Budget Pressure 800회](docs/budget_pressure_analysis_20261111.md)에서는
+Flexible 탈락과 필수 기억 보존을 확인했으며, [Long Horizon 확장](docs/long_horizon_analysis_20261111.md)과
+[H100 Update 5/10 추가 분석](docs/state_update_h100_analysis_20261111.md)은 합계 6개 고유 셀·1,920회에서
+거리와 버전 수의 영향을 구분했다. 이 후속 문서 배포에는 Markdown 보고서만 포함하고
+결과 데이터·그림 및 별도 실험 코드·설정은 포함하지 않았다.
+
 추가로 첫 action 전 Context 구성만 대상으로 freeze 1.0.4의 budget preflight를 수행했다.
 40개 시나리오의 중간 flexible-budget 수준에서 `full`과 packing 비활성 설정의 선택 차이를
 확인했으나, LLM/Tool 행동은 평가하지 않았다. 방법과 제한은
@@ -377,6 +384,10 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 
 ## 관련 문서
 
+- [Temporal 단독 제거 v1.0.4 재실행 — 80회](docs/no_temporal_v104_2k_h100_20261111.md)
+- [Budget Pressure 분석 — 800회](docs/budget_pressure_analysis_20261111.md)
+- [Long Horizon / State Update 분석 — 1,280회](docs/long_horizon_analysis_20261111.md)
+- [H100 고정 Update 5/10 추가 분석 — 신규 640회, 결합 1,920회](docs/state_update_h100_analysis_20261111.md)
 - [Main 12셀 최종 결과 분석](docs/main_final_analysis_20261109.md)
 - [2K/Horizon 100 Ablation 실험 보고서](docs/ablation_2k_h100_analysis_20261111.md)
 - [Action-Time Budget Preflight 보고서](docs/action_time_preflight_report_20261111.md)

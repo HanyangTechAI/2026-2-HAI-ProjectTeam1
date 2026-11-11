@@ -1,6 +1,6 @@
 # Ablation 실험 보고서 — 2K/4K 비교 및 v1.0.4 재검증 (2026-11-11)
 
-**조건 정정:** 이 보고서는 수정 전 freeze 1.0.3 결과다. 당시 `no_temporal`은 Temporal Resolution과 Mandatory State를 함께 껐다. freeze 1.0.4에서 두 축을 분리했으며, 수정된 Temporal 단독 제거 조건은 아직 재실행하지 않았다.
+**조건 정정:** 이 보고서는 수정 전 freeze 1.0.3 결과다. 당시 `no_temporal`은 Temporal Resolution과 Mandatory State를 함께 껐다. freeze 1.0.4에서 두 축을 분리했으며, 수정된 Temporal 단독 제거 조건은 별도 80회 재실행에서 72/80회(90.0%) 성공했다. [재실행 보고서](no_temporal_v104_2k_h100_20261111.md)는 아래 Full-only 재검증과 구분한다.
 
 ## 요약
 
@@ -92,7 +92,7 @@
 
 80/80회가 정상 완료됐고 Prompt Audit verified, budget 초과와 비용 추정 불완전은 0건이었다. v1.0.3의 2K Full과 같은 80개 `(sample_id, repeat_id)`를 대응시킨 결과 응답, tool calls, 선택 memory IDs, task success·실패 종류, 입출력 tokens, 비용이 전부 동일했다. 두 실행은 commit과 런타임 조건이 다르므로 latency를 직접 비교하지 않는다. sample/repeat identity가 재사용됐으므로 이 실행을 독립 표본 80개로 합산하지 않는다.
 
-이 재검증은 Full Proposed의 회귀 확인일 뿐이다. v1.0.4에서 `no_temporal`이 Version Chain Expansion과 Temporal Resolution만 끄고 Required State 강제 선택은 유지하도록 바뀐 동작은 실행되지 않았다. 따라서 2K/4K v1.0.3의 `no_temporal` 결과를 새 v1.0.4 ablation 결과로 해석하면 안 된다.
+이 재검증은 Full Proposed의 회귀 확인일 뿐이다. v1.0.4에서 `no_temporal`이 Version Chain Expansion과 Temporal Resolution만 끄고 Required State 강제 선택은 유지하도록 바뀐 동작은 이 Full-only 재검증에 포함되지 않았다. 별도 실행 결과는 [Temporal 단독 제거 재실행](no_temporal_v104_2k_h100_20261111.md)에 기록했다. 따라서 2K/4K v1.0.3의 `no_temporal` 결과를 새 v1.0.4 ablation 결과로 해석하면 안 된다.
 
 ## 산출물 및 해석 원칙
 
