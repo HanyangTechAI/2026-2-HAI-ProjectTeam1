@@ -14,4 +14,4 @@
 
 ## 2026-11-12
 
-- [Pipeline Smoke 점검](pipeline-smoke-2026-11-12.md) — 고정 smoke 입력의 실행 확인이며 연구 성능 비교에는 사용하지 않는다.
+- [Pipeline Smoke 점검](pipeline-smoke-2026-11-12.md) — 같은 고정 입력을 세 차례 실행한 파이프라인 확인이며 연구 성능 비교에는 사용하지 않는다.
