@@ -28,7 +28,11 @@ TOOLS_PATH = ROOT / "experiments" / "prompts" / "tools_v1.txt"
 KNOWN_TOOLS = frozenset({"email", "file", "calendar", "task"})
 
 
-@unittest.skipUnless(os.getenv("GEMINI_API_KEY"), "GEMINI_API_KEY is not set")
+@unittest.skipUnless(
+    os.getenv("GEMINI_API_KEY")
+    and os.getenv("RUN_LIVE_GEMINI_TESTS") == "1",
+    "Live Gemini smoke test is disabled",
+)
 class SmokeConfigTests(unittest.TestCase):
     def test_llm_planner_calls_tools_under_smoke_config(self):
         from benchmark.experiment_runtime import environment_agent, multilingual_embedder
