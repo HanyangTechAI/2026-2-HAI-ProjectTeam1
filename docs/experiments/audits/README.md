@@ -1,5 +1,9 @@
 ﻿# 검증 및 감사 자료
 
+## 2026-11-08
+
+- [4K/8K Smoke Readiness Gate](smoke-4k8k-readiness-2026-11-08.md) — 64회 실행의 prompt 계측·budget overflow·readiness 판정을 기록한다.
+
 ## 2026-11-10
 
 - [Narrative Retrieval Bias Audit](narrative-bias-audit-2026-11-10.md)

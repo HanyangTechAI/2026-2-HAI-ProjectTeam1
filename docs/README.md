@@ -12,20 +12,28 @@
 - [Critical Flexible 라벨 Preflight](experiments/reports/critical-flexible-preflight-2026-11-12.md) — 긴 핵심 기억이 중간 예산에서 탈락하는 조건을 분석합니다.
 - [Critical Flexible 단일 Step Agent Pilot](experiments/reports/critical-flexible-agent-pilot-2026-11-12.md) — 첫 Tool 행동을 기록하며 `max_steps=1`의 성공률 해석 제한을 명시합니다.
 - [Critical Flexible 75% 단일 Step Holdout](experiments/reports/critical-flexible-holdout-2026-11-12.md) — 160개 paired scenario의 첫 행동과 Tool 효과를 확인합니다.
+- [Packing alpha 개발 실험](experiments/reports/packing-alpha-development-2026-11-12.md) — 조건 C·75% 예산의 alpha별 첫 행동 결과와 개발 데이터 한계를 기록합니다.
+- [Task Criticality 75% 선택 Preflight](experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md) — 기존 개발 데이터에서 실험용 slot 승격 정책을 비교합니다.
+- [Task Criticality S2/S3/S5 스트레스 Preflight](experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md) — 선택 단계의 중요도 역전, 근거 부재와 상충 감지를 점검합니다.
+- [Task Criticality v0.2 S2/S3/S5 Preflight](experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md) — 무효 Evidence 제외와 기존 gold·ambiguity 결과를 같은 데이터에서 재확인합니다.
 - [11월 12일 Pipeline Smoke 점검](experiments/audits/pipeline-smoke-2026-11-12.md) — 같은 5개 smoke scenario의 20회 실행을 세 차례 확인했습니다.
+- [1K·2K Token Budget Preflight](experiments/reports/token-budget-preflight-2026-11-08.md) — 0·32 token safety margin의 고정 입력 사전 점검 결과입니다.
+- [4K/8K Smoke Readiness Gate](experiments/audits/smoke-4k8k-readiness-2026-11-08.md) — 64회 실행의 계측 완결성과 `PASS` 판정을 기록합니다.
+- [초기 파일럿 실행 아카이브](experiments/reports/early-pilot-runs-2026-11-03.md) — 11월 3일 전후의 미보고 오프라인·Gemini pilot과 데이터 한계를 정리합니다.
 
 ## 사용 가이드
 
 - [시나리오 fixture](guides/scenarios-usage.md)
 - [실험 데이터 생성기](guides/generator-usage.md)
 - [Evaluator](guides/evaluator-usage.md)
+- [실험용 Packing·Task Criticality](guides/experimental-packing.md)
 
 ## 디렉토리 안내
 
 | 위치 | 내용 |
 |---|---|
 | 문서 폴더 | 아키텍처, 알고리즘, 인터페이스, 메모리 스키마, 예외 사례, freeze 기준 |
-| [`guides/`](guides/) | 시나리오·데이터 생성기·평가기 사용법 |
+| [`guides/`](guides/) | 시나리오·데이터 생성기·평가기·실험용 packing 사용법 |
 | [`experiments/plans/`](experiments/plans/) | 전체 실험 계획과 실행 기록 |
 | [`experiments/protocols/`](experiments/protocols/) | 개별 실험 설정 및 재현 절차 |
 | [`experiments/reports/`](experiments/reports/) | 날짜가 포함된 실험 결과와 분석 |

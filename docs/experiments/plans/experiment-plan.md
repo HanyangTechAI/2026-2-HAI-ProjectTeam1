@@ -1320,3 +1320,23 @@ end-to-end 결론에는 여러 step과 추가 반복이 필요하다. 실행 메
 [Agent Pilot 보고서](../reports/critical-flexible-agent-pilot-2026-11-12.md)에 기록했다.
 
 pilot 이후 별도 holdout seed 100–119와 holdout 전용 템플릿으로 40개 기본 과제를 만들고, 같은 75% 예산에서 4개 조건으로 확장한 160개 scenario를 preset별 한 번씩 실행했다(320 runs, 160 paired scenarios). 첫 Tool/action·필수 인자·작업별 Tool 효과가 모두 맞는 비율은 Full 117/160 (73.1%), packing 비활성 153/160 (95.6%)였고 paired 차이는 −22.5%p였다. 조건별 차이는 A +7.5%p, B 0%p, C −97.5%p, D 0%p로 조건 C에 집중됐다. `max_steps=1` 때문에 end-to-end Task success는 여전히 0/160이며 이 결과를 완료율로 해석하지 않는다. 독립 기본 과제 40개, 반복 1회, 첫 행동 지표라는 한계를 포함한 세부 결과와 재현 정보는 [75% Holdout 보고서](../reports/critical-flexible-holdout-2026-11-12.md)에 기록했다.
+
+## 26. Flexible Packing Alpha 개발 실험 (2026-11-12)
+
+Freeze 1.0.4의 기존 Utility 점수는 유지한 채 `utility / max(token_count, 1) ** alpha`의 길이 패널티만 overlay로 바꿔 비교했다. Seed 42–61 개발 데이터의 조건 C·75% 예산 40개 scenario에 `alpha=0`, `0.2`, `1`을 각각 한 번 실행했다. 총 120회 실행에서 첫 행동 정답은 각각 40/40 (100%), 31/40 (77.5%), 0/40 (0%)였다. Critical memory가 Context에 포함된 수도 같은 결과였다.
+
+LLM 실행 전 selection preflight는 75% 예산에서 800개 Context를 평가했고, 추가 전체 budget sweep은 4,000개 Context를 평가했다. 둘 다 예산 초과 및 Mandatory 누락은 0건이다. Agent 실행도 prompt budget audit 누락, 예산 초과, 첫 Tool 호출 누락이 없었다. `max_steps=1`이므로 Task Success Rate를 보고하지 않는다.
+
+세 arm은 같은 개발 데이터를 사용했으며 조건 C만 다뤘다. 한 번의 첫 행동 평가이므로 alpha 0의 관측 결과를 정책 우위나 기본값 변경 근거로 일반화하지 않는다. 같은 날의 독립 holdout은 `full` 대 packing 비활성 preset 비교였고 alpha 0을 평가한 것이 아니다. 방법·paired 결과·한계는 [Packing Alpha 개발 실험 보고서](../reports/packing-alpha-development-2026-11-12.md), 명령과 `pack_task_criticality()` 제약은 [실험용 Packing 가이드](../../guides/experimental-packing.md)를 참고한다.
+
+## 27. Task Criticality 75% 선택 Preflight (2026-11-12)
+
+기존 Critical Flexible 개발 데이터 160개에서 `full`, `no_budget_aware_packing`, `criticality`를 75% 예산으로 비교했다(480 Context 평가, LLM generation 0회). Criticality 정책과 packing 비활성은 Critical Memory를 160/160회 포함했고, Full은 120/160회 포함했다. Full의 40개 누락은 모두 조건 C였다. 동일한 개발 데이터를 재사용한 selection-only 분석이며, Agent 동작이나 독립 holdout 결과가 아니다. 상세 수치와 재현 경로는 [Task Criticality 75% 보고서](../reports/task-criticality-75-selection-preflight-2026-11-12.md)에 기록했다.
+
+## 28. Task Criticality S2/S3/S5 Stress Preflight (2026-11-12)
+
+별도 development dataset 160개(두 Task family, seed 200–219, 네 변형)에서 세 정책의 Context 선택을 평가했다(480개 평가, LLM generation 0회). Criticality는 S2의 gold slot 40/40회 승격, S3_EMPTY의 정보 부재 40/40회 감지, S5의 상충 slot 40/40회 감지를 보였다. 무효·상충 Memory가 최종 Context에 남을 수 있고 판정만으로 Agent를 차단하지 않으므로 실제 Tool 행동의 성능 결과로 해석하지 않는다. 방법과 한계는 [S2/S3/S5 Stress Preflight 보고서](../reports/task-criticality-s235-stress-preflight-2026-11-12.md)에 기록했다.
+
+## 29. Task Criticality v0.2 S2/S3/S5 재검증 (2026-11-13)
+
+동일한 `task_criticality_s235_v1` 데이터와 label로 helper를 갱신한 뒤 480개 Context 평가를 다시 수행했다. S3_VALID의 gold 포함은 40/40회로 유지하면서 무효 Memory 노출 합계는 74에서 0으로 줄었고, S3_EMPTY의 missing slot 감지 40/40회를 유지하면서 무효 노출 합계는 76에서 0으로 줄었다. S5 상충 감지는 40/40회였지만 두 상충 항목은 여전히 Context에 남았다. LLM generation은 없으며 같은 개발 데이터를 재사용했으므로 독립 검증으로 보지 않는다. 상세 비교는 [v0.2 Preflight 보고서](../reports/task-criticality-s235-v02-preflight-2026-11-13.md)를 참고한다.

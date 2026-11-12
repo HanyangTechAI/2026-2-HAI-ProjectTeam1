@@ -253,6 +253,14 @@ checksum을 검사해 `experiments/results/smoke_4k8k/smoke_gate_report.json`에
 `PASS` 또는 `HOLD`를 기록한다. 비용 회계 불완전은 성능 gate와 별도 warning으로
 보고하며, 해당 비용을 0으로 해석하지 않는다.
 
+2026-11-08 실행은 4K·8K에서 각 32/32 run을 완료해 `PASS`였다. 실제 prompt call 61건씩을
+모두 확인했고 counted/actual overflow와 미완전 비용 계측은 없었다. 최대 counted/actual
+prompt는 2473/2474 tokens였다. 이는 운영 준비도 점검이며 전략 성능 결과가 아니다. 상세 값은
+[4K/8K Smoke Readiness Gate 감사](docs/experiments/audits/smoke-4k8k-readiness-2026-11-08.md)에 있다.
+
+보고서가 누락돼 있던 11월 8일 budget 사전 점검은 [Token Budget Preflight](docs/experiments/reports/token-budget-preflight-2026-11-08.md)에,
+초기 오프라인·Gemini 파일럿은 계측과 집계 한계를 포함해 [초기 Pilot 아카이브](docs/experiments/reports/early-pilot-runs-2026-11-03.md)에 정리했다.
+
 실행 파이프라인에서는 `memory/baselines.py`의 Sliding Window, Vector Top-k, Utility-per-Token과 `memory/selector.py`의 Proposed를 공통 `SelectionResult`로 변환한다. Proposed Policy는 실행 입력의 Memory Snapshot으로 `SnapshotMemoryStore`를 만들고, 시간 해석 기준인 `current_time`을 요구한다. `pipeline/orchestrator.py`는 선택, Context 재조립, Agent 행동, Tool 결과 feedback을 최대 단계 수 안에서 반복하며 예산 실패 시 Agent를 호출하지 않는다. `benchmark/runner.py`는 네 전략을 `PipelineAdapter`로 반복 실행하고 `runs.jsonl`과 `summary.json`을 생성한다. Vector Top-k, Utility-per-Token, Proposed에는 embedder가 필요하며 Proposed 시나리오에는 ISO 8601 `current_time`이 있어야 한다.
 
 LLM provider 요청이 retry 후에도 실패하면 실행은 `LLMProviderError`로 중단되고 완료된 checkpoint만 보존된다. Provider 장애를 Task failure나 text action으로 기록하지 않으며, `--resume`으로 누락된 run을 완료한 뒤 집계한다. 정상 응답을 structured action으로 해석하지 못한 경우는 Provider 장애와 구분하여 모델 출력 실패로 평가한다. 고정 계약은 [Provider Failure Isolation](docs/architecture_parameter_freeze_v1.md#41-provider-failure-isolation)을 따른다.
@@ -287,6 +295,28 @@ Critical 기억을 40/40회 제외하는 경계를 찾았다. 64-run Agent pilot
 11월 12일 Pipeline Smoke는 같은 고정 입력 20회 실행을 세 차례 확인했다. 세 번 모두 기능상
 결과가 같았으며, 이는 파이프라인 점검으로만 보존하고 성능 실험의 독립 표본으로 합산하지 않는다.
 [상세 점검 보고서](docs/experiments/audits/pipeline-smoke-2026-11-12.md)를 참고한다.
+
+같은 날 Flexible packing의 길이 패널티를 `utility / max(token_count, 1) ** alpha`로 바꿔보는
+개발 실험도 수행했다. Seed 42–61의 조건 C·75% 예산 40개 scenario에서 첫 행동 정답은
+`alpha=0` 40/40, `alpha=0.2` 31/40, `alpha=1` 0/40이었다. 이는 같은 개발 자료를 사용한
+단일 step 결과이며 기본 Selector를 변경하거나 일반 성능을 확정하는 근거가 아니다.
+[실험 보고서](docs/experiments/reports/packing-alpha-development-2026-11-12.md)와
+[재현·실험 도구 가이드](docs/guides/experimental-packing.md)를 참고한다.
+
+실험용 `criticality` 정책의 selection-only preflight도 추가했다. 기존 160개 개발 scenario에서
+75% 예산의 Critical 포함은 `criticality`와 packing 비활성 각각 160/160회, 기본 Full은
+120/160회였다. 별도 S2/S3/S5 데이터에서는 중요도 역전, 정보 부재와 상충 slot 판정을 확인했다.
+두 평가 모두 LLM 행동을 실행하지 않았고, 감지된 모호성이나 정보 부재가 Agent 실행을 막지는 않는다.
+[75% 정책 비교](docs/experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md),
+[S2/S3/S5 스트레스 결과](docs/experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md)를 참고한다.
+
+`memory.task_criticality.pack_task_criticality()`에는 파일 검색과 승인 메일의 필수 슬롯을
+우선 보존하는 별도 실험용 helper가 있다. 아직 `select_memory()`나 실행 파이프라인에 연결되지
+않았다. 최신 v0.2는 인식 가능한 잘못된 프로젝트·예시·취소 근거가 든 Memory 전체를 flexible
+후보에서 제외하고, 유효 slot을 우선 보존한다. 같은 S2/S3/S5 선택 전용 데이터에서 S3의 무효
+Memory 노출은 74/76개에서 0개로 줄었지만, S5 상충 Memory는 계속 Context에 남았다. 정규식 기반
+판정이며 Agent 실행을 차단하지 않는다. [실험 도구 가이드](docs/guides/experimental-packing.md),
+[v0.2 재검증 보고서](docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md)를 참고한다.
 
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
@@ -404,6 +434,12 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 - [Action-Time Budget Preflight 보고서](docs/experiments/audits/action-time-preflight-2026-11-11.md)
 - [Critical Flexible 라벨 Preflight — 조건 C 75% 예산 진단](docs/experiments/reports/critical-flexible-preflight-2026-11-12.md)
 - [Critical Flexible 단일 Step Agent Pilot — 첫 행동 결과와 한계](docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md)
+- [Critical Flexible 75% Holdout — 독립 seed·템플릿 첫 행동 평가](docs/experiments/reports/critical-flexible-holdout-2026-11-12.md)
+- [Packing alpha 개발 실험 — 조건 C 첫 행동 비교](docs/experiments/reports/packing-alpha-development-2026-11-12.md)
+- [Task Criticality 75% 선택 Preflight](docs/experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md)
+- [Task Criticality S2/S3/S5 Stress Preflight](docs/experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md)
+- [Task Criticality v0.2 S2/S3/S5 재검증](docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md)
+- [실험용 Packing·Task Criticality 사용 가이드](docs/guides/experimental-packing.md)
 - [11월 12일 Pipeline Smoke 점검 — 20회](docs/experiments/audits/pipeline-smoke-2026-11-12.md)
 - [실험 계획과 실행 결과](docs/experiments/plans/experiment-plan.md)
 - [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)

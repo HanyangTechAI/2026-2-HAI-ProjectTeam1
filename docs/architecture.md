@@ -2,9 +2,9 @@
 
 ## 1. Overview
 
-본 프로젝트는 Long-Horizon LLM Agent가 제한된 Context Token Budget에서도 **행동에 필수적인 Constraint와 최신 State를 보존하면서 필요한 Memory를 선택할 수 있도록 하는 Memory Architecture**를 구현한다.
+본 레포는 Long-Horizon Agent를 위한 **Constraint와 최신 State 보존형 Memory Selection Architecture**를 구현·평가하는 prototype이다. 기본 Planner는 규칙 기반이며, LLM Planner는 실험 설정에서 선택할 수 있다.
 
-전체 시스템은 크게 다음 파이프라인으로 구성된다.
+목표 end-to-end architecture는 다음 파이프라인으로 구성된다. 현재 레포에서 연결된 실행 경로는 3절에 정리한다.
 
 ```text
 User / Tool Interaction
@@ -24,7 +24,7 @@ Budget-Aware Selector
         ↓
 Context Builder
         ↓
-LLM Agent
+Agent / Planner
         ↓
 Tool Executor
         ↓
@@ -46,6 +46,8 @@ Budget-Aware Selector
 4. 남은 Token Budget에 Flexible Memory를 배치하는 것
 
 이다.
+
+> **현재 구현 범위:** 실행 경로는 호출자가 전달한 `MemoryItem` 스냅샷을 선택해 Context를 만들고 Agent·Tool 루프를 수행한다. Interaction에서 Memory를 자동 추출하거나 `MemoryStore`에 저장하는 수집 경로는 아직 연결되지 않았다. 아래에서 목표 구조와 구현 범위가 다르면 구현 상태를 따로 명시한다.
 
 ---
 
@@ -148,81 +150,45 @@ Final Context 생성
 ```mermaid
 flowchart TD
 
-    U[User / Environment] --> I[Interaction Processor]
-
-    I --> MA[Memory Analyzer]
-
-    MA --> MS[(Memory Store)]
-
-    Q[Current Task / Query] --> R[General Candidate Retriever]
-    MS --> R
-
-    R --> VE[Version Chain Expansion]
-    VE --> TF[Temporal & State Filter]
-
-    MS --> PR[Protected Retrieval]
-    Q --> PR
-
-    TF --> RS[Required State / Flexible Candidates]
-    PR --> PS[Protected Memory Resolver]
-
-    RS --> BAS[Budget-Aware Selector]
-    PS --> BAS
-
-    BAS --> CB[Context Builder]
-
-    Q --> CB
-
-    CB --> A[LLM Agent]
-
-    A --> TE[Tool Executor]
-
-    TE --> ENV[Environment]
-
-    ENV --> I
-
-    A --> LOG[Execution Logger]
-    BAS --> LOG
-    TE --> LOG
+    INPUT[Query + MemoryItem snapshot] --> O[Orchestrator]
+    O --> P{Selection policy}
+    P --> B[Sliding Window / Vector Top-k / Utility-per-Token]
+    P --> S[Proposed selector]
+    S --> Q[Rule-based query analysis]
+    Q --> R[Semantic top-k retrieval]
+    R --> V[Version expansion and temporal resolution]
+    V --> M[Protected constraints + required states + flexible memories]
+    B --> C[Context Builder + token validation]
+    M --> C
+    C -->|Budget failure: stop before Agent| O
+    C -->|Valid context| A[Agent: one action]
+    A --> T[Tool Executor]
+    T --> F[Tool result Interaction]
+    F --> O
+    A --> DONE[Complete / tool failure / max steps]
 ```
 
-Protected Retrieval 경로는 현재 활성화된 Constraint를 대상으로 하며 Temporal / State Filter를 통과하지 않는다.
+각 tool 결과 뒤 Orchestrator는 결과를 다음 요청의 tool feedback에 넣고 선택·Context 구성을 다시 수행한다. 다시 선택할 때 쓰는 Memory 입력은 같은 실행 시작 시 받은 스냅샷이다. 실행 중 Interaction을 Memory로 추출하거나 별도 Store에 반영하지 않는다. Proposed 경로는 그 스냅샷으로 `SnapshotMemoryStore`를 만들며, baseline은 입력 목록에서 직접 후보를 고른다.
 
 ---
 
 # 4. Main Components
 
-## 4.1 Interaction Processor
+## 4.1 Interaction과 Tool Feedback
 
-사용자 메시지와 Tool 실행 결과를 공통 Interaction 형식으로 변환한다.
-
-### Input
-
-```text
-User Message
-Tool Result
-Environment Observation
-```
-
-### Output
+`agent/interaction.py`는 다음 공통 자료형과 Tool 결과 포맷터를 제공한다.
 
 ```python
-Interaction(
-    session_id,
-    turn_id,
-    content,
-    source,
-    timestamp
-)
+Interaction(session_id, turn_id, content, source, timestamp)
 ```
 
-이 Interaction이 Memory Analyzer의 입력이 된다.
+현재 구현은 `Agent.act`가 Tool 결과를 `source="tool"`인 Interaction으로 만든다. Orchestrator는 이를 다음 단계 Context의 `[RECENT TOOL RESULTS]` feedback으로 전달한다. 사용자 메시지·환경 관측을 받아 Interaction으로 바꾸는 별도 processor는 없으며, 이 Interaction을 Memory Analyzer나 Store에 전달하지도 않는다.
 
 ---
 
 # 4.2 Memory Analyzer
 
-Interaction에서 장기적으로 저장할 가치가 있는 정보를 추출한다.
+Interaction에서 장기적으로 저장할 정보를 추출하는 컴포넌트로 설계되어 있다. **현재 레포에는 이 추출기가 구현되어 있지 않다.**
 
 주요 역할:
 
@@ -265,13 +231,13 @@ memory_key = report.current_file
 is_protected = false
 ```
 
-Analyzer 구현 초기에는 **LLM Structured Output + Rule-based Validation** 방식을 사용한다.
+위 입력·출력 예시는 데이터 설계 예시다. `memory/analyzer.py`나 LLM Structured Output 추출 경로는 없다. 현재 `memory/query_analyzer.py`는 반대 방향으로, Task Query에서 시간·도구·action·recipient·entity 신호를 규칙으로 분석해 `QueryContext`를 만든다. `MemoryItem`은 fixture, generator 또는 호출자가 준비해 Pipeline에 전달한다.
 
 ---
 
 # 4.3 Memory Store
 
-Memory를 장기적으로 저장하고 Version History 및 Temporal Validity를 관리한다.
+Memory를 프로세스 내에서 보관하고 Version History 및 Temporal Validity를 관리한다. 현재 구현은 디스크나 데이터베이스에 영속화하지 않는다.
 
 Memory 기본 구조:
 
@@ -344,7 +310,7 @@ is_protected = true
 
 따라서 과거 Constraint는 Historical Retrieval에 사용할 수 있지만 현재 행동의 Protected Memory로는 사용하지 않는다.
 
-현재 `memory/store.py`는 `memory_id`를 키로 사용하는 인메모리 구현이다. 동일 Session과 `memory_key`에 새 ACTIVE Memory가 들어오면 기존 ACTIVE Memory를 자동으로 종료하고 `supersedes`/`superseded_by`를 양방향으로 연결한다. 명시된 선행 버전은 같은 Session과 Key여야 하며, 새 `valid_from`이 선행 버전보다 빠르면 삽입을 거부한다. 저장소는 이력과 참조 일관성만 담당하며 영속화, 의미 검색, 효용 계산은 담당하지 않는다.
+현재 `memory/store.py`는 `memory_id`를 키로 사용하는 인메모리 구현이다. 동일 Session과 `memory_key`에 새 ACTIVE Memory가 들어오면 기존 ACTIVE Memory를 자동으로 종료하고 `supersedes`/`superseded_by`를 양방향으로 연결한다. 명시된 선행 버전은 같은 Session과 Key여야 하며, 새 `valid_from`이 선행 버전보다 빠르면 삽입을 거부한다. 이 규칙은 State 외에도 Key가 있는 Memory에 적용된다. 저장소는 이력과 참조 일관성만 담당하며 영속화, 의미 검색, 효용 계산은 담당하지 않는다. 이 Store API는 Orchestrator 실행 경로에 자동 연결되어 있지 않다.
 
 ---
 
@@ -595,6 +561,8 @@ Temporal 표현은 가능한 경우 실제 시간 범위 또는 Target Time으�
 → Current Time 기준 Target Time 계산
 ```
 
+현재 구현은 `memory/query_analyzer.py`의 규칙 기반 분석이다. ISO 날짜·시각, 연/월/일, 일부 숫자형·한국어 상대 기간, `오늘/어제/내일`, `현재/최신` 등의 제한된 표현을 처리한다. 지원하지 않는 과거 표현은 현재 Query로 간주하지 않고 `ValueError`로 거부한다. 자유 문장에 대한 일반적인 시간 추론은 하지 않는다.
+
 ## 7.2 Version-Aware State Resolution
 
 Query의 Temporal Intent에 따라 State Version을 다르게 선택한다.
@@ -733,6 +701,8 @@ is_protected = true
 
 따라서 Protected Memory에는 별도의 Temporal Filter를 적용하지 않는다.
 
+현재 적용 가능성은 `memory/selector.py`의 규칙 기반 boolean 판정이다. Tool·Action 어휘, 수신자·entity, 외부/내부 범위, 파일명 등의 문자열 조건을 확인하며 LLM 의미 판단이나 점수 threshold를 사용하지 않는다. 어휘에 없는 표현은 빠질 수 있으므로 이 결과를 일반 언어 이해 능력으로 해석하지 않는다.
+
 ---
 
 # 9. Budget-Aware Selector
@@ -817,46 +787,17 @@ B_memory
 
 ## Flexible Memory Utility
 
-각 Memory의 Utility는 예를 들어 다음 요소로 구성한다.
+현재 Proposed selector는 다음 점수를 계산한다.
 
 ```text
-Relevance
-Importance
-Recency
-Entity Match
+U_i = 0.6 · relevance_i
+    + 0.3 · importance_i
+    + 0.1 · recency_i
+
+recency_i = 1 / (1 + max(current_turn - memory.turn_id, 0))
 ```
 
-개념적으로:
-
-```text
-U_i =
-α · Relevance_i
-+ β · Importance_i
-+ γ · Recency_i
-+ δ · EntityMatch_i
-```
-
-최종 선택 문제:
-
-```text
-maximize Σ U_i × x_i
-
-subject to
-
-Σ token_i × x_i ≤ B_flexible
-
-x_i ∈ {0, 1}
-```
-
-초기 구현에서는 다음 두 방식을 비교할 수 있다.
-
-```text
-Greedy Utility-per-Token
-
-vs
-
-0/1 Knapsack
-```
+Relevance는 semantic cosine score를 `[0, 1]`에 제한한다. 가중치는 호출 시 설정할 수 있다. Entity Match나 timestamp 기반 decay는 현재 이 점수에 포함되지 않는다. Flexible memory packing은 기본적으로 `U_i / max(token_count_i, 1)` 내림차순 Greedy이며, Utility·Relevance·Recency를 tie-breaker로 사용한다. 0/1 Knapsack은 현재 core selector에 구현되어 있지 않다.
 
 ---
 
@@ -868,6 +809,10 @@ Selector 결과를 실제 LLM Prompt 형태로 변환한다.
 
 ```text
 [SYSTEM]
+
+...
+
+[TOOL DEFINITIONS]
 
 ...
 
@@ -939,11 +884,13 @@ context/builder.py
 → fixed_context_tokens, build_context, ContextBuildResult
 ```
 
+실제 Prompt에는 `[SYSTEM]`, `[TOOL DEFINITIONS]`, 필요 시 `[PROTECTED CONSTRAINTS]`, `[STATE]`, `[RELEVANT MEMORY]`, `[CURRENT TASK]` 순서로 들어간다. 후속 단계에서는 Tool 결과가 `[RECENT TOOL RESULTS]`로 tool definition 입력에 덧붙는다.
+
 ---
 
-# 11. LLM Agent
+# 11. Agent and Planner
 
-LLM Agent는 제공된 Context를 기반으로 Task를 계획하고 Tool을 호출한다.
+`Agent`는 완성된 Context를 Planner에 전달해 한 번에 하나의 행동을 실행하고, 필요하면 Tool을 호출한다. 기본 `agent.planner.Planner`는 결정적 규칙 기반이며, 실험 구성에서 `agent.llm_planner.LLMPlanner`로 교체할 수 있다. 여러 Tool 단계는 Orchestrator가 Context를 다시 구성하며 반복한다.
 
 예:
 
@@ -960,7 +907,7 @@ Task:
 교수님께 최신 보고서를 보내줘.
 ```
 
-Agent Action:
+여러 단계 Task에서 가능한 Agent Action 예:
 
 ```text
 select_file("report_final.pdf")
@@ -970,7 +917,7 @@ draft_email(...)
 request_approval()
 ```
 
-잘못된 Action:
+평가상 잘못된 Action 예:
 
 ```text
 send_email()
@@ -999,9 +946,9 @@ Tool 실행 결과는 `Interaction(source="tool")`로 바꾼다. `Agent.act`가 
 
 ---
 
-# 13. Execution Logger
+# 13. Benchmark Run Records
 
-각 Agent 실행에서 다음 정보를 기록한다.
+별도 `ExecutionLogger` 클래스 대신 `benchmark/runner.py`가 실행별 결과를 `runs.jsonl`, 집계를 `summary.json`에 기록한다. 실행 trace에는 다음 정보가 포함된다.
 
 ```text
 Query
@@ -1016,7 +963,7 @@ Protected Memories
 
 Token Usage
 
-LLM Input
+Agent Context
 
 Tool Calls
 
@@ -1062,9 +1009,9 @@ INSUFFICIENT_CONTEXT_BUDGET
 
 ---
 
-# 14. End-to-End Data Flow
+# 14. Intended End-to-End Data Flow
 
-전체 흐름은 다음과 같다.
+다음은 Memory 수집부터 저장까지 포함한 목표 흐름이다. Memory Analyzer와 자동 Memory Insert 단계는 현재 Repository runtime에 연결되어 있지 않다. 현재 실행 경로는 3절의 diagram을 기준으로 한다.
 
 ```text
 1. User Interaction 발생
@@ -1197,29 +1144,25 @@ INSUFFICIENT_CONTEXT_BUDGET
 
 ---
 
-# 15. Baseline Architecture
+# 15. Implemented Policy Variants
 
-동일한 Agent와 Tool Environment를 유지하면서 **Memory Policy만 변경**한다.
+현재 Runner는 동일한 Agent와 Tool Environment를 유지하며 **Memory Policy를 변경**해 비교한다. Full Context 전용 Policy는 등록되어 있지 않다.
 
 ```text
-                    ┌─ Full Context
-                    │
-Interaction History ├─ Sliding Window
-                    │
-                    ├─ Vector Top-k
-                    │
-                    ├─ Utility-per-Token
-                    │
-                    └─ Proposed
+Input Memory Snapshot
+├─ Sliding Window
+├─ Vector Top-k
+├─ Utility-per-Token
+└─ Proposed
 ```
 
-이를 통해 Agent 모델 자체의 차이가 아닌 **Memory Architecture의 효과**를 비교한다.
+Baseline factory는 Sliding Window, Vector Top-k, Utility-per-Token을 제공하고 Proposed factory는 Proposed selector를 사용한다. 비교 실험은 같은 Agent·모델·도구·입력을 사용하도록 설정된 경우 Memory policy 차이를 측정한다.
 
 ---
 
 # 16. Long Context / External Memory Extension
 
-본 프로젝트의 기본 구조는 External Memory 기반으로 구현한다.
+현재 실행은 Context와 별도의 `MemoryItem` snapshot을 selector에 전달하는 external-memory 방식이다. Store는 인메모리이며 실행 중 Interaction을 영속 저장하지 않는다.
 
 추가 실험에서는 다음 구조를 비교할 수 있다.
 
@@ -1251,7 +1194,7 @@ Budget-Aware Memory Selection
 
 # 17. Repository Mapping
 
-각 Architecture Component는 다음 파일에 대응한다.
+현재 연결된 주요 구현 파일은 다음과 같다.
 
 ```text
 .
@@ -1315,8 +1258,6 @@ Budget-Aware Memory Selection
 │   │   └── Baseline·Proposed 실행 / JSONL / 집계 출력
 │   ├── experiment_runtime.py
 │   │   └── 다국어 SentenceTransformer embedder / 환경 기반 Agent factory
-│   │
-│   └── scenarios.json
 │
 ├── experiments/
 │   ├── configs/
@@ -1332,6 +1273,8 @@ Budget-Aware Memory Selection
     ├── interfaces.md
     └── experiments/plans/experiment-plan.md
 ```
+
+핵심 경로 외의 `benchmark/first_action_evaluator.py`는 단일 첫 Tool action 평가를 제공한다. `memory/query_analyzer.py`는 위 selector 설명의 규칙 기반 Query 분석기이며, 별도의 Memory 추출기는 아니다. `memory/experimental_packing.py`와 `memory/task_criticality.py`는 실험용 helper고, `memory/criticality_policy.py`는 별도 실험 정책이다. 별도 preflight에서 실행할 수 있지만 기본 Proposed `select_memory`나 Main Runner 정책을 바꾸지 않는다.
 
 ---
 
@@ -1429,35 +1372,22 @@ report_v1.pdf 사용
 
 ---
 
-# 19. Architecture Scope for V1
+# 19. Architecture Scope and Implementation Status
 
-7주 프로젝트 범위를 고려하여 V1에서는 다음 기능을 우선 구현한다.
+현재 레포에서 동작하는 핵심 범위는 구조화된 `MemoryItem`, 인메모리 Version Store API, semantic top-k, Version Chain/Temporal Resolution, 규칙 기반 Protected·Required State 판정, Budget-aware greedy selection, 최종 Prompt token validation, Agent/Tool orchestration, benchmark evaluation이다.
 
-**필수**
-
-```text
-Structured Memory Store
-State Versioning
-Timestamp / Turn Metadata
-Semantic Retrieval
-Version Chain Expansion
-Protected Memory
-Budget-Aware Selection
-Final Context Token Validation
-Tool Agent와 결정적 Planner(실제 LLM 교체 지점)
-Automatic Evaluation
-```
-
-**가능하면 추가**
+다음 기능은 설계·확장 범위이며 현재 실행 경로에는 연결되어 있지 않다.
 
 ```text
-BM25 Retrieval
-Entity Matching
-Temporal Decay
-Reranking
+Interaction 기반 Memory Extraction 및 자동 Store Insert
+영속 Memory Database
+BM25 Retrieval / 독립 Entity Retrieval / Reranking
+Entity-aware 또는 timestamp 기반 Utility / Temporal Decay
+0/1 Knapsack 기반 core selector
+Full Context 비교 Policy
 ```
 
-**후순위**
+후속 확장 후보:
 
 ```text
 Hierarchical Memory
@@ -1467,7 +1397,7 @@ Graph Memory
 RL-based Memory Policy
 ```
 
-V1의 목표는 복잡한 Memory System을 만드는 것이 아니라,
+프로젝트 목표는 복잡한 Memory System을 만드는 것이 아니라,
 
 > **제한된 Token Budget에서 Constraint와 최신 State를 우선적으로 보존하는 것이 실제 Agent 행동의 신뢰성과 효율성을 개선하는지 검증할 수 있는 최소한의 완전한 Architecture를 구현하는 것**
 
