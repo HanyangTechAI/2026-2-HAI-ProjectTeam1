@@ -1,0 +1,31 @@
+# 문서 안내
+
+## 먼저 볼 문서
+
+1. [연구 질문](research/research-questions.md)에서 문제와 평가 기준을 확인합니다.
+2. 시스템 구조는 [아키텍처](architecture.md), 동작 규칙은 [알고리즘](algorithm.md), 모듈 계약은 [인터페이스](interfaces.md)를 봅니다.
+3. 실행과 결과 해석은 [실험 계획](experiments/plans/experiment-plan.md)에서 시작합니다.
+4. 분석 결과는 [실험 보고서 목록](experiments/reports/README.md)에서 찾습니다.
+
+## 사용 가이드
+
+- [시나리오 fixture](guides/scenarios-usage.md)
+- [실험 데이터 생성기](guides/generator-usage.md)
+- [Evaluator](guides/evaluator-usage.md)
+
+## 디렉토리 안내
+
+| 위치 | 내용 |
+|---|---|
+| 문서 폴더 | 아키텍처, 알고리즘, 인터페이스, 메모리 스키마, 예외 사례, freeze 기준 |
+| [`guides/`](guides/) | 시나리오·데이터 생성기·평가기 사용법 |
+| [`experiments/plans/`](experiments/plans/) | 전체 실험 계획과 실행 기록 |
+| [`experiments/protocols/`](experiments/protocols/) | 개별 실험 설정 및 재현 절차 |
+| [`experiments/reports/`](experiments/reports/) | 날짜가 포함된 실험 결과와 분석 |
+| [`experiments/audits/`](experiments/audits/) | 검증, 재점검, 실행 감사 |
+| [`results/`](results/) | 보고서에서 참조하는 집계 JSON, 감사 데이터, 그래프 |
+| [`research/`](research/) | 연구 질문과 프로젝트 제안서 |
+
+`algorithm.md`는 실행 시 freeze 해시 검증에 쓰이는 고정 경로이므로 문서 폴더 바로 아래에 둡니다.
+
+

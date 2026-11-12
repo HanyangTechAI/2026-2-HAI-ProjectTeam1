@@ -1330,7 +1330,7 @@ Budget-Aware Memory Selection
     ├── memory_schema.md
     ├── algorithm.md
     ├── interfaces.md
-    └── experiment_plan.md
+    └── experiments/plans/experiment-plan.md
 ```
 
 ---

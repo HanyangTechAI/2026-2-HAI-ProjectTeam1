@@ -1623,7 +1623,7 @@ no_budget_aware_packing
 
 `full`은 모든 축을 활성화한 Proposed 기준 조건이다. Runner는 선택한 preset별로 같은 Scenario와 repeat를 실행하며 결과를 `proposed/<preset>`으로 구분한다.
 
-`tests/test_ablation.py`는 각 preset이 의도한 축만 변경하는지, Constraint가 일반 후보로 이동하는지, Temporal 확장·해석이 생략되는지, State의 Mandatory 보장만 제거되는지, Utility-only Packing도 hard Budget을 넘지 않는지를 검증한다.
+`tests/unit/memory/test_ablation.py`는 각 preset이 의도한 축만 변경하는지, Constraint가 일반 후보로 이동하는지, Temporal 확장·해석이 생략되는지, State의 Mandatory 보장만 제거되는지, Utility-only Packing도 hard Budget을 넘지 않는지를 검증한다.
 
 ## 이후 추가
 

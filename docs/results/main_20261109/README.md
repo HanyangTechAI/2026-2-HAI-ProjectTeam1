@@ -26,5 +26,5 @@ H10/H50/H100 × 1K/2K/4K/8K의 12셀, 3840회 결과를 검토하기 위한 소�
 $6.5465375를 실제 총청구액으로 보고하지 않는다. 비용 누락은 null로 유지하며
 Task Success에는 해당 실행 결과를 포함한다.
 
-[최종 분석 보고서](../../main_final_analysis_20261109.md)와
-[실험 계획·전체 결과](../../experiment_plan.md#17-전체-main-최종-결과-2026-11-09)를 함께 읽는다.
+[최종 분석 보고서](../../experiments/reports/main-final-analysis-2026-11-09.md)와
+[실험 계획·전체 결과](../../experiments/plans/experiment-plan.md#17-전체-main-최종-결과-2026-11-09)를 함께 읽는다.

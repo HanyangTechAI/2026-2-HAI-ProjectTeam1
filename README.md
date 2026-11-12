@@ -51,38 +51,38 @@ Freeze **1.0.3**으로 Horizon **10/50/100 × 입력 Budget 1K/2K/4K/8K**의
 모든 차수는 같은 commit `5d00c6d`에서 Gemini 3.1 Flash-Lite, temperature 0,
 thinking LOW, 출력 상한 2,048, top-k 5, max_steps 8, 입력 safety margin 32를 유지했다.
 기본 과제는 40개이며 3,840개의 독립 과제를 평가한 것은 아니다.
-12셀 전체 표·신뢰구간·실패 사례는 [Experiment Plan의 최종 결과](docs/experiment_plan.md#17-전체-main-최종-결과-2026-11-09)와
-[최종 분석 보고서](docs/main_final_analysis_20261109.md)를 따른다.
+12셀 전체 표·신뢰구간·실패 사례는 [Experiment Plan의 최종 결과](docs/experiments/plans/experiment-plan.md#17-전체-main-최종-결과-2026-11-09)와
+[최종 분석 보고서](docs/experiments/reports/main-final-analysis-2026-11-09.md)를 따른다.
 
 2026-11-10에는 Horizon 채움 문체의 retrieval 민감도를 별도로 점검했다. Budget 2K,
 Horizon 100의 paired scenario 40개에서 기존 반복 Mode 1, 로컬 자연어 Mode 2,
 50:50 혼합 Mode 3을 비교한 결과, Mode 1→2의 State Recall@5는 baseline에서
 `87.5%→80.0%`, Proposed 일반 후보군에서 `90.0%→80.0%`로 변했다. 이는 offline
 retrieval audit이며 Agent TSR 결과가 아니다. 범위와 한계는
-[Horizon Narrative Retrieval Bias Audit](docs/narrative_bias_audit_20261110.md)에 기록한다.
+[Horizon Narrative Retrieval Bias Audit](docs/experiments/audits/narrative-bias-audit-2026-11-10.md)에 기록한다.
 
 2026-11-11의 후속 2×2 factorial audit에서는 required State padding과 synthetic noise
 padding을 독립적으로 교체했다. 관측된 Recall 차이는 target padding 교체에서만
 나타났고(baseline −7.5%p, Proposed 일반 후보군 −10.0%p), noise 교체와 interaction은
 0이었다. 두 target 효과의 bootstrap 구간은 0을 포함하거나 경계에 닿으므로 확정적
 일반 효과로 표현하지 않는다. 자세한 설계와 해석은
-[Narrative Padding 2×2 Factorial Audit](docs/narrative_factorial_audit_20261111.md)을 따른다.
+[Narrative Padding 2×2 Factorial Audit](docs/experiments/audits/narrative-factorial-audit-2026-11-11.md)을 따른다.
 
 같은 입력의 Mode 1/2를 실제 Proposed 선택기와 Context Builder까지 확인한 후속 audit에서는
 Mode 2의 초기 Required State hit가 80%(Mode 1: 90%)였지만, 두 모드 모두 version chain
 확장 뒤 정답 State와 적용 제약을 최종 Context에 100% 포함했다. 이는 LLM 호출 전 단계
-검증으로 TSR 결과가 아니다. [Final Context Audit 보고서](docs/narrative_final_context_audit_20261111.md)에
+검증으로 TSR 결과가 아니다. [Final Context Audit 보고서](docs/experiments/audits/narrative-final-context-audit-2026-11-11.md)에
 단계별 수치와 제한을 기록했다.
 
 이어 같은 Mode 1/2 paired 과제에서 Gemini Agent를 실행한 결과 Proposed TSR은 각각
 97.5%(39/40), 100%(40/40), Vector Top-k는 87.5%(35/40), 80%(32/40)였다. 적용 승인
 과제의 Constraint Violation은 모두 0/20이었다. 이는 실제 Tool 행동을 포함한 단일 실행
-평가이며, 범위와 반복 한계는 [Narrative Mode 1/2 LLM 실행 보고서](docs/narrative_llm_execution_audit_20261111.md)에 기록했다.
+평가이며, 범위와 반복 한계는 [Narrative Mode 1/2 LLM 실행 보고서](docs/experiments/audits/narrative-llm-execution-audit-2026-11-11.md)에 기록했다.
 
 별도 attachment 재점검에서는 같은 승인 과제 하나를 Mode별 5회 실행했다. Mode 1은 검색·선택된
 정답 상태가 Context에 있었지만 `request_approval`의 `attachment`를 5회 모두 생략했고,
 Mode 2는 5회 모두 올바른 파일을 첨부했다. 이는 단일 과제 진단으로 일반적인 Mode 효과를
-뜻하지 않는다. [재점검 보고서](docs/attachment_recheck_audit_20261111.md)를 참고한다.
+뜻하지 않는다. [재점검 보고서](docs/experiments/audits/attachment-recheck-2026-11-11.md)를 참고한다.
 
 같은 날 수행한 Ablation은 2K와 4K/Horizon 100의 각 400회, 총 800회 실행이다. 두 예산 결과는
 모든 대응 실행에서 성공률, Agent 응답·도구 호출, 선택 기억, 입력·출력 tokens와 비용이
@@ -91,8 +91,8 @@ Mode 2는 5회 모두 올바른 파일을 첨부했다. 이는 단일 과제 진
 저하와 stale-state 사용이 나타났고, Constraint Preservation 제거에서는 성공률 100%와 보호
 기억 recall 90%가 함께 관측됐다. 두 실행의 OS와 commit이 달라 latency는 직접 비교하지 않는다.
 상세 결과와 한계는
-[Ablation 보고서](docs/ablation_2k_h100_analysis_20261111.md) 및
-[Experiment Plan 23절](docs/experiment_plan.md#23-ablation-2k-horizon-100-실행-2026-11-11)을 따른다.
+[Ablation 보고서](docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md) 및
+[Experiment Plan 23절](docs/experiments/plans/experiment-plan.md#23-ablation-2k-horizon-100-실행-2026-11-11)을 따른다.
 
 PR에서 확인할 수 있는 [집계 JSON·감사 결과·그래프](docs/results/main_20261109/README.md)도 함께 보존한다.
 
@@ -153,7 +153,7 @@ Freeze checksum 대상인 `experiments/prompts/system_v1.txt`, `experiments/prom
 1. **RQ1:** 동일한 Context Token Budget에서 Proposed가 기존 기억 방식보다 실제 Tool 행동을 포함한 작업 성공률(Action-Level TSR)을 높이는가?
 2. **RQ2:** Budget이 감소하거나 중요한 정보와 Task 사이의 거리(Horizon)가 증가할 때 Proposed가 제약 위반과 잘못된 State 사용을 더 잘 억제하는가?
 
-기준 문서는 [Research Questions](docs/research_questions.md)이다. 현재 Task에 필요한 State는 항상 최신 버전을 뜻하지 않는다. Historical Query에서는 요청 시점에 유효했던 과거 버전이 정답이다.
+기준 문서는 [Research Questions](docs/research/research-questions.md)이다. 현재 Task에 필요한 State는 항상 최신 버전을 뜻하지 않는다. Historical Query에서는 요청 시점에 유효했던 과거 버전이 정답이다.
 
 ## 실험 계획
 
@@ -221,8 +221,8 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 │   ├── configs/         # 실험 설정
 │   └── results/         # 실험 결과
 ├── prototype/           # 레거시 데모 스크립트와 과거 예시 출력
-├── tests/               # Memory, State, 시나리오 테스트
-├── docs/                # 연구 질문 및 설계 문서
+├── tests/               # unit, integration, and manual gates
+├── docs/                # index, core specs, and organized project documents
 ├── requirements.txt     # Python 의존성 목록
 └── README.md
 ```
@@ -242,9 +242,9 @@ Freeze 승인 전 실 Gemini 4K/8K gate는 검증된
 다음 순서로 실행하며, 중단된 동일 실행은 `run --resume`으로 이어서 완료한다.
 
 ```text
-python tests/smoke_4k8k.py prepare
-python tests/smoke_4k8k.py run
-python tests/smoke_4k8k.py report
+python tests/manual/smoke_4k8k.py prepare
+python tests/manual/smoke_4k8k.py run
+python tests/manual/smoke_4k8k.py report
 ```
 
 `report`는 실행 수와 checkpoint 완결성, 네 전략의 실제 LLM 호출, request-aware
@@ -261,25 +261,25 @@ Provider usage 회계는 완전성 우선이다. 모든 API 시도와 성공 응
 
 `memory/ablation.py`는 `full`, `no_constraint_preservation`, `no_temporal`, `no_state_mandatory`, `no_budget_aware_packing` preset을 제공한다. Runner의 `--proposed-ablations`로 하나 이상을 선택하며, 변형 실행은 `proposed/<preset>` 전략명과 설정 snapshot을 결과에 기록한다. `no_temporal`은 Version Chain Expansion과 Temporal Resolution만 끄고 Required State 강제 선택은 유지한다. 시간 판별 없이 검색된 관련 State 후보들을 필수 보존하며, 같은 key의 여러 버전도 그대로 보존한다.
 
-수정 전 v1.0.3의 2K·H100 5개 조건, 400회 실행 결과는 [Ablation Test 보고서](docs/ablation_2k_h100_20261111.md)에 기록했다.
+수정 전 v1.0.3의 2K·H100 5개 조건, 400회 실행 결과는 [Ablation Test 보고서](docs/experiments/reports/ablation-2k-h100-2026-11-11.md)에 기록했다.
 2K/4K 두 Budget의 800회 비교와 v1.0.4 Full-only 80회 재검증은
-[후속 Ablation 보고서](docs/ablation_2k_h100_analysis_20261111.md)에 정리했다. v1.0.4 재검증은
+[후속 Ablation 보고서](docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md)에 정리했다. v1.0.4 재검증은
 Full Proposed만 포함하며, 수정된 `no_temporal` preset의 재실행 결과로 해석하지 않는다.
 
-이와 별도로 수행한 [Temporal 단독 제거 재실행](docs/no_temporal_v104_2k_h100_20261111.md)은
-Mandatory State를 유지한 80회에서 90.0% 성공했다. [Budget Pressure 800회](docs/budget_pressure_analysis_20261111.md)에서는
-Flexible 탈락과 필수 기억 보존을 확인했으며, [Long Horizon 확장](docs/long_horizon_analysis_20261111.md)과
-[H100 Update 5/10 추가 분석](docs/state_update_h100_analysis_20261111.md)은 합계 6개 고유 셀·1,920회에서
+이와 별도로 수행한 [Temporal 단독 제거 재실행](docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md)은
+Mandatory State를 유지한 80회에서 90.0% 성공했다. [Budget Pressure 800회](docs/experiments/reports/budget-pressure-analysis-2026-11-11.md)에서는
+Flexible 탈락과 필수 기억 보존을 확인했으며, [Long Horizon 확장](docs/experiments/reports/long-horizon-analysis-2026-11-11.md)과
+[H100 Update 5/10 추가 분석](docs/experiments/reports/state-update-h100-analysis-2026-11-11.md)은 합계 6개 고유 셀·1,920회에서
 거리와 버전 수의 영향을 구분했다. 이 후속 문서 배포에는 Markdown 보고서만 포함하고
 결과 데이터·그림 및 별도 실험 코드·설정은 포함하지 않았다.
 
 추가로 첫 action 전 Context 구성만 대상으로 freeze 1.0.4의 budget preflight를 수행했다.
 40개 시나리오의 중간 flexible-budget 수준에서 `full`과 packing 비활성 설정의 선택 차이를
 확인했으나, LLM/Tool 행동은 평가하지 않았다. 방법과 제한은
-[Action-Time Budget Preflight 보고서](docs/action_time_preflight_report_20261111.md)와
-[Experiment Plan 24절](docs/experiment_plan.md#24-action-time-budget-preflight-2026-11-11)에 기록했다.
+[Action-Time Budget Preflight 보고서](docs/experiments/audits/action-time-preflight-2026-11-11.md)와
+[Experiment Plan 24절](docs/experiments/plans/experiment-plan.md#24-action-time-budget-preflight-2026-11-11)에 기록했다.
 
-`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/generator_usage.md)을 참고한다.
+`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
 
@@ -336,13 +336,15 @@ V1 실험 embedder는 현재 실험용으로 사용 중인 `sentence-transformer
 
 현재 `unittest` 기반 테스트 전체는 다음 명령으로 실행한다.
 
+테스트 폴더별 설명과 수동 게이트 실행법은 [tests/README.md](tests/README.md)를 참고한다.
+
 ```text
 python -m unittest discover -s tests -v
 ```
 
 GitHub Actions의 `Python CI`도 `main` push·pull request와 수동 실행에서 같은 전체 테스트를 수행한다. Ubuntu 24.04와 Python 3.12를 사용하고 CPU 전용 PyTorch 및 `requirements.txt`를 설치한 뒤 `pip check`, 주요 Python 패키지의 `compileall`, 단위 테스트 순서로 검증한다. 실제 Gemini smoke 호출은 CI에서 `GEMINI_API_KEY`를 비워 두므로 건너뛴다.
 
-`tests/test_memory.py`와 `tests/test_state.py`는 Store와 State Versioning을, `tests/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/test_baseline_context_agent_integration.py`와 `tests/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/test_proposed_pipeline.py`는 Proposed Adapter의 현재 ACTIVE State 복원을 검증하고, `tests/test_pipeline_adapter.py`는 과거 버전, Protected/Required-State 예산 실패, formatting overflow, 네 전략 공정성, Ablation 공통 schema와 Runner 기록을 검증한다. `tests/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/test_tokenizer.py`는 Gemini counter의 입력 검증, 메모리·SQLite 캐시, 재시도와 격리를 fake client로 검증한다.
+`tests/unit/memory/test_memory.py`와 `tests/unit/memory/test_state.py`는 Store와 State Versioning을, `tests/unit/memory/test_retrieval.py`는 임베딩 검증·코사인·Top-K를 검증한다. `tests/integration/test_memory_context_integration.py`는 Store와 Context Builder 경계를 검증한다. `tests/integration/test_baseline_context_agent_integration.py`와 `tests/unit/pipeline/test_pipeline.py`는 Baseline부터 다단계 Agent 실행까지를 검증한다. `tests/integration/test_proposed_pipeline.py`는 Proposed Adapter의 현재 ACTIVE State 복원을 검증하고, `tests/unit/pipeline/test_pipeline_adapter.py`는 과거 버전, Protected/Required-State 예산 실패, formatting overflow, 네 전략 공정성, Ablation 공통 schema와 Runner 기록을 검증한다. `tests/unit/memory/test_ablation.py`는 preset 계약, 축별 독립성, Constraint·Temporal·State·Packing 제거 동작과 hard Budget 유지를 검증한다. `tests/unit/context/test_tokenizer.py`는 Gemini counter의 입력 검증, 메모리·SQLite 캐시, 재시도와 격리를 fake client로 검증한다.
 
 ### 출력 상한 변경과 결과 구분 (freeze 1.0.3)
 
@@ -357,7 +359,7 @@ thinking token을 포함해 비용과 함께 측정한다. 응답별 종료 사�
 ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기준은
 [freeze 변경 내역](docs/architecture_parameter_freeze_v1.md#patch-note---v103)을 따른다.
 변경 후 동일 입력 10개를 전략별 실행한 결과는
-[2048 출력 상한 검증](docs/output_limit_2048_validation_20261109.md)에 정리한다.
+[2048 출력 상한 검증](docs/experiments/reports/output-limit-2048-validation-2026-11-09.md)에 정리한다.
 
 ## 기술 스택 후보
 
@@ -384,14 +386,14 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 
 ## 관련 문서
 
-- [Temporal 단독 제거 v1.0.4 재실행 — 80회](docs/no_temporal_v104_2k_h100_20261111.md)
-- [Budget Pressure 분석 — 800회](docs/budget_pressure_analysis_20261111.md)
-- [Long Horizon / State Update 분석 — 1,280회](docs/long_horizon_analysis_20261111.md)
-- [H100 고정 Update 5/10 추가 분석 — 신규 640회, 결합 1,920회](docs/state_update_h100_analysis_20261111.md)
-- [Main 12셀 최종 결과 분석](docs/main_final_analysis_20261109.md)
-- [2K/Horizon 100 Ablation 실험 보고서](docs/ablation_2k_h100_analysis_20261111.md)
-- [Action-Time Budget Preflight 보고서](docs/action_time_preflight_report_20261111.md)
-- [실험 계획과 실행 결과](docs/experiment_plan.md)
+- [Temporal 단독 제거 v1.0.4 재실행 — 80회](docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md)
+- [Budget Pressure 분석 — 800회](docs/experiments/reports/budget-pressure-analysis-2026-11-11.md)
+- [Long Horizon / State Update 분석 — 1,280회](docs/experiments/reports/long-horizon-analysis-2026-11-11.md)
+- [H100 고정 Update 5/10 추가 분석 — 신규 640회, 결합 1,920회](docs/experiments/reports/state-update-h100-analysis-2026-11-11.md)
+- [Main 12셀 최종 결과 분석](docs/experiments/reports/main-final-analysis-2026-11-09.md)
+- [2K/Horizon 100 Ablation 실험 보고서](docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md)
+- [Action-Time Budget Preflight 보고서](docs/experiments/audits/action-time-preflight-2026-11-11.md)
+- [실험 계획과 실행 결과](docs/experiments/plans/experiment-plan.md)
 - [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
-- [프로젝트 제안서](docs/Constraint-Preserving%20Budget-Aware%20Memory.docx)
-- [연구 질문 및 평가 방향](docs/research_questions.md)
+- [프로젝트 제안서](docs/research/constraint-preserving-budget-aware-memory.docx)
+- [연구 질문 및 평가 방향](docs/research/research-questions.md)

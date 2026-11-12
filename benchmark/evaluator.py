@@ -2,7 +2,7 @@
 
 RQ1 uses action-level task_success; RQ2 uses budget/horizon cells and
 constraint/state metrics. Required states may be current or historical.
-No agent, store, tokenizer or API is called here. See docs/evaluation_usage.md
+No agent, store, tokenizer or API is called here. See docs/guides/evaluator-usage.md
 for the input contract and the offline JSONL command.
 """
 

@@ -249,7 +249,7 @@ Planned agent runs는 `2160`이다.
 Budget `2048`, history `15000`, horizon `50`, 5 samples, seed `42`, repeat `1`이다.
 본실험 효과 크기 보고에는 사용하지 않는다.
 
-Freeze 승인용 live gate는 `tests/smoke_4k8k.py`로 별도 수행한다. 검증된 Gemini 3.1
+Freeze 승인용 live gate는 `tests/manual/smoke_4k8k.py`로 별도 수행한다. 검증된 Gemini 3.1
 Main ZIP에서 seed `42, 43`, horizon `50`의 동일한 8개 sample을 Budget `4096`과
 `8192`에 짝지어 추출하고, 네 전략을 repeat `1`로 실행한다. Budget별 `32`회, 총
 `64`회의 예정 run을 모두 완료해야 한다. 이 gate 역시 Main 효과 크기 결과에는 섞지 않는다.
@@ -372,7 +372,7 @@ Architecture/parameter가 frozen인 것과 본실험 입력이 준비된 것은 
   `requirements.txt`의 lower bound만으로 동일 weight revision까지 보장하지 않는다.
 - 전체 test와 smoke가 통과하고 `experiment.json`의 model, tokenizer, K, utility weights,
   prompt, override 목록이 이 문서와 일치하는지 확인한 뒤 main을 실행한다.
-- `tests/smoke_4k8k.py prepare`, `run`, `report`를 순서대로 수행하고 live gate의
+- `tests/manual/smoke_4k8k.py prepare`, `run`, `report`를 순서대로 수행하고 live gate의
   `smoke_gate_report.json`이 `readiness="PASS"`인지 확인한다. 중단된 동일 실행만
   `run --resume`으로 이어서 수행한다.
 

@@ -75,8 +75,8 @@ benchmark/runner.py
 - memory/query_analyzer.py의 규칙 기반 Temporal Intent·Entity·Required Tool 분석
 - memory/selector.py의 Version Chain Expansion, Temporal/Protected applicability/Required-State Resolution
 - memory/selector.py의 효용 계산, Mandatory 중복 제거·예산 검증, Utility-per-Token Flexible Selection, 선택 전 재토큰화와 상위 `select_memory` 경로
-- tests/test_memory.py와 tests/test_state.py의 Memory Store 및 State Versioning 단위 테스트
-- tests/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
+- tests/unit/memory/test_memory.py와 tests/unit/memory/test_state.py의 Memory Store 및 State Versioning 단위 테스트
+- tests/integration/test_memory_context_integration.py의 Memory Store → Context Builder 경계 테스트
 - context/tokenizer.py의 공용 TokenCounter, GeminiTokenCounter, count 검증과 token_count_mode
 - context/builder.py의 Prompt 조립과 최종 Budget Validation
 - memory/baselines.py의 Sliding Window, Vector Top-k, Utility-per-Token
@@ -86,12 +86,12 @@ benchmark/runner.py
 - benchmark/runner.py의 네 전략 시나리오 실행과 JSONL/summary 출력
 - benchmark/evaluator.py의 snapshot 평가와 집계
 - benchmark/generator.py의 설정 grid 기반 temporal_update/approval 생성, 측정 및 셀별 저장
-- tests/test_baseline_context_agent_integration.py, tests/test_pipeline.py, tests/test_pipeline_adapter.py의 경계·파이프라인 테스트
-- tests/test_tokenizer.py의 Gemini CountTokens fake-client, 메모리·SQLite 캐시, 재시도·격리 테스트
-- tests/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
-- tests/test_proposed_pipeline.py의 Snapshot Store → Proposed Policy → Agent 현재 State 통합 테스트
+- tests/integration/test_baseline_context_agent_integration.py, tests/unit/pipeline/test_pipeline.py, tests/unit/pipeline/test_pipeline_adapter.py의 경계·파이프라인 테스트
+- tests/unit/context/test_tokenizer.py의 Gemini CountTokens fake-client, 메모리·SQLite 캐시, 재시도·격리 테스트
+- tests/unit/memory/test_retrieval.py의 임베딩·코사인·Top-K·동률 정렬 테스트
+- tests/integration/test_proposed_pipeline.py의 Snapshot Store → Proposed Policy → Agent 현재 State 통합 테스트
 - memory/ablation.py의 SelectorAblationConfig와 다섯 preset, Runner의 Proposed 변형 반복·결과 기록
-- tests/test_ablation.py의 preset 검증, 축별 독립성, Selector 결과와 hard Budget 단위 테스트
+- tests/unit/memory/test_ablation.py의 preset 검증, 축별 독립성, Selector 결과와 hard Budget 단위 테스트
 
 미연결 또는 추가 검증 필요
 - 과거 State와 현재 행동 Constraint를 함께 요구하는 복합 시점 통합 테스트
@@ -724,14 +724,14 @@ def list_session_memories(
 현재 단위 테스트는 다음 계약을 실행 가능한 형태로 검증한다.
 
 ```text
-tests/test_memory.py
+tests/unit/memory/test_memory.py
 - insert/get 및 중복 ID·잘못된 입력 거부
 - Session별 전체 목록과 Session + memory_key 격리
 - ACTIVE 조회와 Version Chain 정렬
 - 활성·보호된 Constraint만 별도 조회
 - 알 수 없는 선행 버전, 다른 Session/Key 참조, 역행하는 valid_from 거부
 
-tests/test_state.py
+tests/unit/memory/test_state.py
 - 최초 State의 ACTIVE 등록과 새 State의 자동 대체
 - 3단계 Version Chain의 양방향 참조와 valid_to 갱신
 - Key/Session별 ACTIVE 유일성 및 독립성
@@ -742,7 +742,7 @@ tests/test_state.py
 
 영속화, 동시성, 프로세스 간 공유와 검색 인덱스는 이 테스트 범위에 포함되지 않는다.
 
-`tests/test_memory_context_integration.py`는 현재 Store와 Context Builder 사이의 다음 계약을 추가로 검증한다.
+`tests/integration/test_memory_context_integration.py`는 현재 Store와 Context Builder 사이의 다음 계약을 추가로 검증한다.
 
 ```text
 - 현재 ACTIVE State와 활성·보호된 Constraint가 각 Context 섹션에 포함됨
@@ -751,7 +751,7 @@ tests/test_state.py
   INSUFFICIENT_CONTEXT_BUDGET과 context=None을 반환함
 ```
 
-이 테스트의 `selection_from_store`는 Context Builder 경계만 격리하기 위한 helper이므로 General Retrieval과 Temporal Resolution을 검증하지 않는다. 실제 Proposed 현재 State 통합 경로는 `tests/test_proposed_pipeline.py`가 별도로 검증한다.
+이 테스트의 `selection_from_store`는 Context Builder 경계만 격리하기 위한 helper이므로 General Retrieval과 Temporal Resolution을 검증하지 않는다. 실제 Proposed 현재 State 통합 경로는 `tests/integration/test_proposed_pipeline.py`가 별도로 검증한다.
 
 ---
 
@@ -1993,7 +1993,7 @@ metadata
 `metadata.history_length_tokens`와 `noise_memory_ratio`는 실험 셀의 요청값을 유지하고,
 `actual_history_length_tokens`와 `actual_noise_memory_ratio`에 실측값을 기록한다.
 Budget/Horizon 간 공유된 ID를 보존하므로 Runner에는 셀 JSON 하나씩 전달한다.
-세부 계약과 CLI는 [generator_usage.md](generator_usage.md)를 따른다.
+세부 계약과 CLI는 [generator-usage.md](guides/generator-usage.md)를 따른다.
 
 `horizon_generation_mode`는 정수 `1`~`5` 중 하나다. `1`은 기존 반복 문장, `2`는
 결정적 로컬 자연어, `3`은 둘의 50:50 혼합, `4`는 LLM 자연어, `5`는 기존 문장과
@@ -2006,20 +2006,20 @@ effective config와 scenario metadata에 기록한다.
 `benchmark/narrative_bias_audit.py`는 같은 scenario와 cell 조건을 가진 Mode 1~3
 데이터의 offline retrieval을 paired 비교한다. 전체 후보군과 Proposed 일반 후보군의
 Recall@k, rank, similarity, Top-k Jaccard를 기록하지만 Agent/TSR을 평가하지 않는다.
-Audit 계약과 실행 예시는 [generator_usage.md](generator_usage.md#mode-13-retrieval-bias-audit)를
+Audit 계약과 실행 예시는 [generator-usage.md](guides/generator-usage.md#mode-13-retrieval-bias-audit)를
 따른다.
 
 `benchmark/narrative_factorial_audit.py`는 Mode 1·2의 required State target padding과
 synthetic noise padding을 독립적으로 교체한 2×2 offline retrieval 조건을 만든다.
 scenario·Memory 불변 필드와 정답 content를 검증한 뒤 paired Recall@k의 Target 효과,
 Noise 효과, interaction과 bootstrap 구간을 출력한다. 이는 Agent/TSR 평가가 아니며
-[factorial 실행 계약](generator_usage.md#target--noise-22-factorial-audit)을 따른다.
+[factorial 실행 계약](guides/generator-usage.md#target--noise-22-factorial-audit)을 따른다.
 
 `benchmark/proposed_context_audit.py`는 Mode 1/2 paired 입력에서 Proposed의 실제
 retrieval부터 Context Builder까지 단계별 결과를 감사한다. Main freeze/config와 두 입력의
 동일성을 검사하고, initial miss 복구·최종 Required State 및 적용 Constraint·실효 Budget을
 기록한다. Agent/LLM 동작은 실행하지 않는다. CLI와 산출물 계약은
-[Final Context audit 실행 설명](generator_usage.md#proposed-최종-context-단계별-audit)을 따른다.
+[Final Context audit 실행 설명](guides/generator-usage.md#proposed-최종-context-단계별-audit)을 따른다.
 
 추가 실험 변수의 코드상 이름:
 
