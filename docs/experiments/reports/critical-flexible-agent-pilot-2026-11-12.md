@@ -39,7 +39,7 @@ Pilot 입력은 사전 검증된 Critical Flexible 데이터 중 4개 seed만 �
 
 ## 해석과 다음 단계
 
-Preflight에서 관측한 75%·조건 C의 Context 선택 차이가 Agent의 첫 행동에서도 반복됐다. 이 pilot에서 확인된 실질적인 정보는 Full preset의 8개 Critical omission과 그에 따른 첫 Tool call 누락이다. 반면 최종 작업 완료, 여러 단계 Tool 흐름, 장기 성공률은 측정하지 못했다.
+Preflight에서 관측한 75%·조건 C의 Context 선택 차이가 Agent의 첫 행동에서도 나타났다. 이 pilot에서 확인된 실질적인 정보는 Full preset의 8개 Critical omission과 그에 따른 첫 Tool call 누락이다. 이후 별도 seed·템플릿의 160-pair holdout에서도 조건 C의 큰 첫 행동 격차가 재현됐다. 반면 이 pilot과 holdout 모두 최종 작업 완료, 여러 단계 Tool 흐름, 장기 성공률은 측정하지 못했다. 후속 비교는 [75% Holdout 보고서](critical-flexible-holdout-2026-11-12.md)를 참고한다.
 
 다음 end-to-end 평가에서는 동일한 고정 입력과 두 preset을 유지하면서 `max_steps`를 충분히 늘려 Tool 결과 후 Agent가 완료를 판단할 수 있게 해야 한다. 기본 과제별 반복도 추가해야 하며, single-step pilot의 0/32 성공률을 후속 결과와 합산하면 안 된다.
 

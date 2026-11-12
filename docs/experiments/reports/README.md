@@ -22,3 +22,4 @@
 
 - [Critical Flexible 라벨 Preflight](critical-flexible-preflight-2026-11-12.md)
 - [Critical Flexible 단일 Step Agent Pilot](critical-flexible-agent-pilot-2026-11-12.md)
+- [Critical Flexible 75% 단일 Step Holdout](critical-flexible-holdout-2026-11-12.md)

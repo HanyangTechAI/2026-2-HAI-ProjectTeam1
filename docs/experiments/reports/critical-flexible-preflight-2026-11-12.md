@@ -48,7 +48,7 @@
 
 이 후속 데이터는 이전 Action-Time audit의 핵심 한계였던 “중요 Flexible 기억의 정답 라벨 부재”를 보완한다. 이번 조건에서 Full의 token-aware packing은 짧은 기억을 우선해 길고 중요한 기억을 제외할 수 있으며, 이는 단순 Flexible 전체 회수율만으로는 드러나지 않았던 실패다.
 
-결과는 합성 시나리오 40개와 고정된 Freeze 1.0.4, 특정 모델·임베딩 및 정해진 길이 범위에 한정된다. 반복 조건과 장기 온라인 Memory 생성은 평가하지 않았다. `no_budget_aware_packing`의 관측 우위를 일반적인 정책 우위로 확대할 수 없고, 실제 Agent의 작업 성공이나 제약 위반에 미치는 영향도 이 preflight만으로 판단할 수 없다. 이 한계를 살피기 위한 단일 step Agent probe 결과는 [후속 Pilot 보고서](critical-flexible-agent-pilot-2026-11-12.md)에 별도로 기록했다.
+결과는 합성 시나리오 40개와 고정된 Freeze 1.0.4, 특정 모델·임베딩 및 정해진 길이 범위에 한정된다. 반복 조건과 장기 온라인 Memory 생성은 평가하지 않았다. `no_budget_aware_packing`의 관측 우위를 일반적인 정책 우위로 확대할 수 없고, 실제 Agent의 작업 성공이나 제약 위반에 미치는 영향도 이 preflight만으로 판단할 수 없다. 이 한계를 살피기 위한 단일 step Agent probe와 별도 seed·템플릿 holdout 결과는 [후속 Pilot 보고서](critical-flexible-agent-pilot-2026-11-12.md)와 [75% Holdout 보고서](critical-flexible-holdout-2026-11-12.md)에 기록했다.
 
 ## 재현과 산출물
 

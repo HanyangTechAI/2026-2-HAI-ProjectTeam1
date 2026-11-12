@@ -11,6 +11,7 @@
 
 - [Critical Flexible 라벨 Preflight](experiments/reports/critical-flexible-preflight-2026-11-12.md) — 긴 핵심 기억이 중간 예산에서 탈락하는 조건을 분석합니다.
 - [Critical Flexible 단일 Step Agent Pilot](experiments/reports/critical-flexible-agent-pilot-2026-11-12.md) — 첫 Tool 행동을 기록하며 `max_steps=1`의 성공률 해석 제한을 명시합니다.
+- [Critical Flexible 75% 단일 Step Holdout](experiments/reports/critical-flexible-holdout-2026-11-12.md) — 160개 paired scenario의 첫 행동과 Tool 효과를 확인합니다.
 - [11월 12일 Pipeline Smoke 점검](experiments/audits/pipeline-smoke-2026-11-12.md) — 5개 smoke scenario의 20회 실행 상태를 확인합니다.
 
 ## 사용 가이드

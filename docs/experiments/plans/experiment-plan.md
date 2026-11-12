@@ -1292,7 +1292,7 @@ planning latency는 직접 비교하지 않는다.
 따라서 고정 절대예산 sweep이나 행동 수준 실험으로 해석하지 않는다. 상세 방법·한계·재현 메타데이터는
 [Action-Time Budget Preflight 보고서](../audits/action-time-preflight-2026-11-11.md)를 따른다.
 
-## 25. Critical Flexible 라벨 Preflight와 Agent Pilot (2026-11-12)
+## 25. Critical Flexible Preflight, Agent Pilot 및 Holdout (2026-11-12)
 
 24절의 라벨 부재를 보완하기 위해, Critical Flexible 1개와 distractor 3개를 사전 지정한
 데이터셋으로 Freeze 1.0.4 preflight를 수행했다. `file_lookup`과 `approved_email` 각 20개 기본
@@ -1318,3 +1318,5 @@ Full은 Critical selection omission 8/32, packing 비활성은 0/32였고 Expect
 Task success는 0/32였다. 이를 성공률 비교로 해석하지 않는다. 이 pilot은 첫 step의 진단으로만 보존하며,
 end-to-end 결론에는 여러 step과 추가 반복이 필요하다. 실행 메타데이터·평가와 한계는
 [Agent Pilot 보고서](../reports/critical-flexible-agent-pilot-2026-11-12.md)에 기록했다.
+
+pilot 이후 별도 holdout seed 100–119와 holdout 전용 템플릿으로 40개 기본 과제를 만들고, 같은 75% 예산에서 4개 조건으로 확장한 160개 scenario를 preset별 한 번씩 실행했다(320 runs, 160 paired scenarios). 첫 Tool/action·필수 인자·작업별 Tool 효과가 모두 맞는 비율은 Full 117/160 (73.1%), packing 비활성 153/160 (95.6%)였고 paired 차이는 −22.5%p였다. 조건별 차이는 A +7.5%p, B 0%p, C −97.5%p, D 0%p로 조건 C에 집중됐다. `max_steps=1` 때문에 end-to-end Task success는 여전히 0/160이며 이 결과를 완료율로 해석하지 않는다. 독립 기본 과제 40개, 반복 1회, 첫 행동 지표라는 한계를 포함한 세부 결과와 재현 정보는 [75% Holdout 보고서](../reports/critical-flexible-holdout-2026-11-12.md)에 기록했다.

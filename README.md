@@ -275,10 +275,12 @@ Flexible 탈락과 필수 기억 보존을 확인했으며, [Long Horizon 확장
 
 첫 action 전 Context 구성만 본 2026-11-11 Action-Time Preflight는 중요 Flexible 라벨이 없었다.
 2026-11-12 후속 preflight는 라벨이 있는 160개 시나리오에서 75% 예산·조건 C의 Full preset이
-Critical 기억을 40/40회 제외하는 경계를 찾았다. 이어진 64-run Agent pilot은 동일 조건의 첫
-Tool 행동 차이를 관측했지만 `max_steps=1`이라 Task 성공률을 비교할 수 없다. 상세 결과와 제한은
+Critical 기억을 40/40회 제외하는 경계를 찾았다. 64-run Agent pilot에 이어 별도 seed·템플릿의
+160-pair holdout에서도 첫 행동 정확도는 Full 117/160, packing 비활성 153/160이었으며 차이는
+조건 C에 집중됐다. 두 실행 모두 `max_steps=1`이므로 Task 성공률을 비교할 수 없다. 상세 결과와 제한은
 [라벨 Preflight 보고서](docs/experiments/reports/critical-flexible-preflight-2026-11-12.md),
 [Agent Pilot 보고서](docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md),
+[75% Holdout 보고서](docs/experiments/reports/critical-flexible-holdout-2026-11-12.md),
 [기존 Action-Time audit](docs/experiments/audits/action-time-preflight-2026-11-11.md) 및
 [Experiment Plan 24–25절](docs/experiments/plans/experiment-plan.md)에 기록했다.
 
