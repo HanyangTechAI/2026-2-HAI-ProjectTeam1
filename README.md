@@ -273,11 +273,14 @@ Flexible 탈락과 필수 기억 보존을 확인했으며, [Long Horizon 확장
 거리와 버전 수의 영향을 구분했다. 이 후속 문서 배포에는 Markdown 보고서만 포함하고
 결과 데이터·그림 및 별도 실험 코드·설정은 포함하지 않았다.
 
-추가로 첫 action 전 Context 구성만 대상으로 freeze 1.0.4의 budget preflight를 수행했다.
-40개 시나리오의 중간 flexible-budget 수준에서 `full`과 packing 비활성 설정의 선택 차이를
-확인했으나, LLM/Tool 행동은 평가하지 않았다. 방법과 제한은
-[Action-Time Budget Preflight 보고서](docs/experiments/audits/action-time-preflight-2026-11-11.md)와
-[Experiment Plan 24절](docs/experiments/plans/experiment-plan.md#24-action-time-budget-preflight-2026-11-11)에 기록했다.
+첫 action 전 Context 구성만 본 2026-11-11 Action-Time Preflight는 중요 Flexible 라벨이 없었다.
+2026-11-12 후속 preflight는 라벨이 있는 160개 시나리오에서 75% 예산·조건 C의 Full preset이
+Critical 기억을 40/40회 제외하는 경계를 찾았다. 이어진 64-run Agent pilot은 동일 조건의 첫
+Tool 행동 차이를 관측했지만 `max_steps=1`이라 Task 성공률을 비교할 수 없다. 상세 결과와 제한은
+[라벨 Preflight 보고서](docs/experiments/reports/critical-flexible-preflight-2026-11-12.md),
+[Agent Pilot 보고서](docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md),
+[기존 Action-Time audit](docs/experiments/audits/action-time-preflight-2026-11-11.md) 및
+[Experiment Plan 24–25절](docs/experiments/plans/experiment-plan.md)에 기록했다.
 
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. main ZIP을 압축 해제한 뒤 셀별 JSON을 Runner에 전달한다. 두 기존 데이터는 공백 기준 counter로 생성한 입력이며 실제 모델 성능 결과가 아니다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
@@ -393,6 +396,9 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 - [Main 12셀 최종 결과 분석](docs/experiments/reports/main-final-analysis-2026-11-09.md)
 - [2K/Horizon 100 Ablation 실험 보고서](docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md)
 - [Action-Time Budget Preflight 보고서](docs/experiments/audits/action-time-preflight-2026-11-11.md)
+- [Critical Flexible 라벨 Preflight — 조건 C 75% 예산 진단](docs/experiments/reports/critical-flexible-preflight-2026-11-12.md)
+- [Critical Flexible 단일 Step Agent Pilot — 첫 행동 결과와 한계](docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md)
+- [11월 12일 Pipeline Smoke 점검 — 20회](docs/experiments/audits/pipeline-smoke-2026-11-12.md)
 - [실험 계획과 실행 결과](docs/experiments/plans/experiment-plan.md)
 - [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/research/constraint-preserving-budget-aware-memory.docx)

@@ -7,6 +7,12 @@
 3. 실행과 결과 해석은 [실험 계획](experiments/plans/experiment-plan.md)에서 시작합니다.
 4. 분석 결과는 [실험 보고서 목록](experiments/reports/README.md)에서 찾습니다.
 
+## 최근 추가 보고서
+
+- [Critical Flexible 라벨 Preflight](experiments/reports/critical-flexible-preflight-2026-11-12.md) — 긴 핵심 기억이 중간 예산에서 탈락하는 조건을 분석합니다.
+- [Critical Flexible 단일 Step Agent Pilot](experiments/reports/critical-flexible-agent-pilot-2026-11-12.md) — 첫 Tool 행동을 기록하며 `max_steps=1`의 성공률 해석 제한을 명시합니다.
+- [11월 12일 Pipeline Smoke 점검](experiments/audits/pipeline-smoke-2026-11-12.md) — 5개 smoke scenario의 20회 실행 상태를 확인합니다.
+
 ## 사용 가이드
 
 - [시나리오 fixture](guides/scenarios-usage.md)

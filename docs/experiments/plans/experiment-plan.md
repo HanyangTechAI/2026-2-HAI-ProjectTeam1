@@ -32,6 +32,9 @@ Target/Noise padding을 분리한 2×2 후속 audit은
 Freeze 1.0.4의 첫 action 이전 예산 preflight audit은
 [24절](#24-action-time-budget-preflight-2026-11-11)과
 [별도 보고서](../audits/action-time-preflight-2026-11-11.md)에 기록한다.
+중요 Flexible 라벨을 포함한 후속 preflight와 단일-step Agent pilot은
+[25절](#25-critical-flexible-라벨-preflight와-agent-pilot-2026-11-12)과
+[두 실험 보고서](../reports/README.md)에 기록한다.
 
 ## 실행 완료 및 결과 요약
 
@@ -1288,3 +1291,30 @@ planning latency는 직접 비교하지 않는다.
 시나리오별 budget 구간은 floor 1,262–1,325, ceiling 1,334–1,390 tokens로 서로 다르다.
 따라서 고정 절대예산 sweep이나 행동 수준 실험으로 해석하지 않는다. 상세 방법·한계·재현 메타데이터는
 [Action-Time Budget Preflight 보고서](../audits/action-time-preflight-2026-11-11.md)를 따른다.
+
+## 25. Critical Flexible 라벨 Preflight와 Agent Pilot (2026-11-12)
+
+24절의 라벨 부재를 보완하기 위해, Critical Flexible 1개와 distractor 3개를 사전 지정한
+데이터셋으로 Freeze 1.0.4 preflight를 수행했다. `file_lookup`과 `approved_email` 각 20개 기본
+과제를 조건 A–D(핵심/잡음 길이 조합)로 확장한 160 scenarios에서 다섯 예산 수준과 두 preset을
+비교했다. 총 1,600 Context 평가와 800 paired cases가 정상 종료했고 overflow와 Mandatory 누락은
+없었다.
+
+| Flexible 예산 수준 | Critical feasible | Full Critical 선택 | Packing 비활성 Critical 선택 | 선택 집합 차이 |
+|---:|---:|---:|---:|---:|
+| 0% | 0/160 | 0/160 | 0/160 | 0 |
+| 25% | 40/160 | 40/160 | 40/160 | 0 |
+| 50% | 120/160 | 120/160 | 120/160 | 0 |
+| 75% | 160/160 | 120/160 | 160/160 | 40 |
+| 100% | 160/160 | 160/160 | 160/160 | 0 |
+
+75%의 40개 차이는 전부 긴 Critical·짧은 distractor인 조건 C에 나타났다. 이 결과는 예산 안에
+넣을 수 있는 중요한 Flexible 기억이 비용 효율 기준의 선택에서 빠질 수 있음을 보인다. 상세한
+조건별 결과, 점수 진단, 데이터 해시와 재현 절차는 [라벨 Preflight 보고서](../reports/critical-flexible-preflight-2026-11-12.md)를 따른다.
+
+같은 75% 예산의 32개 scenario로 실제 Gemini Agent 첫 step을 preset별 한 번 실행했다(총 64회).
+Full은 Critical selection omission 8/32, packing 비활성은 0/32였고 Expected Tool call은 각각
+24/32와 32/32였다. 두 preset 모두 `max_steps=1`로 모든 run이 `goal_completed=false`에서 끝나
+Task success는 0/32였다. 이를 성공률 비교로 해석하지 않는다. 이 pilot은 첫 step의 진단으로만 보존하며,
+end-to-end 결론에는 여러 step과 추가 반복이 필요하다. 실행 메타데이터·평가와 한계는
+[Agent Pilot 보고서](../reports/critical-flexible-agent-pilot-2026-11-12.md)에 기록했다.

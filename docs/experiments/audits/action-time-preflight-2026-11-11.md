@@ -47,3 +47,7 @@ Floor는 시나리오별 1,262–1,325 tokens, ceiling은 1,334–1,390 tokens �
 - `selection_details.csv` 및 `.jsonl`: 시나리오·예산·preset별 선택 결과.
 
 이 디렉터리는 `.gitignore` 규칙으로 추적되지 않을 수 있다. 재현 시 동일한 freeze된 입력과 config를 사용하고, 기존 결과를 덮어쓰지 않는 새 output 경로를 지정한다.
+
+## 후속 검증
+
+이 audit의 입력에는 중요 Flexible Memory 라벨이 없어 선택 차이의 정답성을 판별할 수 없었다. 2026-11-12에는 Critical Flexible을 사전 라벨링한 160개 시나리오에서 같은 두 preset과 예산 수준을 비교했다. 75% 예산의 조건 C에서 Full이 Critical을 40/40회 누락한 결과와 그 해석은 [Critical Flexible 라벨 Preflight 보고서](../reports/critical-flexible-preflight-2026-11-12.md)에 기록했다. 첫 Tool 행동까지 실행한 단일-step pilot은 별도 [Agent Pilot 보고서](../reports/critical-flexible-agent-pilot-2026-11-12.md)를 참고한다.

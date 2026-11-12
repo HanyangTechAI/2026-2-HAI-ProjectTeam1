@@ -17,3 +17,8 @@
 - [Budget Pressure 분석](budget-pressure-analysis-2026-11-11.md)
 - [Long Horizon 분석](long-horizon-analysis-2026-11-11.md)
 - [H100 State Update 분석](state-update-h100-analysis-2026-11-11.md)
+
+## Critical Flexible 후속 실험 · 2026-11-12
+
+- [Critical Flexible 라벨 Preflight](critical-flexible-preflight-2026-11-12.md)
+- [Critical Flexible 단일 Step Agent Pilot](critical-flexible-agent-pilot-2026-11-12.md)
