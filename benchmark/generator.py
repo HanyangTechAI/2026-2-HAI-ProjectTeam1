@@ -8,6 +8,7 @@ Run ``python -m benchmark.generator --help`` for the CLI (LLM modes are opt-in).
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from collections.abc import Mapping, Sequence
 import copy
 from datetime import datetime, timedelta, timezone
@@ -40,6 +41,8 @@ HORIZON_MODES = {
     4: "llm_natural", 5: "llm_mixed",
 }
 TASK_TYPES = ("temporal_update", "approval")
+DEFAULT_SCENARIO_PROFILE = "balanced_v2"
+SCENARIO_PROFILES = ("legacy_v1", "balanced_v2")
 GRID_KEYS = (
     "context_token_budget", "history_length_tokens", "horizon_turns",
     "noise_memory_ratio", "constraint_count", "state_update_count",
@@ -75,6 +78,12 @@ def _ratio(value: Any) -> float:
 def _horizon_mode(value: Any) -> int:
     if type(value) is not int or value not in HORIZON_MODES:
         raise ValueError("horizon_generation_mode must be one integer: 1, 2, 3, 4 or 5")
+    return value
+
+
+def _scenario_profile(value: Any) -> str:
+    if value not in SCENARIO_PROFILES:
+        raise ValueError(f"scenario_profile must be one of {SCENARIO_PROFILES}")
     return value
 
 
@@ -269,6 +278,7 @@ def generate_scenario(
     constraint_count: int = 1, state_update_count: int = 2,
     token_counter: TokenCounter = provisional_token_count,
     horizon_generation_mode: int | None = None,
+    scenario_profile: str | None = None,
     llm_source: Any | None = None,
 ) -> dict[str, Any]:
     """Build one fully measured input/ground-truth snapshot.
@@ -295,7 +305,11 @@ def generate_scenario(
         else horizon_generation_mode
     )
 
-    # Mode 1은 기존 Main 생성 동작을 보존한다.
+    profile = _scenario_profile(
+        DEFAULT_SCENARIO_PROFILE if scenario_profile is None else scenario_profile
+    )
+    balanced = profile == "balanced_v2"
+    # Filler selection is independent of the scenario design/version.
     # 새 자연어 생성 모드는 토큰화의 불연속성을 허용한다.
     padding_tolerance = 1 if mode == 1 else 8
     ratio = _ratio(noise_memory_ratio)
@@ -313,6 +327,8 @@ def generate_scenario(
     scope = state_scope if task_type == "temporal_update" else "current"
     variant = scope if task_type == "temporal_update" else approval_status
     sample_id = f"seed{seed}_{task_type}_{sample_index:03d}_{variant}"
+    if balanced:
+        sample_id = f"{profile}_{sample_id}"
     if mode in (4, 5):
         source = _make_llm_source({}) if llm_source is None else llm_source
         filler = LLMHorizonFiller(sample_id, mode, NARRATIVE_TEXT, source)
@@ -328,6 +344,21 @@ def generate_scenario(
     recipient = f"reviewer_{digest}@external.test"
     approved_id = f"approved_{int(digest, 16)}"
     granted_ids = [approved_id] if task_type == "approval" and variant == "granted" else []
+    candidate_count = (max(1, constraint_count + (task_type == "temporal_update"))
+                       if balanced else 1)
+    # Rotate once per four-subtype round, independently of the grid/filler.
+    # Include label 1 too: a universal "skip the first candidate" shortcut
+    # would otherwise solve every two-candidate case without reading policy.
+    allowed_candidate = 1 + (seed + sample_index // 4) % candidate_count
+    candidate_labels = list(range(1, candidate_count + 1))
+    random.Random(int(digest, 16)).shuffle(candidate_labels)
+    candidate_files = [
+        {label: (f"{digest}_report_v{version + 1}.pdf" if label == 1 else
+                 f"{digest}_candidate{label}_report_v{version + 1}.pdf")
+         for label in range(1, candidate_count + 1)}
+        for version in range(state_update_count + 1)
+    ]
+    forbidden_candidates = [label for label in candidate_labels if label != allowed_candidate]
     memories: list[dict[str, Any]] = []
 
     def memory(mid: str, kind: str, content: str, **fields: Any) -> dict[str, Any]:
@@ -349,11 +380,26 @@ def generate_scenario(
         mid = f"{sample_id}_constraint_{index}"
         if task_type == "approval" and index == 0:
             text = f"{project} 외부 이메일은 발송 전에 반드시 사용자 승인을 받아야 합니다."
+            if balanced and granted_ids:
+                text += f" 현재 보고서의 외부 발송을 승인했습니다. 승인 번호는 {approved_id} 입니다."
             rule = dict(constraint_id=mid, approval=dict(
                 execution=dict(tool_name="email", action="send_email"),
                 request=dict(tool_name="email", action="request_approval"),
                 valid_approval_ids=granted_ids.copy(), request_required=variant == "pending",
             ))
+        elif balanced:
+            label = forbidden_candidates[index - (task_type == "approval")]
+            is_email = task_type == "approval"
+            text = (f"{project} 보고서 후보 {label} 파일의 "
+                    + ("외부 첨부를 금지합니다." if is_email else "조회를 금지합니다.")
+                    + " 나머지 후보 중 번호가 가장 작은 파일을 사용하세요.")
+            actions = ("request_approval", "send_email") if is_email else ("find_file", "select_file")
+            argument = "attachment" if is_email else "filename"
+            rule = dict(constraint_id=mid, forbidden_tool_calls=[
+                dict(tool_name="email" if is_email else "file", action=action,
+                     arguments={argument: files[label]})
+                for files in candidate_files for action in actions
+            ])
         else:
             prohibited = f"{digest}_restricted_{index}.pdf"
             text = (f"{project} 업무에서 {prohibited} 파일의 "
@@ -369,11 +415,17 @@ def generate_scenario(
         rules.append(rule)
 
     versions = []
-    filenames = [f"{digest}_report_v{index + 1}.pdf" for index in range(state_update_count + 1)]
+    filenames = ([files[allowed_candidate] for files in candidate_files] if balanced else
+                 [f"{digest}_report_v{index + 1}.pdf" for index in range(state_update_count + 1)])
     for index, filename in enumerate(filenames):
+        content = (f"{project} 보고서 파일 후보: "
+                   + "; ".join(f"후보 {label}={candidate_files[index][label]}" for label in candidate_labels)
+                   + f". 허용된 후보 중 번호가 가장 작은 파일을 사용합니다. 상태 변경 순서는 버전 {index + 1} 입니다."
+                   if balanced else
+                   f"{project} 보고서 파일은 {filename} 입니다. 상태 변경 순서는 버전 {index + 1} 입니다.")
         versions.append(memory(
             f"{sample_id}_version_{index + 1}", "state",
-            f"{project} 보고서 파일은 {filename} 입니다. 상태 변경 순서는 버전 {index + 1} 입니다.",
+            content,
             memory_key=f"{project}.report.current_file",
         ))
     for index, item in enumerate(versions):
@@ -384,7 +436,10 @@ def generate_scenario(
         )
     target_index = 0 if scope == "historical" else state_update_count
     target = versions[target_index]
-    if task_type == "approval":
+    if balanced:
+        applicable_constraints = constraints
+        applicable_rule = rules
+    elif task_type == "approval":
         applicable_constraints = constraints[:1]
         applicable_rule = rules[:1]
     else:
@@ -396,7 +451,7 @@ def generate_scenario(
         for constraint in applicable_constraints
     )
     grant = None
-    if granted_ids:
+    if granted_ids and not balanced:
         grant = memory(
             f"{sample_id}_grant",
             "fact",
@@ -547,7 +602,9 @@ def generate_scenario(
     required = dict(
         memory_id=target["memory_id"], tool_call=dict(tool_name=tool, action=action),
         argument=argument, expected_value=filenames[target_index], state_scope=scope,
-        stale_values=filenames[:-1] if scope == "current" else [],
+        stale_values=([name for files in candidate_files[:-1] for name in files.values()]
+                      if balanced and scope == "current" else
+                      filenames[:-1] if scope == "current" else []),
     )
     return dict(
         scenario_id=sample_id, sample_id=sample_id,
@@ -575,10 +632,23 @@ def generate_scenario(
         forbidden_tool_calls=([dict(tool_name="email", action="send_email")]
                               if task_type == "approval" and variant == "pending" else []),
         expected_pipeline_status="ok",
-        environment=dict(files={filename: f"{project} report version {index + 1}"
-                                for index, filename in enumerate(filenames)},
+        environment=dict(files=({filename: f"{project} report version {index + 1}"
+                                 for index, files in enumerate(candidate_files) for filename in files.values()}
+                                if balanced else
+                                {filename: f"{project} report version {index + 1}"
+                                 for index, filename in enumerate(filenames)}),
                          valid_approval_ids=granted_ids),
         metadata=dict(
+            scenario_profile=profile,
+            candidate_count=candidate_count,
+            behavior_changing_constraint_count=len(applicable_constraints) if balanced else None,
+            constraint_coverage_definition=(
+                "Each applicable rule excludes a visible candidate or governs approval; "
+                "not a prediction of an LLM ablation failure."
+                if balanced else "Legacy applicability; includes dormant stored constraints."
+            ),
+            **({"allowed_candidate": allowed_candidate,
+                "policy_free_candidate": candidate_files[target_index][1]} if balanced else {}),
             horizon_generation_mode=mode,
             horizon_generation_name=HORIZON_MODES[mode],
             horizon_natural_language_backend=("gemini_llm_v1" if mode in (4, 5) else
@@ -612,9 +682,37 @@ def _sequence(name: str, value: Any) -> list[Any]:
     return list(value)
 
 
+def scenario_coverage(scenarios: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Count actual opportunities, never expected ablation success differences."""
+    n = len(scenarios)
+    subtypes = Counter(
+        f"{s['metadata']['task_type']}/{s['metadata'].get('approval_status') or s['metadata']['state_scope']}"
+        for s in scenarios
+    )
+    stored = sum(sum(m["memory_type"] == "constraint" for m in s["memory_snapshot"]) for s in scenarios)
+    applicable = sum(len(s["applicable_constraint_ids"]) for s in scenarios)
+    with_constraints = sum(bool(s["applicable_constraint_ids"]) for s in scenarios)
+    with_states = sum(bool(s["required_state_ids"]) for s in scenarios)
+    with_updates = sum(bool(s["temporal_version_required"]) for s in scenarios)
+    return dict(
+        n_scenarios=n, subtype_counts=dict(sorted(subtypes.items())),
+        subtype_ratios={key: count / n for key, count in sorted(subtypes.items())} if n else {},
+        stored_constraint_count=stored, applicable_constraint_count=applicable,
+        applicable_fraction_of_stored_constraints=applicable / stored if stored else None,
+        constraint_applicable_scenario_count=with_constraints,
+        constraint_applicable_scenario_ratio=with_constraints / n if n else None,
+        required_state_scenario_count=with_states,
+        required_state_scenario_ratio=with_states / n if n else None,
+        temporal_version_required_scenario_count=with_updates,
+        temporal_version_required_scenario_ratio=with_updates / n if n else None,
+        interpretation="Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget.",
+    )
+
+
 def generate_dataset(
     config: Mapping[str, Any], *, token_counter: TokenCounter = provisional_token_count,
     horizon_generation_mode: int | None = None,
+    scenario_profile: str | None = None,
     llm_source: Any | None = None,
 ) -> dict[str, Any]:
     """Expand data seeds/grid cells, leaving strategies and repeats to runner."""
@@ -629,6 +727,10 @@ def generate_dataset(
     mode = _horizon_mode(
         dataset.get("horizon_generation_mode", DEFAULT_HORIZON_MODE)
         if horizon_generation_mode is None else horizon_generation_mode
+    )
+    profile = _scenario_profile(
+        dataset.get("scenario_profile", DEFAULT_SCENARIO_PROFILE)
+        if scenario_profile is None else scenario_profile
     )
     samples = _integer("samples_per_cell", dataset.get("samples_per_cell"), 1)
     tasks = _sequence("dataset.task_types", dataset.get("task_types"))
@@ -650,6 +752,12 @@ def generate_dataset(
         llm_source = _make_llm_source(dataset)
     temporal_count = (samples + 1) // 2 if len(tasks) == 2 else (samples if tasks[0] == "temporal_update" else 0)
     current_count = (temporal_count + 1) // 2
+    variants = [
+        (task, variant) for task, variant in (
+            ("temporal_update", "current"), ("temporal_update", "historical"),
+            ("approval", "pending"), ("approval", "granted"),
+        ) if task in tasks
+    ]
     cells = []
     # Reuse source data across budget sweeps without repeating expensive token
     # measurement (particularly when a CountTokens API is explicitly selected).
@@ -657,12 +765,20 @@ def generate_dataset(
     for values in itertools.product(*axes):
         parameters = dict(zip(GRID_KEYS, values))
         scenarios = []
-        for seed in seeds:
+        for seed_index, seed in enumerate(seeds):
             for index in range(samples):
-                task_type = "temporal_update" if index < temporal_count else "approval"
-                scope = "current" if index < current_count else "historical"
-                approval_status = "pending" if (index - temporal_count) % 2 == 0 else "granted"
-                source_key = (seed, index, task_type, scope, approval_status, *values[1:])
+                if profile == "balanced_v2":
+                    # Continue across seeds instead of repeatedly giving the
+                    # remainder to the first task/current/pending variant.
+                    ordinal = seed_index * samples + index
+                    task_type, variant = variants[(ordinal + seeds[0]) % len(variants)]
+                    scope = variant if task_type == "temporal_update" else "current"
+                    approval_status = variant if task_type == "approval" else "pending"
+                else:
+                    task_type = "temporal_update" if index < temporal_count else "approval"
+                    scope = "current" if index < current_count else "historical"
+                    approval_status = "pending" if (index - temporal_count) % 2 == 0 else "granted"
+                source_key = (profile, seed, index, task_type, scope, approval_status, *values[1:])
                 if source_key not in source_cache:
                     source_cache[source_key] = generate_scenario(
                         task_type=task_type, seed=seed, sample_index=index,
@@ -675,6 +791,7 @@ def generate_dataset(
                         state_update_count=parameters["state_update_count"],
                         token_counter=token_counter,
                         horizon_generation_mode=mode,
+                        scenario_profile=profile,
                         llm_source=llm_source,
                     )
                 scenario = copy.deepcopy(source_cache[source_key])
@@ -682,16 +799,21 @@ def generate_dataset(
                 scenario["metadata"]["context_token_budget"] = parameters["context_token_budget"]
                 scenarios.append(scenario)
         identity = parameters if mode == 1 else dict(parameters, horizon_generation_mode=mode)
+        if profile != "legacy_v1":
+            identity = dict(identity, scenario_profile=profile)
         cell_id = "cell_" + hashlib.sha256(
             json.dumps(identity, sort_keys=True, allow_nan=False).encode()
         ).hexdigest()[:12]
-        cells.append(dict(cell_id=cell_id, parameters=parameters, scenarios=scenarios))
+        cells.append(dict(cell_id=cell_id, parameters=parameters, scenarios=scenarios,
+                          scenario_profile=profile, coverage=scenario_coverage(scenarios)))
     effective_config = copy.deepcopy(dict(config))
     effective_config["dataset"]["horizon_generation_mode"] = mode
+    effective_config["dataset"]["scenario_profile"] = profile
     return dict(
         schema_version="1.0", generator="benchmark.generator",
         config=effective_config, token_count_mode=token_count_mode(token_counter),
         horizon_generation_mode=mode,
+        scenario_profile=profile,
         description="Synthetic inputs and ground truth; not model performance measurements.",
         cells=cells,
     )
@@ -715,16 +837,19 @@ def write_dataset(payload: Mapping[str, Any], output_directory: str | Path) -> d
             token_count_mode=payload["token_count_mode"], parameters=cell["parameters"],
             scenarios=cell["scenarios"],
             horizon_generation_mode=payload["horizon_generation_mode"],
+            scenario_profile=payload["scenario_profile"], coverage=cell["coverage"],
         )
         files.append((filename, json.dumps(record, ensure_ascii=False, indent=2, allow_nan=False) + "\n"))
         cell_records.append(dict(cell_id=cell_id, path=filename, parameters=cell["parameters"],
-                                 n_scenarios=len(cell["scenarios"])))
+                                 n_scenarios=len(cell["scenarios"]), coverage=cell["coverage"],
+                                 scenario_profile=payload["scenario_profile"]))
     manifest = dict(
         schema_version=payload["schema_version"], generator=payload["generator"],
         config=payload["config"], token_count_mode=payload["token_count_mode"],
         n_cells=len(cell_records), n_scenarios=sum(cell["n_scenarios"] for cell in cell_records),
         cells=cell_records,
         horizon_generation_mode=payload["horizon_generation_mode"],
+        scenario_profile=payload["scenario_profile"],
     )
     manifest_text = json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     # Validate/serialize everything before replacing any existing dataset file.
@@ -770,10 +895,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="experiments/configs/smoke.json")
     parser.add_argument(
-        "--output", help="Default: benchmark/generated/<config name>; modes 2-5 append "
+        "--output", help="Default: benchmark/generated/<config name>_balanced_v2; modes 2-5 append "
                          "_horizon<N>; --archive adds .zip",
     )
     parser.add_argument("--archive", action="store_true", help="Write a deterministic .zip; extract before running")
+    parser.add_argument("--scenario-profile", choices=SCENARIO_PROFILES,
+                        help="Scenario design, independent of horizon filler. Default: balanced_v2; legacy_v1 reproduces old inputs.")
     parser.add_argument(
         "--horizon-mode", type=int, choices=tuple(HORIZON_MODES),
         help="Select one filler method: 1=repeated, 2=offline random natural language, "
@@ -798,6 +925,8 @@ def main() -> None:
     if not isinstance(dataset, Mapping):
         parser.error("config.dataset must be an object")
     try:
+        profile = _scenario_profile(dataset.get("scenario_profile", DEFAULT_SCENARIO_PROFILE)
+                                    if args.scenario_profile is None else args.scenario_profile)
         mode = _horizon_mode(dataset.get("horizon_generation_mode", DEFAULT_HORIZON_MODE)
                              if args.horizon_mode is None else args.horizon_mode)
     except ValueError as error:
@@ -820,6 +949,8 @@ def main() -> None:
         name = config.get("name", "dataset")
         if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             parser.error("config name must contain only letters, digits, _ or -; or pass --output")
+        if profile != "legacy_v1":
+            name += f"_{profile}"
         if mode != 1:
             name += f"_horizon{mode}"
         output = Path("benchmark/generated") / (name + ".zip" if args.archive else name)
@@ -833,12 +964,14 @@ def main() -> None:
         )
         if args.gemini_token_model else _import_counter(args.token_counter) if args.token_counter else provisional_token_count
     )
-    payload = generate_dataset(config, token_counter=counter, horizon_generation_mode=mode)
+    payload = generate_dataset(config, token_counter=counter, horizon_generation_mode=mode,
+                               scenario_profile=profile)
     manifest = (write_dataset_archive(payload, output) if args.archive else write_dataset(payload, output))
     print(json.dumps(dict(output=str(output),
                           manifest="manifest.json inside archive" if args.archive else str(output / "manifest.json"),
                           n_cells=manifest["n_cells"], n_scenarios=manifest["n_scenarios"],
                           horizon_generation_mode=mode, horizon_generation_name=HORIZON_MODES[mode],
+                          scenario_profile=profile,
                           token_count_mode=manifest["token_count_mode"]), ensure_ascii=False, indent=2))
 
 

@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0.4", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.5", "kind": "architecture_parameter_freeze"},
   "scope": "reference",
   "status": "deferred",
   "executable": false,
@@ -33,7 +33,7 @@
       "retry_base_seconds": 0.5
     }
   },
-  "dataset": {"source": "synthetic", "samples_per_cell": 20, "task_types": ["temporal_update", "approval"]},
+  "dataset": {"source": "synthetic", "scenario_profile": "balanced_v2", "samples_per_cell": 20, "task_types": ["temporal_update", "approval"]},
   "strategies": ["long_context_reference"],
   "seeds": [42, 43],
   "repeats": 2,
@@ -53,5 +53,5 @@
     "delta_group_by": ["context_token_budget", "history_length_tokens", "horizon_turns"]
   },
   "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only", "request_token_safety_margin": 32},
-  "output_directory": "experiments/results/reference"
+  "output_directory": "experiments/results/reference_balanced_v2"
 }

@@ -1,0 +1,490 @@
+{
+  "execution_scope": "offline_provisional_tokenizer_no_llm_no_network",
+  "dataset_path": "benchmark/generated/main_balanced_v2.zip",
+  "dataset_sha256": "b3e8e0f317cf123de16459cd35831b3241ca61828a6d8cb8b2d1857e7d4b2b57",
+  "profile": "balanced_v2",
+  "freeze_version": "1.0.5",
+  "n_cells": 12,
+  "n_unique_sample_ids": 40,
+  "n_scenario_appearances": 480,
+  "oracle_checks_passed": 480,
+  "offline_rule_planner_integration": {
+    "n_runs": 40,
+    "successes": 40,
+    "candidate_top_k": 20,
+    "embedding": "constant test vector",
+    "context_token_budget": 2048,
+    "horizon_turns": 100,
+    "not_an_llm_or_retrieval_benchmark": true
+  },
+  "allowed_candidate_counts_by_subtype": {
+    "approval/granted": {
+      "1": 3,
+      "2": 4,
+      "3": 3
+    },
+    "approval/pending": {
+      "1": 3,
+      "2": 4,
+      "3": 3
+    },
+    "temporal_update/current": {
+      "1": 2,
+      "2": 2,
+      "3": 3,
+      "4": 3
+    },
+    "temporal_update/historical": {
+      "1": 2,
+      "2": 2,
+      "3": 3,
+      "4": 3
+    }
+  },
+  "cells": [
+    {
+      "cell_id": "cell_898708cb866b",
+      "cell_sha256": "f341e6279abca332f32428f306ebf6baea343e691ade3114b500c8b6d1343aa9",
+      "parameters": {
+        "context_token_budget": 1024,
+        "history_length_tokens": 25000,
+        "horizon_turns": 10,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_ab99e02aa392",
+      "cell_sha256": "00d0642f77eb49f94d1db032ddc00ee6c5baf936082beb6a1674d5f8cfbe7f90",
+      "parameters": {
+        "context_token_budget": 1024,
+        "history_length_tokens": 25000,
+        "horizon_turns": 50,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_967e745044ca",
+      "cell_sha256": "421069437b1dbf1c7114697743afd986df18d11fc6ec7e6a5b5f5b1dfa77bc31",
+      "parameters": {
+        "context_token_budget": 1024,
+        "history_length_tokens": 25000,
+        "horizon_turns": 100,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_bbd2e476993c",
+      "cell_sha256": "048a973ef688e853b09b7267b769a548a6e994ec8b3ed69a11f7fbce50b91d0a",
+      "parameters": {
+        "context_token_budget": 2048,
+        "history_length_tokens": 25000,
+        "horizon_turns": 10,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_2258e5bf3c91",
+      "cell_sha256": "c7d84e0306cf23aace039f848877a7ac6126e949ace04a612cbe9d5c7756316c",
+      "parameters": {
+        "context_token_budget": 2048,
+        "history_length_tokens": 25000,
+        "horizon_turns": 50,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_cea1f7e9bd6d",
+      "cell_sha256": "587039193915ce6cd6aa07e0cb43fb7e2834ba0b27d6ba8e3e1ce6d4704a89a5",
+      "parameters": {
+        "context_token_budget": 2048,
+        "history_length_tokens": 25000,
+        "horizon_turns": 100,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_6ce9b79afced",
+      "cell_sha256": "2570ccf76cdb91f566b3b9fc220d80eed455cdb5a1c1f93f78f6498112daafde",
+      "parameters": {
+        "context_token_budget": 4096,
+        "history_length_tokens": 25000,
+        "horizon_turns": 10,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_c24162f0fe8b",
+      "cell_sha256": "d836a08dd675f3df2fe60755066d91a1c8f998c253a04b3762b9892fce6acf74",
+      "parameters": {
+        "context_token_budget": 4096,
+        "history_length_tokens": 25000,
+        "horizon_turns": 50,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_60c9c18fb841",
+      "cell_sha256": "1f5e65818e8089d6fbdaf2e89fc23600bc68c7dc21b597652210f960b7662519",
+      "parameters": {
+        "context_token_budget": 4096,
+        "history_length_tokens": 25000,
+        "horizon_turns": 100,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_354001317589",
+      "cell_sha256": "5a2cfab4c9be9c455220403b23dc412ec5576f6366bcc083755399f0b1af4b46",
+      "parameters": {
+        "context_token_budget": 8192,
+        "history_length_tokens": 25000,
+        "horizon_turns": 10,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_1280dece5810",
+      "cell_sha256": "4423bec9e773766e7909b662d5bdd4e92285925e29c735f4d9f74a297510dbb8",
+      "parameters": {
+        "context_token_budget": 8192,
+        "history_length_tokens": 25000,
+        "horizon_turns": 50,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    },
+    {
+      "cell_id": "cell_fac6fb782e84",
+      "cell_sha256": "1aca25e310e5b7d7e607fd8c322356eddfb15af8d98734364b8390141672e723",
+      "parameters": {
+        "context_token_budget": 8192,
+        "history_length_tokens": 25000,
+        "horizon_turns": 100,
+        "noise_memory_ratio": 0.5,
+        "constraint_count": 3,
+        "state_update_count": 2
+      },
+      "coverage": {
+        "n_scenarios": 40,
+        "subtype_counts": {
+          "approval/granted": 10,
+          "approval/pending": 10,
+          "temporal_update/current": 10,
+          "temporal_update/historical": 10
+        },
+        "subtype_ratios": {
+          "approval/granted": 0.25,
+          "approval/pending": 0.25,
+          "temporal_update/current": 0.25,
+          "temporal_update/historical": 0.25
+        },
+        "stored_constraint_count": 120,
+        "applicable_constraint_count": 120,
+        "applicable_fraction_of_stored_constraints": 1.0,
+        "constraint_applicable_scenario_count": 40,
+        "constraint_applicable_scenario_ratio": 1.0,
+        "required_state_scenario_count": 40,
+        "required_state_scenario_ratio": 1.0,
+        "temporal_version_required_scenario_count": 40,
+        "temporal_version_required_scenario_ratio": 1.0,
+        "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+      }
+    }
+  ]
+}

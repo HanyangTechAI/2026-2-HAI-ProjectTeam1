@@ -19,3 +19,8 @@
 ## 2026-11-12
 
 - [Pipeline Smoke 점검](pipeline-smoke-2026-11-12.md) — 같은 고정 입력을 세 차례 실행한 파이프라인 확인이며 연구 성능 비교에는 사용하지 않는다.
+
+## 2026-11-13
+
+- [Constraint Coverage 및 Ablation 민감도 점검](constraint-coverage-audit-2026-11-13.md) — 실제 입력의 적용 제약 비율, 우선 보존 제거 후 제약 잔존, 생성 설계의 한계를 확인한다.
+- [균형 생성기 변경 및 검증](balanced-generator-2026-11-13.md) — `balanced_v2`의 유형 배분·실제 후보 제약·버전 분리와 오프라인 검증을 기록한다.

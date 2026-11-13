@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0.4", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.5", "kind": "architecture_parameter_freeze"},
   "scope": "stress",
   "status": "executable",
   "executable": true,
@@ -32,7 +32,7 @@
       "retry_base_seconds": 0.5
     }
   },
-  "dataset": {"source": "synthetic", "samples_per_cell": 10, "task_types": ["temporal_update", "approval"]},
+  "dataset": {"source": "synthetic", "scenario_profile": "balanced_v2", "samples_per_cell": 10, "task_types": ["temporal_update", "approval"]},
   "strategies": ["proposed", "sliding_window", "vector_top_k", "utility_per_token"],
   "seeds": [42],
   "repeats": 2,
@@ -52,5 +52,5 @@
     "delta_group_by": ["context_token_budget", "horizon_turns", "constraint_count", "state_update_count", "noise_memory_ratio"]
   },
   "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget", "request_token_safety_margin": 32},
-  "output_directory": "experiments/results/stress"
+  "output_directory": "experiments/results/stress_balanced_v2"
 }

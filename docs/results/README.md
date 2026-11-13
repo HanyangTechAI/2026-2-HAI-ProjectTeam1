@@ -4,5 +4,7 @@
 
 - [Main 12셀 결과 아카이브 · 2026-11-09](main_20261109/README.md)
 - [2K/H100 Ablation 집계 · 2026-11-11](ablation_2k_h100_20261111/)
+- [Constraint Coverage 점검 · 2026-11-13](constraint_coverage_20261113/) — 시나리오별 제약 적용 비율과 로컬 평가기 진단.
+- [균형 생성기 Coverage · 2026-11-13](constraint_coverage_balanced_v2_20261113/) — 새 입력과 오프라인 검증이며 LLM 성능 결과가 아니다.
 
 각 실험의 JSON 및 그림 파일은 실행·분석 코드에서 경로로 참조하므로 현재 하위 폴더 이름을 유지합니다.

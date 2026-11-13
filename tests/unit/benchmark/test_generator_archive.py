@@ -25,6 +25,7 @@ class GeneratorArchiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             first, second = Path(directory) / "first.zip", Path(directory) / "second.zip"
             manifest = write_dataset_archive(payload, first)
+            self.assertEqual(manifest["scenario_profile"], "balanced_v2")
             write_dataset_archive(payload, second)
             self.assertEqual(first.read_bytes(), second.read_bytes())
             with zipfile.ZipFile(first) as archive:
@@ -33,6 +34,10 @@ class GeneratorArchiveTests(unittest.TestCase):
                 self.assertEqual(len(archive.namelist()), 3)
                 for cell in manifest["cells"]:
                     record = json.loads(archive.read(cell["path"]))
+                    self.assertEqual(record["scenario_profile"], manifest["scenario_profile"])
+                    self.assertEqual(record["coverage"], cell["coverage"])
+                    self.assertEqual(record["coverage"]["constraint_applicable_scenario_count"], 2)
+                    self.assertEqual(record["coverage"]["applicable_constraint_count"], 2)
                     self.assertEqual(record["parameters"], cell["parameters"])
                     self.assertEqual(len(record["scenarios"]), 2)
                     self.assertTrue(all(s["history"] for s in record["scenarios"]))

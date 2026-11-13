@@ -56,7 +56,7 @@ class GeneratorModeTests(unittest.TestCase):
         for variant, expected in zip(VARIANTS, expected_hashes):
             with self.subTest(variant=variant):
                 scenario = generator.generate_scenario(
-                    horizon_generation_mode=1, **variant,
+                    scenario_profile="legacy_v1", horizon_generation_mode=1, **variant,
                 )
                 content = {key: scenario[key] for key in (
                     "history", "memory_snapshot", "query", "expected_tool_calls",
@@ -308,7 +308,7 @@ class GeneratorModeTests(unittest.TestCase):
                             output = io.StringIO()
                             with patch.object(sys, "argv", args), redirect_stdout(output):
                                 generator.main()
-                            name = "mode_test" if mode == 1 else f"mode_test_horizon{mode}"
+                            name = "mode_test_balanced_v2" if mode == 1 else f"mode_test_balanced_v2_horizon{mode}"
                             target = Path("benchmark/generated") / (
                                 name + ".zip" if archived else name
                             )
@@ -322,7 +322,30 @@ class GeneratorModeTests(unittest.TestCase):
                                     (target / "manifest.json").read_text(encoding="utf-8"),
                                 )
                             self.assertEqual(manifest["horizon_generation_mode"], mode)
+                            self.assertEqual(manifest["scenario_profile"], "balanced_v2")
                             self.assertEqual(manifest["n_scenarios"], 1)
+            finally:
+                os.chdir(original_directory)
+
+    def test_cli_explicit_legacy_profile_keeps_legacy_output_path(self):
+        original_directory = os.getcwd()
+        with tempfile.TemporaryDirectory() as directory:
+            config = mode_config()
+            config["dataset"].update(samples_per_cell=1, scenario_profile="balanced_v2")
+            config_path = Path(directory) / "config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            try:
+                os.chdir(directory)
+                args = ["generator", "--config", str(config_path), "--archive",
+                        "--scenario-profile", "legacy_v1", "--horizon-mode", "2"]
+                output = io.StringIO()
+                with patch.object(sys, "argv", args), redirect_stdout(output):
+                    generator.main()
+                target = Path("benchmark/generated/mode_test_horizon2.zip")
+                self.assertEqual(Path(json.loads(output.getvalue())["output"]), target)
+                with zipfile.ZipFile(target) as archive:
+                    manifest = json.loads(archive.read("manifest.json"))
+                self.assertEqual(manifest["scenario_profile"], "legacy_v1")
             finally:
                 os.chdir(original_directory)
 

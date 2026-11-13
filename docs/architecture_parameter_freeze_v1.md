@@ -1,9 +1,9 @@
-# Architecture / Parameter Freeze v1.0.4
+# Architecture / Parameter Freeze v1.0.5
 
 - 상태: **FROZEN**
-- 기준일: 2026-11-11 (Asia/Seoul)
+- 기준일: 2026-11-13 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.4"`
+- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.5"`
 - 이전 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`; v1.0.3 변경은 각 실행의 `git_commit`, `git_dirty`, `resume_identity.code`와 함께 추적한다.
 
 ## Patch note - v1.0.1
@@ -78,6 +78,31 @@ Version Chain Expansion만 끄며, Mandatory State는 독립적으로 유지한�
 기존 v1.0.3 실행물과 checkpoint는 그대로 보존한다. 이전 `no_temporal`의 성공률은
 두 기능을 함께 제거한 결과이며 수정된 조건의 결과로 사용하지 않는다. 수정된 조건은
 별도 output 경로에서 실행해야 하며 이전 checkpoint에 resume하지 않는다.
+
+## Patch note - v1.0.5
+
+2026-11-13, 제약 보존 효과를 시험할 기회가 적었던 입력 생성 설계를 수정한다.
+기본 `dataset.scenario_profile`은 `balanced_v2`이며 과거 설계 재현에는 명시적인
+`legacy_v1`을 사용한다. 시나리오 profile은 Horizon의 채움 방식 1~5와 독립이다.
+
+- 현재 조회·과거 조회·승인 대기·승인 완료 하위 유형을 층화 배정한다. 나누어떨어지지
+  않는 표본 수에서도 유형별 개수 차이를 최대 1개로 제한한다.
+- State에는 실제 파일 후보를 기록하고, 저장 제약은 후보를 금지하거나 발송 승인을
+  요구한다. 허용 후보와 후보의 표시 순서는 sample에 따라 달라진다.
+  `constraint_count`가 늘면 실제 후보 선택에
+  적용되는 제약도 늘어난다. 과거의 무관한 restricted 파일 제약을 개수만 늘리는
+  방식과 구분한다.
+- 승인 완료 번호는 해당 승인 제약에 기록하며 별도 fact에 중복하지 않는다.
+  Required State와 시간에 따른 버전 관계는 유지한다.
+- Profile을 시나리오 metadata와 생성물에 기록하고, 새 기본 출력은
+  `*_balanced_v2`로 구분한다. 표준 실험 결과 경로도 `experiments/results/*_balanced_v2`다.
+
+새 입력은 내용·정답이 달라지므로 counter로 새로 생성·측정하고 모든 비교 전략에
+같은 입력을 사용한다. 기존 main/pilot ZIP과 v1.0.4 이하의 결과·checkpoint·manifest는
+그대로 보존하며 새 입력의 반복 관측으로 합산하거나 이전 checkpoint에 resume하지 않는다.
+LLM 모델, 프롬프트, algorithm specification 및 checksum은 이번 변경에서 유지한다.
+이 변경은 시나리오의 측정 기회를 고르게 하는 것이며, ablation별 성공률 하락폭의
+동일함을 보장하지 않는다.
 
 ## 1. Frozen architecture
 
@@ -364,9 +389,9 @@ Planner와 Runner는 다음 완전성 계약을 적용한다.
 
 Architecture/parameter가 frozen인 것과 본실험 입력이 준비된 것은 구분한다.
 
-- 현재 저장된 `benchmark/generated/main.zip`은 `provisional_token_count`로 생성된 개발용
-  입력이다. V1.0 본실험 전에 freeze된 Gemini counter로 main dataset을 다시 생성·측정해야
-  한다. Metadata의 `token_count_mode`만 바꾸어 재사용하지 않는다.
+- 저장된 `benchmark/generated/main.zip`과 기존 Gemini ZIP은 이전 생성 설계의 입력이다.
+  v1.0.5 본실험에는 `balanced_v2`를 freeze된 Gemini counter로 새 경로에 생성·측정해야
+  한다. 기존 파일의 profile·freeze·`token_count_mode` label만 바꾸어 재사용하지 않는다.
 - `GEMINI_API_KEY`와 embedding model weight를 실행 환경에 준비한다.
 - 실제 사용한 Python/package 버전과 embedding model revision을 결과와 함께 기록한다.
   `requirements.txt`의 lower bound만으로 동일 weight revision까지 보장하지 않는다.

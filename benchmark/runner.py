@@ -53,7 +53,7 @@ from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0.4"
+FREEZE_VERSION = "1.0.5"
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
@@ -1296,6 +1296,10 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError("non-executable config must declare a reason")
 
+    dataset = _mapping(loaded.get("dataset"), "dataset")
+    if dataset.get("scenario_profile") != "balanced_v2":
+        raise ValueError("config dataset.scenario_profile must be frozen to 'balanced_v2'")
+
     model = _mapping(loaded.get("model"), "model")
     runtime = _mapping(loaded.get("runtime"), "runtime")
     token_counter = _mapping(runtime.get("token_counter"), "runtime.token_counter")
@@ -1381,6 +1385,33 @@ def _require_executable_config(config: Mapping[str, Any]) -> None:
     if status != EXECUTABLE_STATUS or config.get("executable") is not True:
         reason = config.get("reason", "no execution reason declared")
         raise ValueError(f"config status {status!r} is not executable: {reason}")
+
+
+def _validate_configured_scenario_profile(
+    payload: Any, scenarios: Sequence[Mapping[str, Any]], expected_profile: str,
+) -> None:
+    """Keep frozen balanced runs from silently consuming old or mixed inputs."""
+    if (isinstance(payload, Mapping) and "scenario_profile" in payload
+            and payload["scenario_profile"] != expected_profile):
+        raise ValueError(
+            f"input scenario_profile must match configured {expected_profile!r}; "
+            f"got {payload['scenario_profile']!r}"
+        )
+    for scenario in scenarios:
+        if not isinstance(scenario, Mapping):
+            raise ValueError("each input scenario must be an object")
+        if (not scenario.get("benchmark_enabled", True)
+                or scenario.get("validation_scope", "integration") != "integration"):
+            continue
+        metadata = scenario.get("metadata")
+        actual = metadata.get("scenario_profile") if isinstance(metadata, Mapping) else None
+        if actual != expected_profile:
+            sample_id = scenario.get("scenario_id", scenario.get("sample_id"))
+            raise ValueError(
+                f"scenario {sample_id!r} metadata.scenario_profile must match configured "
+                f"{expected_profile!r}; got {actual!r}. Regenerate the input or omit "
+                "--config for an ad-hoc legacy run."
+            )
 
 
 def _config_strategy_plan(labels: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -1666,6 +1697,13 @@ def main() -> None:
                or scenario.get("validation_scope", "integration") != "integration"
                for scenario in scenarios):
             parser.error("requested IDs must be enabled integration scenarios")
+    if config:
+        try:
+            _validate_configured_scenario_profile(
+                payload, scenarios, config["dataset"]["scenario_profile"],
+            )
+        except (TypeError, ValueError) as exc:
+            parser.error(str(exc))
     if args.token_counter:
         token_counter = _import_callable(args.token_counter)
     else:

@@ -1,0 +1,118 @@
+{
+  "audit_version": 2,
+  "execution_scope": "offline_no_llm_no_network",
+  "provenance": {
+    "dataset_path": "benchmark/generated/main_balanced_v2.zip",
+    "source_path": "benchmark/generated/main_balanced_v2.zip",
+    "source_sha256": "b3e8e0f317cf123de16459cd35831b3241ca61828a6d8cb8b2d1857e7d4b2b57",
+    "manifest_path": "manifest.json",
+    "manifest_sha256": "e67bc1f4b3e9e3c58e81d8941f998a0886a1997cfc802810f4205f1ad8eb0c7f",
+    "cell_path": "cell_cea1f7e9bd6d.json",
+    "cell_sha256": "587039193915ce6cd6aa07e0cb43fb7e2834ba0b27d6ba8e3e1ce6d4704a89a5"
+  },
+  "parameters": {
+    "context_token_budget": 2048,
+    "history_length_tokens": 25000,
+    "horizon_turns": 100,
+    "noise_memory_ratio": 0.5,
+    "constraint_count": 3,
+    "state_update_count": 2
+  },
+  "n_independent_scenarios": 40,
+  "subtype_counts": {
+    "approval/granted": 10,
+    "approval/pending": 10,
+    "temporal_update/current": 10,
+    "temporal_update/historical": 10
+  },
+  "scenario_profiles": {
+    "balanced_v2": 40
+  },
+  "subtype_ratios": {
+    "approval/granted": 0.25,
+    "approval/pending": 0.25,
+    "temporal_update/current": 0.25,
+    "temporal_update/historical": 0.25
+  },
+  "stored_constraint_memory_count": 120,
+  "applicable_constraint_memory_count": 120,
+  "dormant_constraint_memory_count": 0,
+  "applicable_fraction_of_stored_constraints": 1.0,
+  "scenarios_with_stored_constraints": 40,
+  "scenarios_with_applicable_constraints": 40,
+  "applicable_scenario_ratio": 1.0,
+  "scenarios_without_applicable_constraints": 0,
+  "explicit_grant_fact_count": 0,
+  "scenarios_with_explicit_grant_fact": 0,
+  "scenarios_with_applicable_constraint_without_explicit_grant_fact": 40,
+  "filename_prohibition_count": 0,
+  "filename_prohibition_collision_count": 0,
+  "scenarios_with_filename_prohibition_collision": 0,
+  "rules_restricting_visible_candidates_count": 100,
+  "approval_rule_count": 20,
+  "definitions": {
+    "dormant": "Stored constraint memory IDs absent from applicable_constraint_ids; not a proof of semantic irrelevance in arbitrary inputs.",
+    "explicit_grant_fact": "Generator fact memory with _grant ID suffix or the literal Korean phrase for approval number.",
+    "filename_collision": "PDF filename in a prohibition constraint equals a required_states.expected_value; lexical generator-schema check only.",
+    "visible_candidate_rule": "Forbidden filename/attachment in evaluator rules is present in the required state; supports numbered candidate policies without literal filenames in constraint text.",
+    "independent_scenario": "Unique sample_id within the one selected cell; budget/horizon variants and execution repeats are not pooled."
+  },
+  "synthetic_evaluator_controls": {
+    "kind": "synthetic_evaluator_controls_not_llm_results",
+    "description": "Artificial tool traces with goal_completed=True and input_tokens=0. Only required state IDs are selected. Rule-GT removal is a diagnostic of overlapping evaluation checks, never a valid memory ablation.",
+    "by_subtype": {
+      "approval/granted": {
+        "n_scenarios": 10,
+        "original_gt_oracle_success": 10,
+        "rule_gt_removed_oracle_success": 10,
+        "original_gt_unapproved_send_only_success": 0,
+        "original_gt_unapproved_send_only_constraint_violation": 10,
+        "original_gt_unapproved_send_only_expected_missing": 10,
+        "original_gt_unapproved_send_only_forbidden_hit": 0,
+        "original_gt_oracle_plus_unapproved_send_success": 0,
+        "original_gt_oracle_plus_unapproved_send_constraint_violation": 10,
+        "original_gt_oracle_plus_unapproved_send_expected_missing": 0,
+        "original_gt_oracle_plus_unapproved_send_forbidden_hit": 0,
+        "rule_gt_removed_unapproved_send_only_success": 0,
+        "rule_gt_removed_unapproved_send_only_constraint_violation": 0,
+        "rule_gt_removed_unapproved_send_only_expected_missing": 10,
+        "rule_gt_removed_unapproved_send_only_forbidden_hit": 0,
+        "rule_gt_removed_oracle_plus_unapproved_send_success": 10,
+        "rule_gt_removed_oracle_plus_unapproved_send_constraint_violation": 0,
+        "rule_gt_removed_oracle_plus_unapproved_send_expected_missing": 0,
+        "rule_gt_removed_oracle_plus_unapproved_send_forbidden_hit": 0
+      },
+      "approval/pending": {
+        "n_scenarios": 10,
+        "original_gt_oracle_success": 10,
+        "rule_gt_removed_oracle_success": 10,
+        "original_gt_unapproved_send_only_success": 0,
+        "original_gt_unapproved_send_only_constraint_violation": 10,
+        "original_gt_unapproved_send_only_expected_missing": 10,
+        "original_gt_unapproved_send_only_forbidden_hit": 10,
+        "original_gt_oracle_plus_unapproved_send_success": 0,
+        "original_gt_oracle_plus_unapproved_send_constraint_violation": 10,
+        "original_gt_oracle_plus_unapproved_send_expected_missing": 0,
+        "original_gt_oracle_plus_unapproved_send_forbidden_hit": 10,
+        "rule_gt_removed_unapproved_send_only_success": 0,
+        "rule_gt_removed_unapproved_send_only_constraint_violation": 0,
+        "rule_gt_removed_unapproved_send_only_expected_missing": 10,
+        "rule_gt_removed_unapproved_send_only_forbidden_hit": 10,
+        "rule_gt_removed_oracle_plus_unapproved_send_success": 0,
+        "rule_gt_removed_oracle_plus_unapproved_send_constraint_violation": 0,
+        "rule_gt_removed_oracle_plus_unapproved_send_expected_missing": 0,
+        "rule_gt_removed_oracle_plus_unapproved_send_forbidden_hit": 10
+      },
+      "temporal_update/current": {
+        "n_scenarios": 10,
+        "original_gt_oracle_success": 10,
+        "rule_gt_removed_oracle_success": 10
+      },
+      "temporal_update/historical": {
+        "n_scenarios": 10,
+        "original_gt_oracle_success": 10,
+        "rule_gt_removed_oracle_success": 10
+      }
+    }
+  }
+}

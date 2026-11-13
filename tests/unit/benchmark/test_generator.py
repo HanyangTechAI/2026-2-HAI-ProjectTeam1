@@ -392,17 +392,13 @@ class GeneratorTests(unittest.TestCase):
                     count,
                 )
 
-                # 하지만 현재 report lookup에 적용되지는 않는다.
+                # Every stored rule now excludes a visible report candidate.
                 self.assertEqual(
-                    temporal[
-                        "applicable_constraint_ids"
-                    ],
-                    [],
+                    set(temporal["applicable_constraint_ids"]),
+                    {memory["memory_id"] for memory in temporal_constraints},
                 )
-                self.assertEqual(
-                    temporal["constraint_rules"],
-                    [],
-                )
+                self.assertEqual(len(temporal["constraint_rules"]), count)
+                self.assertEqual(temporal["metadata"]["candidate_count"], count + 1)
 
                 self.assertEqual(
                     len(
@@ -436,14 +432,14 @@ class GeneratorTests(unittest.TestCase):
                     count,
                 )
 
-                # 현재 email task에는 approval constraint 하나만 적용.
+                # Approval plus attachment-candidate rules all affect this task.
                 self.assertEqual(
                     len(
                         approval[
                             "applicable_constraint_ids"
                         ]
                     ),
-                    1,
+                    count,
                 )
 
                 self.assertEqual(
@@ -452,8 +448,9 @@ class GeneratorTests(unittest.TestCase):
                             "constraint_rules"
                         ]
                     ),
-                    1,
+                    count,
                 )
+                self.assertEqual(approval["metadata"]["candidate_count"], count)
 
     def test_invalid_parameters_and_impossible_lengths_fail_explicitly(self):
         bad_parameters = [
@@ -520,17 +517,7 @@ class GeneratorTests(unittest.TestCase):
 
         self.assertEqual(
             set(clean["target_memory_ids"]),
-            set(clean["required_state_ids"]),
-        )
-
-        self.assertEqual(
-            clean["applicable_constraint_ids"],
-            [],
-        )
-
-        self.assertEqual(
-            clean["constraint_rules"],
-            [],
+            set(clean["required_state_ids"]) | set(clean["applicable_constraint_ids"]),
         )
 
         constraint_ids = {
@@ -541,11 +528,9 @@ class GeneratorTests(unittest.TestCase):
 
         self.assertTrue(constraint_ids)
 
-        self.assertTrue(
-            constraint_ids.isdisjoint(
-                clean["target_memory_ids"]
-            )
-        )
+        self.assertEqual(constraint_ids, set(clean["applicable_constraint_ids"]))
+        self.assertEqual(constraint_ids, {rule["constraint_id"] for rule in clean["constraint_rules"]})
+        self.assertTrue(evaluate(clean, oracle(clean)).task_success)
         
         
     def test_zero_synthetic_noise_allows_wrong_versions(self):
@@ -649,74 +634,39 @@ class GeneratorTests(unittest.TestCase):
                 
                 
     def test_ground_truth_contains_only_task_applicable_constraints(self):
-        temporal = self.scenario(
-            task_type="temporal_update",
-            state_scope="current",
-            constraint_count=3,
-        )
+        for task, variant in (("temporal_update", "current"),
+                              ("approval", "pending"), ("approval", "granted")):
+            parameters = {"state_scope" if task == "temporal_update" else "approval_status": variant}
+            scenario = self.scenario(task_type=task, constraint_count=3, **parameters)
+            with self.subTest(task=task, variant=variant):
+                stored = {
+                    memory["memory_id"]: memory for memory in scenario["memory_snapshot"]
+                    if memory["memory_type"] == "constraint"
+                }
+                self.assertEqual(len(stored), 3)
+                self.assertEqual(set(scenario["applicable_constraint_ids"]), set(stored))
+                self.assertEqual({rule["constraint_id"] for rule in scenario["constraint_rules"]}, set(stored))
+                self.assertEqual(set(scenario["target_memory_ids"]), set(scenario["required_state_ids"]) | set(stored))
+                self.assertTrue(evaluate(scenario, oracle(scenario)).task_success)
 
-        self.assertEqual(
-            temporal["applicable_constraint_ids"],
-            [],
-        )
-        self.assertEqual(
-            temporal["constraint_rules"],
-            [],
-        )
-        self.assertEqual(
-            set(temporal["target_memory_ids"]),
-            set(temporal["required_state_ids"]),
-        )
+                expected_tool = "file" if task == "temporal_update" else "email"
+                for rule in scenario["constraint_rules"]:
+                    if "approval" in rule:
+                        self.assertEqual(expected_tool, "email")
+                        continue
+                    self.assertTrue(rule["forbidden_tool_calls"])
+                    for forbidden in rule["forbidden_tool_calls"]:
+                        self.assertEqual(forbidden["tool_name"], expected_tool)
+                        filename = next(iter(forbidden["arguments"].values()))
+                        self.assertTrue(any(filename in memory["content"]
+                                            for memory in scenario["memory_snapshot"]
+                                            if memory["memory_type"] == "state"))
 
-        pending = self.scenario(
-            task_type="approval",
-            approval_status="pending",
-            constraint_count=3,
-        )
-
-        self.assertEqual(
-            len(pending["applicable_constraint_ids"]),
-            1,
-        )
-        self.assertEqual(
-            len(pending["constraint_rules"]),
-            1,
-        )
-
-        approval_constraint_id = (
-            pending["applicable_constraint_ids"][0]
-        )
-
-        self.assertIn(
-            approval_constraint_id,
-            pending["target_memory_ids"],
-        )
-
-        granted = self.scenario(
-            task_type="approval",
-            approval_status="granted",
-            constraint_count=3,
-        )
-
-        self.assertEqual(
-            len(granted["applicable_constraint_ids"]),
-            1,
-        )
-        self.assertEqual(
-            len(granted["constraint_rules"]),
-            1,
-        )
-
-        grant_ids = [
-            memory_id
-            for memory_id in granted["target_memory_ids"]
-            if memory_id.endswith("_grant")
-        ]
-
-        self.assertEqual(
-            len(grant_ids),
-            1,
-        )
+                if variant == "granted":
+                    self.assertFalse(any(memory["memory_id"].endswith("_grant")
+                                         for memory in scenario["memory_snapshot"]))
+                    for approval_id in scenario["environment"]["valid_approval_ids"]:
+                        self.assertTrue(any(approval_id in memory["content"] for memory in stored.values()))
 
 
 if __name__ == "__main__":

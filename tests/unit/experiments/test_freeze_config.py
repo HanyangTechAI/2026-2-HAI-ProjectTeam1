@@ -22,6 +22,7 @@ from benchmark.runner import (
     _config_strategy_plan,
     _load_runner_config,
     _require_executable_config,
+    _validate_configured_scenario_profile,
     main,
     run_scenarios,
 )
@@ -47,6 +48,7 @@ class FreezeConfigTests(unittest.TestCase):
                 config = _load_runner_config(CONFIGS / f"{name}.json")
                 self.assertEqual(config["freeze"]["version"], FREEZE_VERSION)
                 self.assertEqual(config["scope"], name)
+                self.assertEqual(config["dataset"]["scenario_profile"], "balanced_v2")
                 self.assertEqual(config["status"], status)
                 self.assertIs(config["executable"], executable)
                 self.assertEqual(config["model"]["name"], "gemini-3.1-flash-lite")
@@ -93,6 +95,81 @@ class FreezeConfigTests(unittest.TestCase):
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "model.provider"):
                 _load_runner_config(path)
+
+    def test_legacy_missing_and_unknown_profiles_are_rejected_by_current_freeze(self):
+        for profile in ("legacy_v1", "unknown", None):
+            config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))
+            if profile is None:
+                config["dataset"].pop("scenario_profile")
+            else:
+                config["dataset"]["scenario_profile"] = profile
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "invalid-profile.json"
+                path.write_text(json.dumps(config), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "dataset.scenario_profile"):
+                    _load_runner_config(path)
+
+    def test_frozen_input_profile_checks_selected_enabled_scenarios_and_cell(self):
+        balanced = {"scenario_id": "balanced", "metadata": {"scenario_profile": "balanced_v2"}}
+        _validate_configured_scenario_profile(
+            {"scenario_profile": "balanced_v2"}, [balanced], "balanced_v2",
+        )
+        _validate_configured_scenario_profile({}, [balanced], "balanced_v2")
+        for profile in ("legacy_v1", "unknown", None):
+            scenario = {"scenario_id": "old", "metadata": {"scenario_profile": profile}}
+            with self.subTest(scenario_profile=profile), self.assertRaisesRegex(
+                ValueError, "metadata.scenario_profile",
+            ):
+                _validate_configured_scenario_profile({}, [balanced, scenario], "balanced_v2")
+            with self.subTest(cell_profile=profile), self.assertRaisesRegex(
+                ValueError, "input scenario_profile",
+            ):
+                _validate_configured_scenario_profile(
+                    {"scenario_profile": profile}, [balanced], "balanced_v2",
+                )
+        with self.assertRaisesRegex(ValueError, "metadata.scenario_profile"):
+            _validate_configured_scenario_profile({}, [{"scenario_id": "unversioned"}], "balanced_v2")
+        _validate_configured_scenario_profile(
+            {}, [balanced, {"benchmark_enabled": False}, {"validation_scope": "unit"}], "balanced_v2",
+        )
+
+    def test_cli_rejects_old_input_before_constructing_api_clients_or_factories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scenarios = Path(directory) / "old-scenarios.json"
+            scenarios.write_text(json.dumps({"scenarios": [{"scenario_id": "old"}]}), encoding="utf-8")
+            arguments = [
+                "runner", "--config", str(CONFIGS / "main.json"),
+                "--scenarios", str(scenarios), "--environment-agent-factory", "test:factory",
+            ]
+            with patch.object(sys, "argv", arguments), patch(
+                "benchmark.runner.GeminiTokenCounter",
+            ) as counter, patch("benchmark.runner.LLMRunConfig") as llm, patch(
+                "benchmark.runner._import_callable",
+            ) as imported, redirect_stderr(io.StringIO()) as stderr, self.assertRaises(SystemExit) as error:
+                main()
+            self.assertEqual(error.exception.code, 2)
+            self.assertIn("metadata.scenario_profile", stderr.getvalue())
+            counter.assert_not_called()
+            llm.assert_not_called()
+            imported.assert_not_called()
+
+    def test_cli_without_config_still_accepts_explicit_legacy_input(self):
+        counter = lambda text: len(text.split())
+        with tempfile.TemporaryDirectory() as directory:
+            scenarios = Path(directory) / "legacy.json"
+            legacy = {"scenario_id": "legacy", "metadata": {"scenario_profile": "legacy_v1"}}
+            scenarios.write_text(json.dumps({"scenario_profile": "legacy_v1", "scenarios": [legacy]}), encoding="utf-8")
+            arguments = [
+                "runner", "--scenarios", str(scenarios), "--agent-factory", "test:factory",
+                "--token-counter", "test:counter", "--system-prompt-file", "experiments/prompts/system_v1.txt",
+                "--tool-definitions-file", "experiments/prompts/tools_v1.txt", "--no-progress",
+            ]
+            with patch.object(sys, "argv", arguments), patch(
+                "benchmark.runner._import_callable", side_effect=lambda spec: counter if spec == "test:counter" else lambda: None,
+            ), patch("benchmark.runner.run_scenarios", return_value={}) as run, redirect_stdout(io.StringIO()):
+                main()
+            self.assertEqual(run.call_args.args[0], [legacy])
+            self.assertIsNone(run.call_args.kwargs["config_metadata"])
 
     def test_previous_output_limit_is_rejected_by_new_freeze(self):
         config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))

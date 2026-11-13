@@ -26,6 +26,13 @@ TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:
 MEMBER = re.compile(r"\bmember_\w+\b", re.ASCII)
 GRANTED_APPROVAL = re.compile(r"\bapproved_\d+\b", re.ASCII)
 EARLIEST_HOUR = re.compile(r"오전\s*(\d{1,2})시\s*이전")
+CANDIDATE_FILE = re.compile(
+    r"후보\s+(\d+)\s*=\s*(" + FILENAME.pattern + r")",
+    re.IGNORECASE | re.ASCII,
+)
+CANDIDATE_PROHIBITION = re.compile(
+    r"보고서\s+후보\s+(\d+)\s+파일의\s+(조회|외부\s+첨부)를\s+금지"
+)
 
 
 class Planner:
@@ -60,9 +67,11 @@ class Planner:
         if recipient is None:
             return _say("수신자 주소를 찾지 못해 메일을 보내지 않았습니다.")
         arguments = {"recipient": recipient}
-        attachment = _first(FILENAME, view.states, [view.task], view.memories)
+        attachment = _report_filename(view, "외부 첨부")
         if attachment is not None:
             arguments["attachment"] = attachment
+        elif _has_report_candidates(view):
+            return _say("제약을 만족하는 첨부 파일 후보가 없습니다.")
 
         if self._needs_approval(view.protected, recipient):
             granted = _first(GRANTED_APPROVAL, view.protected, view.states, view.memories)
@@ -212,10 +221,39 @@ def _find_file(view: _ContextView) -> AgentAction:
     if found is not None:
         status = "있습니다" if found.get("found") else "목록에 없습니다"
         return _say(f"{found.get('filename')} 파일이 {status}.")
-    filename = _first(FILENAME, view.states, [view.task], view.memories)
+    filename = _report_filename(view, "조회")
     if filename is None:
         return _say("처리할 행동을 찾지 못했습니다.")
     return _call("file", "find_file", {"filename": filename})
+
+
+def _has_report_candidates(view: _ContextView) -> bool:
+    return any("보고서 파일 후보:" in line and CANDIDATE_FILE.search(line) for line in view.states)
+
+
+def _report_filename(view: _ContextView, operation: str) -> str | None:
+    """Choose the first permitted numbered candidate from the resolved STATE.
+
+    This syntax is specific to the balanced generator. Unstructured contexts
+    retain the existing first-filename behavior; temporal resolution remains
+    the selector's responsibility.
+    """
+    prohibited = {
+        int(match.group(1))
+        for line in view.protected
+        for match in CANDIDATE_PROHIBITION.finditer(line)
+        if " ".join(match.group(2).split()) == operation
+    }
+    for line in view.states:
+        if "보고서 파일 후보:" not in line:
+            continue
+        candidates = sorted(
+            (int(match.group(1)), match.group(2))
+            for match in CANDIDATE_FILE.finditer(line)
+        )
+        if candidates:
+            return next((filename for number, filename in candidates if number not in prohibited), None)
+    return _first(FILENAME, view.states, [view.task], view.memories)
 
 
 def _first(pattern: re.Pattern[str], *groups: list[str]) -> str | None:
