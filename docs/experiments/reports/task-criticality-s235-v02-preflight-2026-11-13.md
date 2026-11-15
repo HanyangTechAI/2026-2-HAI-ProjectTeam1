@@ -19,7 +19,7 @@ S2와 S3_VALID에서 gold slot 포함은 40/40회를 유지했고, S3_VALID의 �
 | 비교 정책 | `full`, `no_budget_aware_packing`, 업데이트된 `criticality` |
 | 평가 | 3개 정책 × 160 scenario = 480 Context 선택 |
 | 모델 호출 | Gemini CountTokens; LLM generation 0회 |
-| 데이터 / 라벨 SHA-256 | `3a5b8980ac0ae29fc5231c7738e058d5cbf8aea1e332cfcb5c4190f4cb113534` / `45e8b67e0f4e3d37ebeb3e1cbf920003863c08b233a59f5d3b233c52b3192eb7` |
+| 데이터 / 라벨 SHA-256 | `3a5b8980ac0ae29fc5231c7738e059d5cbf8aea1e332cfcb5c4190f4cb113534` / `45e8b67e0f4e3d37ebeb3e1cbf920003863c08b233a59f5d3b233c52b3192eb7` |
 
 선택 정책에는 oracle label을 넘기지 않았다. 선택 후 결과 집계에 label을 사용해 gold 포함, 무효 항목 노출, 누락 감지, 상충 감지를 계산했다. 데이터 SHA가 이전 실행과 같으므로 독립 데이터 검증은 아니다.
 

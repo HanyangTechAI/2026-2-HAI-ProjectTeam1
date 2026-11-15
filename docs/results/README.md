@@ -6,5 +6,7 @@
 - [2K/H100 Ablation 집계 · 2026-11-11](ablation_2k_h100_20261111/)
 - [Constraint Coverage 점검 · 2026-11-13](constraint_coverage_20261113/) — 시나리오별 제약 적용 비율과 로컬 평가기 진단.
 - [균형 생성기 Coverage · 2026-11-13](constraint_coverage_balanced_v2_20261113/) — 새 입력과 오프라인 검증이며 LLM 성능 결과가 아니다.
+- [Task Criticality Safety Gate 결과 · 2026-11-15](../experiments/reports/task-criticality-safety-gate-2026-11-15.md) — scripted action 160개 비교; 원본 CSV·validation은 `experiments/results/task_criticality_s235_gate_v03/` 및 `..._approval_fix/`에 있다.
+- [초기 Runner·Smoke 실행 점검 · 2026-11-15](../experiments/audits/early-runner-and-smoke-archive-2026-11-15.md) — 과거 runner fixture 결과와 동일한 5개 입력의 2K smoke 재실행을 요약한다.
 
 각 실험의 JSON 및 그림 파일은 실행·분석 코드에서 경로로 참조하므로 현재 하위 폴더 이름을 유지합니다.

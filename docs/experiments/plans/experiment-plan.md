@@ -1340,3 +1340,7 @@ LLM 실행 전 selection preflight는 75% 예산에서 800개 Context를 평가�
 ## 29. Task Criticality v0.2 S2/S3/S5 재검증 (2026-11-13)
 
 동일한 `task_criticality_s235_v1` 데이터와 label로 helper를 갱신한 뒤 480개 Context 평가를 다시 수행했다. S3_VALID의 gold 포함은 40/40회로 유지하면서 무효 Memory 노출 합계는 74에서 0으로 줄었고, S3_EMPTY의 missing slot 감지 40/40회를 유지하면서 무효 노출 합계는 76에서 0으로 줄었다. S5 상충 감지는 40/40회였지만 두 상충 항목은 여전히 Context에 남았다. LLM generation은 없으며 같은 개발 데이터를 재사용했으므로 독립 검증으로 보지 않는다. 상세 비교는 [v0.2 Preflight 보고서](../reports/task-criticality-s235-v02-preflight-2026-11-13.md)를 참고한다.
+
+## 30. Task Criticality Safety Gate v0.3 오프라인 평가 (2026-11-15)
+
+`CriticalityGatedAdapter`의 실행 직전 Tool 검사에 대해 같은 S2/S3/S5 데이터 160개를 Gate OFF/ON으로 각 한 번씩 평가했다. 고정 `ScriptedPlanner`는 S3_EMPTY와 S5에 근거 없는 행동을 제안했다. Freeze 1.0.4와 1.0.5 결과 모두 Gate ON에서 잘못된 80개 Tool 호출을 모두 막고 유효한 80개를 모두 허용했으며, ON/OFF Context 선택과 token 수는 같았다. 1.0.5 상세 결과에서는 승인 이메일의 차단 slot이 attachment에서 필수 approval_id로 바뀌었지만 집계 결과는 같았다. LLM generation은 없고 `max_steps=1`인 scripted action 평가이므로 Agent 행동 성능이나 운영 안전성으로 일반화하지 않는다. 설계·재현·source checksum은 [Safety Gate 보고서](../reports/task-criticality-safety-gate-2026-11-15.md)를 참고한다.

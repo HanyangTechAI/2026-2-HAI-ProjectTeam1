@@ -41,3 +41,7 @@
 ## Task Criticality v0.2 후속 Preflight · 2026-11-13
 
 - [S2/S3/S5 v0.2 Preflight](task-criticality-s235-v02-preflight-2026-11-13.md) — 같은 stress data에서 무효 Evidence 제외와 상충 감지를 재검토한다.
+
+## Task Criticality Safety Gate · 2026-11-15
+
+- [S2/S3/S5 Safety Gate v0.3 오프라인 평가](task-criticality-safety-gate-2026-11-15.md) — 고정 scripted action 160개에서 gate OFF/ON을 비교하고, Freeze 1.0.5 approval-fix 재실행과 차단 원인 차이를 기록한다. LLM generation은 없다.

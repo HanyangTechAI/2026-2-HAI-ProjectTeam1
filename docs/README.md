@@ -16,6 +16,8 @@
 - [Task Criticality 75% 선택 Preflight](experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md) — 기존 개발 데이터에서 실험용 slot 승격 정책을 비교합니다.
 - [Task Criticality S2/S3/S5 스트레스 Preflight](experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md) — 선택 단계의 중요도 역전, 근거 부재와 상충 감지를 점검합니다.
 - [Task Criticality v0.2 S2/S3/S5 Preflight](experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md) — 무효 Evidence 제외와 기존 gold·ambiguity 결과를 같은 데이터에서 재확인합니다.
+- [Task Criticality Safety Gate v0.3](experiments/reports/task-criticality-safety-gate-2026-11-15.md) — 고정 scripted action에서 80개 위험 Tool 실행 차단과 Freeze 1.0.5 재실행을 기록합니다. LLM 성능 결과는 아닙니다.
+- [초기 Runner·Smoke 실행 점검 아카이브](experiments/audits/early-runner-and-smoke-archive-2026-11-15.md) — 기존 보고서에 직접 연결되지 않았던 개발 점검과 11월 8일·11일 smoke 재실행을 정리합니다.
 - [11월 12일 Pipeline Smoke 점검](experiments/audits/pipeline-smoke-2026-11-12.md) — 같은 5개 smoke scenario의 20회 실행을 세 차례 확인했습니다.
 - [1K·2K Token Budget Preflight](experiments/reports/token-budget-preflight-2026-11-08.md) — 0·32 token safety margin의 고정 입력 사전 점검 결과입니다.
 - [4K/8K Smoke Readiness Gate](experiments/audits/smoke-4k8k-readiness-2026-11-08.md) — 64회 실행의 계측 완결성과 `PASS` 판정을 기록합니다.

@@ -1,5 +1,9 @@
 ﻿# 검증 및 감사 자료
 
+## 2026-11-15
+
+- [초기 Runner·Smoke 실행 점검 아카이브](early-runner-and-smoke-archive-2026-11-15.md) — 직접 연결되지 않았던 개발용 Runner 자료와 11월 8일·11일 2K smoke 기록을 성능 실험과 구분해 정리한다.
+
 ## 2026-11-08
 
 - [4K/8K Smoke Readiness Gate](smoke-4k8k-readiness-2026-11-08.md) — 64회 실행의 prompt 계측·budget overflow·readiness 판정을 기록한다.

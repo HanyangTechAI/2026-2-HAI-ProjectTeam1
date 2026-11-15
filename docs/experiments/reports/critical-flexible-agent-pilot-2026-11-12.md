@@ -46,6 +46,7 @@ Preflight에서 관측한 75%·조건 C의 Context 선택 차이가 Agent의 첫
 ## 산출물과 재현
 
 원본 실행은 `experiments/results/critical_flexible_pilot_75_v104/`에 있다. `experiment.json`은 freeze·모델·prompt checksum·override를, `progress.json`과 `summary.json`은 집계를, `runs.jsonl`은 run별 Tool 호출·선택·평가 기록을 보존한다.
+여기서 보고한 첫 행동 집계와 paired 비교 원본은 `experiments/results/critical_flexible_first_action_v104/`의 `first_action_summary.json`, `paired_first_action.csv`, `failure_details.csv`에 있다. 이 평가는 위 64개 run의 기록에서 첫 행동을 계산한 결과이며 별도 LLM 실행은 아니다.
 
 아래는 동일한 파일과 설정으로 별도 결과 경로에 재실행하는 명령이다. Agent generation을 호출하므로 API 사용량이 발생한다.
 
