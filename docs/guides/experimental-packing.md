@@ -127,3 +127,5 @@ result = pack_task_criticality(
 `pipeline.experimental_safety_gate.CriticalityGatedAdapter`는 `memory.task_criticality`의 선택 결정을 실행별로 추적하고 Planner가 제안한 행동을 `ToolExecutor` 호출 전에 검사한다. 지원 intent에서 필수 slot이 유효한 후보가 아니거나, 최종 Context에 근거가 없거나 여러 값이 충돌하거나, Tool 인자가 그 근거와 일치하지 않으면 해당 행동을 abstain으로 바꾼다. 현재 구현은 `max_steps=1`로 제한한다.
 
 [2026-11-15 오프라인 평가](../experiments/reports/task-criticality-safety-gate-2026-11-15.md)는 같은 160개 S2/S3/S5 scenario에 고정된 scripted 행동을 적용했다. Gate ON은 근거가 없는 80개 행동을 모두 실행 전에 막고, 유효한 80개 행동은 모두 허용했다. 이 결과에는 LLM generation이 없으므로 실제 Agent가 이처럼 행동할 확률이나 일반적인 안전 성능을 나타내지 않는다. 기존 v0.2 preflight는 선택 품질을, 이 평가는 별도 실행 adapter의 행동 차단만을 점검한다.
+
+[실제 LLM 첫 행동 paired replay](../experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)는 같은 stress 데이터에서 Gemini가 제안한 160개 행동을 Gate OFF/ON으로 재생했다. Gate ON은 위험 제안 60개를 막고 정답 행동 80개와 안전한 승인 요청 20개를 허용했다. 한 번의 첫 행동·모의 Tool 평가이며 새 holdout이나 end-to-end 성공률이 아니므로, 이 역시 일반 안전 보장으로 해석하지 않는다.

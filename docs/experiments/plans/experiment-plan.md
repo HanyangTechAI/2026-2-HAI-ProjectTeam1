@@ -1344,3 +1344,7 @@ LLM 실행 전 selection preflight는 75% 예산에서 800개 Context를 평가�
 ## 30. Task Criticality Safety Gate v0.3 오프라인 평가 (2026-11-15)
 
 `CriticalityGatedAdapter`의 실행 직전 Tool 검사에 대해 같은 S2/S3/S5 데이터 160개를 Gate OFF/ON으로 각 한 번씩 평가했다. 고정 `ScriptedPlanner`는 S3_EMPTY와 S5에 근거 없는 행동을 제안했다. Freeze 1.0.4와 1.0.5 결과 모두 Gate ON에서 잘못된 80개 Tool 호출을 모두 막고 유효한 80개를 모두 허용했으며, ON/OFF Context 선택과 token 수는 같았다. 1.0.5 상세 결과에서는 승인 이메일의 차단 slot이 attachment에서 필수 approval_id로 바뀌었지만 집계 결과는 같았다. LLM generation은 없고 `max_steps=1`인 scripted action 평가이므로 Agent 행동 성능이나 운영 안전성으로 일반화하지 않는다. 설계·재현·source checksum은 [Safety Gate 보고서](../reports/task-criticality-safety-gate-2026-11-15.md)를 참고한다.
+
+## 31. Task Criticality Safety Gate v0.3 실제 LLM 첫 행동 paired replay (2026-11-15)
+
+Freeze 1.0.5에서 Gemini가 생성한 첫 행동 160개를 같은 75% Context로 Gate OFF/ON 각각 재생했다(320 paired pipeline runs). 모델은 정답 Tool 행동 80개를 모두 제안했고, 위험 행동 60개는 OFF에서 실행됐지만 ON에서 전부 차단됐다. Gate는 안전한 승인 요청 20개와 정답 효과 80개를 허용했으며 오차단은 없었다. 같은 synthetic stress 데이터와 한 번의 첫 행동만 평가한 결과라 독립 holdout이나 end-to-end Task 성공률이 아니다. 8개 smoke, 모델 비용 추정, paired 결과, 해시 및 한계는 [Gemini Safety Gate 보고서](../reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)에 기록했다.
