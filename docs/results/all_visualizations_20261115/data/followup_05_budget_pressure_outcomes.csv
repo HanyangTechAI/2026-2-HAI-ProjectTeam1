@@ -1,0 +1,11 @@
+﻿strategy,rho_percent,final_flexible_retention_percent,retention_n,success_percent,success_n
+Full,0,0,80,97.5,80
+Full,25,1.7,80,97.5,80
+Full,50,15,80,97.5,80
+Full,75,51.7,80,97.5,80
+Full,100,100,80,97.5,80
+No packing,0,0,78,95,80
+No packing,25,1.7,80,97.5,80
+No packing,50,11.7,80,97.5,80
+No packing,75,40,80,97.5,80
+No packing,100,98.8,80,97.5,80

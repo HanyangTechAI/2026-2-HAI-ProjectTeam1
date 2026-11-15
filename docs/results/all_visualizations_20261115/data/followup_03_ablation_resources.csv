@@ -1,0 +1,6 @@
+﻿strategy,input_tokens,output_tokens,estimated_usd_per_run,latency_2k_ms,latency_4k_ms,n_per_budget,freeze
+proposed,1469.975,558.575,0.0015626250000000002,3378.6,4260.1,80,1.0.3
+proposed/no_constraint_preservation,1473.95,549.05,0.0015667437499999998,3270.8,4337.7,80,1.0.3
+proposed/no_temporal,1633.325,808.175,0.00207000625,3990.0,4810.6,80,1.0.3
+proposed/no_state_mandatory,1469.975,558.575,0.0015626250000000002,3272.0,4240.7,80,1.0.3
+proposed/no_budget_aware_packing,1470.025,552.7,0.001553825,3316.1,4283.4,80,1.0.3

@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="848.44pt" height="434.319375pt" viewBox="0 0 848.44 434.319375" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <title>Critical Flexible pilot: first-step diagnostics</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>Critical Flexible pilot: first-step diagnostics</dc:title>
+    <dc:description>Single-step LLM pilot; 32 scenarios per preset, 64 runs; 75% normalized budget. Email-only metrics have n=16. All runs ended at max_steps=1; these are not final task completion rates. Report aggregates; individual run files unavailable locally. No confidence intervals reported. Sources: docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 434.319375
+L 848.44 434.319375
+L 848.44 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 52.002344 349.691406
+L 841.24 349.691406
+L 841.24 82.12976
+L 52.002344 82.12976
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="m7abda19ca8" d="M 0 0
+L 0 3.5
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m7abda19ca8" x="161.903403" y="349.691406" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(127.215121 365.29082)">Expected first</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(142.010434 377.293555)">Tool call</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="351.715249" y="349.691406" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(317.435561 365.29082)">Critical target</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(329.569936 377.293555)">omission</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="541.527095" y="349.691406" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(505.01772 365.29082)">Required state</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(504.739595 377.293555)">correct (email)</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="731.338941" y="349.691406" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(682.389722 365.29082)">Constraint violation</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'" transform="translate(713.648316 377.293555)">(email)</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_5">
+      <path d="M 52.002344 349.691406
+L 841.24 349.691406
+" clip-path="url(#p19dc1620df)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6">
+      <defs>
+       <path id="mee8207eb62" d="M 0 0
+L -3.5 0
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.002344" y="349.691406" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.002344" y="353.490234" transform="rotate(-0 45.002344 353.490234)">0</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_7">
+      <path d="M 52.002344 290.496352
+L 841.24 290.496352
+" clip-path="url(#p19dc1620df)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.002344" y="290.496352" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.002344" y="294.29518" transform="rotate(-0 45.002344 294.29518)">25</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_9">
+      <path d="M 52.002344 231.301297
+L 841.24 231.301297
+" clip-path="url(#p19dc1620df)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.002344" y="231.301297" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.002344" y="235.100125" transform="rotate(-0 45.002344 235.100125)">50</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_11">
+      <path d="M 52.002344 172.106243
+L 841.24 172.106243
+" clip-path="url(#p19dc1620df)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.002344" y="172.106243" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_8">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.002344" y="175.905071" transform="rotate(-0 45.002344 175.905071)">75</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_13">
+      <path d="M 52.002344 112.911188
+L 841.24 112.911188
+" clip-path="url(#p19dc1620df)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.002344" y="112.911188" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_9">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.002344" y="116.710016" transform="rotate(-0 45.002344 116.710016)">100</text>
+     </g>
+    </g>
+    <g id="text_10">
+     <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="19.5125" y="215.910583" transform="rotate(-90 19.5125 215.910583)">Scenarios (%)</text>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 87.876783 349.691406
+L 161.903403 349.691406
+L 161.903403 172.106243
+L 87.876783 172.106243
+z
+" clip-path="url(#p19dc1620df)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 277.688629 349.691406
+L 351.715249 349.691406
+L 351.715249 290.496352
+L 277.688629 290.496352
+z
+" clip-path="url(#p19dc1620df)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 467.500475 349.691406
+L 541.527095 349.691406
+L 541.527095 172.106243
+L 467.500475 172.106243
+z
+" clip-path="url(#p19dc1620df)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 657.312321 349.691406
+L 731.338941 349.691406
+L 731.338941 349.691406
+L 657.312321 349.691406
+z
+" clip-path="url(#p19dc1620df)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 161.903403 349.691406
+L 235.930023 349.691406
+L 235.930023 112.911188
+L 161.903403 112.911188
+z
+" clip-path="url(#p19dc1620df)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 351.715249 349.691406
+L 425.741869 349.691406
+L 425.741869 349.691406
+L 351.715249 349.691406
+z
+" clip-path="url(#p19dc1620df)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 541.527095 349.691406
+L 615.553715 349.691406
+L 615.553715 112.911188
+L 541.527095 112.911188
+z
+" clip-path="url(#p19dc1620df)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 731.338941 349.691406
+L 805.365561 349.691406
+L 805.365561 349.691406
+L 731.338941 349.691406
+z
+" clip-path="url(#p19dc1620df)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 52.002344 349.691406
+L 52.002344 82.12976
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_12">
+    <path d="M 52.002344 349.691406
+L 841.24 349.691406
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="124.890093" y="166.184368" transform="rotate(-0 124.890093 166.184368)">24/32</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="314.701939" y="284.574477" transform="rotate(-0 314.701939 284.574477)">8/32</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="504.513785" y="166.184368" transform="rotate(-0 504.513785 166.184368)">12/16</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="694.325631" y="343.769531" transform="rotate(-0 694.325631 343.769531)">0/16</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="198.916713" y="106.989313" transform="rotate(-0 198.916713 106.989313)">32/32</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="388.728559" y="343.769531" transform="rotate(-0 388.728559 343.769531)">0/32</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="578.540405" y="106.989313" transform="rotate(-0 578.540405 106.989313)">16/16</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="768.352251" y="343.769531" transform="rotate(-0 768.352251 343.769531)">0/16</text>
+   </g>
+   <g id="legend_1">
+    <g id="patch_13">
+     <path d="M 379.523359 48.907257
+L 397.523359 48.907257
+L 397.523359 42.607257
+L 379.523359 42.607257
+z
+" style="fill: #0072b2"/>
+    </g>
+    <g id="text_19">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="404.723359" y="48.907257" transform="rotate(-0 404.723359 48.907257)">Full</text>
+    </g>
+    <g id="patch_14">
+     <path d="M 438.111953 48.907257
+L 456.111953 48.907257
+L 456.111953 42.607257
+L 438.111953 42.607257
+z
+" style="fill: #d55e00"/>
+    </g>
+    <g id="text_20">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="463.311953" y="48.907257" transform="rotate(-0 463.311953 48.907257)">No packing</text>
+    </g>
+   </g>
+  </g>
+  <g id="text_21">
+   <text style="font-weight: 700; font-size: 14px; font-family: 'DejaVu Sans'; text-anchor: middle" x="426.24" y="17.837812" transform="rotate(-0 426.24 17.837812)">Critical Flexible pilot: first-step diagnostics</text>
+  </g>
+  <g id="text_22">
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 414.794531)">criticality_02_pilot_first_step | Single-step LLM pilot; 32 scenarios per preset, 64 runs; 75% normalized budget. Email-only metrics have n=16. All runs ended at</text>
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 424.396719)">max_steps=1; these are not final task completion rates. Report aggregates; individual run files unavailable locally. No confidence intervals reported.</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p19dc1620df">
+   <rect x="52.002344" y="82.12976" width="789.237656" height="267.561646"/>
+  </clipPath>
+ </defs>
+</svg>

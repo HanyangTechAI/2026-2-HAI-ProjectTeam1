@@ -1,0 +1,1176 @@
+{
+  "as_of": "2026-11-15",
+  "engine": "matplotlib",
+  "chart_count": 54,
+  "charts": [
+    {
+      "id": "main_01_success",
+      "title": "Main: task success by budget and horizon",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. ",
+      "svg": "svg/main_01_success.svg",
+      "preview": "previews/main_01_success.png",
+      "data": "data/main_01_success.csv",
+      "plotted_rows": 48
+    },
+    {
+      "id": "main_02_behavior_reliability",
+      "title": "Main: behavior reliability and safety",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. RSA denominator 80; applicable CVR denominator 40; current-state SSUR denominator 60 per cell. Lower is better for violations/stale usage. A zero violation rate after a preflight stop is not task success.",
+      "svg": "svg/main_02_behavior_reliability.svg",
+      "preview": "previews/main_02_behavior_reliability.png",
+      "data": "data/main_02_behavior_reliability.csv",
+      "plotted_rows": 144
+    },
+    {
+      "id": "main_03_context_and_action",
+      "title": "Main: memory context versus action correctness",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. Correct memory context does not guarantee correct structured tool arguments.",
+      "svg": "svg/main_03_context_and_action.svg",
+      "preview": "previews/main_03_context_and_action.png",
+      "data": "data/main_03_context_and_action.csv",
+      "plotted_rows": 144
+    },
+    {
+      "id": "main_04_retrieval_diagnostics",
+      "title": "Main: supporting retrieval diagnostics",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. Missing Sliding retrieval metrics are not measured, not zero. Retrieval metrics are diagnostics, not task success.",
+      "svg": "svg/main_04_retrieval_diagnostics.svg",
+      "preview": "previews/main_04_retrieval_diagnostics.png",
+      "data": "data/main_04_retrieval_diagnostics.csv",
+      "plotted_rows": 192
+    },
+    {
+      "id": "main_05_selection_diagnostics",
+      "title": "Main: selection and state failure diagnostics",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. Denominators and absent metrics are retained in CSV. Failure metrics can overlap.",
+      "svg": "svg/main_05_selection_diagnostics.svg",
+      "preview": "previews/main_05_selection_diagnostics.png",
+      "data": "data/main_05_selection_diagnostics.csv",
+      "plotted_rows": 192
+    },
+    {
+      "id": "main_06_tokens",
+      "title": "Main: observed token usage per stored run",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. Input is the per-run maximum counted context, not cumulative provider usage. Proposed 1K input is unmeasured after preflight stop. H100/2K output-token means use 78 Sliding and 79 Utility runs.",
+      "svg": "svg/main_06_tokens.svg",
+      "preview": "previews/main_06_tokens.png",
+      "data": "data/main_06_tokens.csv",
+      "plotted_rows": 96
+    },
+    {
+      "id": "main_07_cost_and_latency",
+      "title": "Main: observed generation cost and planning latency",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical saved aggregates; 40 sample clusters x 2 repeats per strategy/cell. Bars: saved 95% sample-cluster bootstrap CI; no multiplicity adjustment. 1K Proposed stops before model execution. Overlapping curves retain distinct markers. H100/2K cost averages use 78 Sliding and 79 Utility runs; others use 80. Costs omit unknown attempts and are not a total bill. Latency is descriptive: network/time were uncontrolled.",
+      "svg": "svg/main_07_cost_and_latency.svg",
+      "preview": "previews/main_07_cost_and_latency.png",
+      "data": "data/main_07_cost_and_latency.csv",
+      "plotted_rows": 96
+    },
+    {
+      "id": "main_08_paired_effects",
+      "title": "Main: paired success differences with saved 95% CI",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/deltas.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Canonical final aggregation; 40 sample clusters / 80 paired runs per point. Intervals are exploratory and unadjusted for multiplicity; endpoint zero does not establish superiority or equivalence.",
+      "svg": "svg/main_08_paired_effects.svg",
+      "preview": "previews/main_08_paired_effects.png",
+      "data": "data/main_08_paired_effects.csv",
+      "plotted_rows": 36
+    },
+    {
+      "id": "main_09_failure_tags",
+      "title": "Main: failure tags across all 12 cells",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Tags overlap: never sum to infer failed runs. Blank cells are zero. P=Proposed, SW=Sliding, V=Vector, U=Utility. 1K preflight stops are retained. Color scale: 0 to 80 tagged runs.",
+      "svg": "svg/main_09_failure_tags.svg",
+      "preview": "previews/main_09_failure_tags.png",
+      "data": "data/main_09_failure_tags.csv",
+      "plotted_rows": 432
+    },
+    {
+      "id": "main_10_task_subgroups",
+      "title": "Main: task-family outcomes at the 2K boundary",
+      "category": "main",
+      "sources": [
+        "docs/experiments/reports/main-phase1-h50-analysis-2026-11-09.md",
+        "docs/experiments/reports/main-phase2-h10-analysis-2026-11-09.md",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Published phase tables; 10 shared base tasks x 2 repeats per family/strategy. These are subsets of final Main, not extra independent runs. No family-level intervals were supplied.",
+      "svg": "svg/main_10_task_subgroups.svg",
+      "preview": "previews/main_10_task_subgroups.png",
+      "data": "data/main_10_task_subgroups.csv",
+      "plotted_rows": 32
+    },
+    {
+      "id": "main_11_performance_cost",
+      "title": "Main: observed success and generation-cost trade-off",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Marker area encodes 2K/4K/8K budget (small/medium/large); concentric points overlap. 1K is omitted here because Proposed did not execute. H100/2K cost means use 78 Sliding and 79 Utility runs. Stored usage is an estimate, not a total bill; intervals shown in other Main figures.",
+      "svg": "svg/main_11_performance_cost.svg",
+      "preview": "previews/main_11_performance_cost.png",
+      "data": "data/main_11_performance_cost.csv",
+      "plotted_rows": 36
+    },
+    {
+      "id": "main_12_input_accounting",
+      "title": "Main: cumulative provider usage versus peak counted input",
+      "category": "main",
+      "sources": [
+        "docs/results/main_20261109/summary.json",
+        "docs/experiments/reports/main-phase1-h50-analysis-2026-11-09.md",
+        "docs/experiments/reports/main-phase2-h10-analysis-2026-11-09.md",
+        "docs/experiments/reports/main-final-analysis-2026-11-09.md"
+      ],
+      "note": "Cumulative usage: rounded published phase means, no intervals reported. Peak context: saved canonical summary means. 80 live runs per point. A multi-call run can have cumulative input above its single-request budget. These are subsets of final Main.",
+      "svg": "svg/main_12_input_accounting.svg",
+      "preview": "previews/main_12_input_accounting.png",
+      "data": "data/main_12_input_accounting.csv",
+      "plotted_rows": 24
+    },
+    {
+      "id": "preliminary_01_early_pilots",
+      "title": "Early pilots: recorded outcomes with known measurement limitations",
+      "category": "preliminary",
+      "sources": [
+        "docs/experiments/reports/early-pilot-runs-2026-11-03.md",
+        "experiments/results/pilot_offline_20261103_182136/summary.json"
+      ],
+      "note": "Report aggregates; P=Proposed, SW=Sliding, V=Vector, U=Utility. First two runs have contradictory success/selection-failure metrics; first Gemini run fails budgeting before valid execution. Gemini v2 lacks current provenance/cost accounting. Do not compare with final Main.",
+      "svg": "svg/preliminary_01_early_pilots.svg",
+      "preview": "previews/preliminary_01_early_pilots.png",
+      "data": "data/preliminary_01_early_pilots.csv",
+      "plotted_rows": 16
+    },
+    {
+      "id": "preliminary_02_budget_margin",
+      "title": "Token-budget preflight: safety margin 0 versus 32",
+      "category": "preliminary",
+      "sources": [
+        "docs/experiments/reports/token-budget-preflight-2026-11-08.md"
+      ],
+      "note": "Published report table; 8 fixed scenarios, one run per strategy/condition; 128 runs total. 1K Proposed stops before model execution. No intervals reported; identical observed rates do not establish equivalence.",
+      "svg": "svg/preliminary_02_budget_margin.svg",
+      "preview": "previews/preliminary_02_budget_margin.png",
+      "data": "data/preliminary_02_budget_margin.csv",
+      "plotted_rows": 16
+    },
+    {
+      "id": "preliminary_03_output_limit",
+      "title": "Output-limit validation: 512 versus 2048 tokens",
+      "category": "preliminary",
+      "sources": [
+        "docs/experiments/reports/output-limit-2048-validation-2026-11-09.md"
+      ],
+      "note": "Published report table: same 10 selected inputs per strategy; one execution, not the 12-cell Main design. Proposed has two 1K budget stops in the new run. Parse errors and MAX_TOKENS are distinct diagnostics; no paired CI supplied.",
+      "svg": "svg/preliminary_03_output_limit.svg",
+      "preview": "previews/preliminary_03_output_limit.png",
+      "data": "data/preliminary_03_output_limit.csv",
+      "plotted_rows": 8
+    },
+    {
+      "id": "preliminary_04_output_limit_budget",
+      "title": "Output-limit 2048 validation: selected-input budget breakdown",
+      "category": "preliminary",
+      "sources": [
+        "docs/experiments/reports/output-limit-2048-validation-2026-11-09.md"
+      ],
+      "note": "Published aggregate counts. Each budget includes only 2 or 4 selected inputs per strategy; mixed tasks/horizons are not fully crossed. 38 live runs, 75 STOP responses; no observed parse or input-budget errors. Exploratory instrumentation check, not final Main.",
+      "svg": "svg/preliminary_04_output_limit_budget.svg",
+      "preview": "previews/preliminary_04_output_limit_budget.png",
+      "data": "data/preliminary_04_output_limit_budget.csv",
+      "plotted_rows": 16
+    },
+    {
+      "id": "followup_01_ablation_quality",
+      "title": "Ablation: quality and memory preservation",
+      "category": "followups",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Freeze 1.0.3: no_temporal also disables mandatory state. Checked-in 2K aggregates; the report states all 400 paired 4K outcomes match. Error bars: reported sample-cluster bootstrap 95% CI.",
+      "svg": "svg/followup_01_ablation_quality.svg",
+      "preview": "previews/followup_01_ablation_quality.png",
+      "data": "data/followup_01_ablation_quality.csv",
+      "plotted_rows": 20
+    },
+    {
+      "id": "followup_02_ablation_retrieval_failures",
+      "title": "Ablation: retrieval and failure diagnostics",
+      "category": "followups",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Freeze 1.0.3, 2K/H100. Recall, precision, and MRR are scaled to 0-100. Failure labels can overlap; constraint violation uses n=40, other shown diagnostics n=80. Heatmap shows means.",
+      "svg": "svg/followup_02_ablation_retrieval_failures.svg",
+      "preview": "previews/followup_02_ablation_retrieval_failures.png",
+      "data": "data/followup_02_ablation_retrieval_failures.csv",
+      "plotted_rows": 45
+    },
+    {
+      "id": "followup_03_ablation_resources",
+      "title": "Ablation: tokens, estimated cost, and recorded latency",
+      "category": "followups",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Input is peak counted context, not cumulative provider usage. Token and cost means match between 2K and 4K. Latency includes OS/commit differences and is not a causal budget comparison. Costs are recorded LLM estimates, excluding CountTokens and infrastructure.",
+      "svg": "svg/followup_03_ablation_resources.svg",
+      "preview": "previews/followup_03_ablation_resources.png",
+      "data": "data/followup_03_ablation_resources.csv",
+      "plotted_rows": 5
+    },
+    {
+      "id": "followup_04_temporal_versions_deltas",
+      "title": "Temporal ablation: corrected condition and paired effects",
+      "category": "followups",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/deltas.json",
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md",
+        "docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md"
+      ],
+      "note": "v1.0.3 no_temporal disables temporal AND mandatory state; v1.0.4 disables temporal only. Full rerun reuses the same tasks. Corrected temporal comparison uses historical v1.0.3 Full; CIs include zero.",
+      "svg": "svg/followup_04_temporal_versions_deltas.svg",
+      "preview": "previews/followup_04_temporal_versions_deltas.png",
+      "data": "data/followup_04_temporal_versions_deltas.csv",
+      "plotted_rows": 9
+    },
+    {
+      "id": "followup_05_budget_pressure_outcomes",
+      "title": "Budget pressure: memory retention and task success",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/budget-pressure-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived values. Rho interpolates between mandatory and all-candidate boundaries; it is not a total-budget fraction. At rho=0, no-packing retention excludes 2 absent contexts (n=78); success includes all 80 runs. No CIs reported for these means.",
+      "svg": "svg/followup_05_budget_pressure_outcomes.svg",
+      "preview": "previews/followup_05_budget_pressure_outcomes.png",
+      "data": "data/followup_05_budget_pressure_outcomes.csv",
+      "plotted_rows": 10
+    },
+    {
+      "id": "followup_06_budget_pressure_stages",
+      "title": "Budget pressure: first, intermediate, and final contexts",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/budget-pressure-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived Full condition. Exclusions count events across steps, not unique memories. Final retention does not describe the first action: at rho=0, first-step retention remains 89.2%.",
+      "svg": "svg/followup_06_budget_pressure_stages.svg",
+      "preview": "previews/followup_06_budget_pressure_stages.png",
+      "data": "data/followup_06_budget_pressure_stages.csv",
+      "plotted_rows": 5
+    },
+    {
+      "id": "followup_07_budget_pressure_boundary",
+      "title": "Budget pressure: the additional failure at rho=0",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/budget-pressure-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived failure case: same first-step memory set, different ordering and generated feedback. Nominal budget 1,484 minus safety margin 32. This is a specific trace, not a general packing success guarantee.",
+      "svg": "svg/followup_07_budget_pressure_boundary.svg",
+      "preview": "previews/followup_07_budget_pressure_boundary.png",
+      "data": "data/followup_07_budget_pressure_boundary.csv",
+      "plotted_rows": 2
+    },
+    {
+      "id": "followup_08_horizon_state_success",
+      "title": "Long horizon and state updates: six unique cells",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/long-horizon-analysis-2026-11-11.md",
+        "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived values; 6 unique cells / 1,920 runs total, each point 40 tasks x 2 repeats. Vector/Utility success rates overlap. Snapshot selection with Top-k=5; this is not 1,000 online agent turns. No marginal CIs supplied for every point.",
+      "svg": "svg/followup_08_horizon_state_success.svg",
+      "preview": "previews/followup_08_horizon_state_success.png",
+      "data": "data/followup_08_horizon_state_success.csv",
+      "plotted_rows": 24
+    },
+    {
+      "id": "followup_09_state_retrieval_recovery",
+      "title": "State updates: initial retrieval and context recovery",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/long-horizon-analysis-2026-11-11.md",
+        "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived rates are identical at H100 and H1000 (80 runs per strategy/update/horizon). This diagnostic tracks one correct State, not all required constraints. Correct State is substantially longer than other versions in these synthetic inputs.",
+      "svg": "svg/followup_09_state_retrieval_recovery.svg",
+      "preview": "previews/followup_09_state_retrieval_recovery.png",
+      "data": "data/followup_09_state_retrieval_recovery.csv",
+      "plotted_rows": 6
+    },
+    {
+      "id": "followup_10_state_safety",
+      "title": "State updates at H1000: stale states and approval violations",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/long-horizon-analysis-2026-11-11.md",
+        "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived H1000 values. Vector and Utility overlap; their displayed rates also recur at H100. Stale usage excludes 20 historical-state requests; zero stale usage alone does not imply task success.",
+      "svg": "svg/followup_10_state_safety.svg",
+      "preview": "previews/followup_10_state_safety.png",
+      "data": "data/followup_10_state_safety.csv",
+      "plotted_rows": 24
+    },
+    {
+      "id": "followup_11_sliding_subgroups",
+      "title": "Sliding Window: which task types fail as versions increase",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived H100 subgroup counts. Stale-state usage is zero for Sliding, but historical versions and approval behavior still produce failures. Each condition reuses the same ten base tasks per subgroup with two repeats.",
+      "svg": "svg/followup_11_sliding_subgroups.svg",
+      "preview": "previews/followup_11_sliding_subgroups.png",
+      "data": "data/followup_11_sliding_subgroups.csv",
+      "plotted_rows": 12
+    },
+    {
+      "id": "followup_12_horizon_input_diagnostics",
+      "title": "Long horizon inputs: measured history and State-memory lengths",
+      "category": "followups",
+      "sources": [
+        "docs/experiments/reports/long-horizon-analysis-2026-11-11.md",
+        "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Report-derived min-max ranges, not confidence intervals. History is restored as a synthetic snapshot; the full 128K history is not sent to the LLM. Correct-State padding and fixed Top-k=5 limit generalization.",
+      "svg": "svg/followup_12_horizon_input_diagnostics.svg",
+      "preview": "previews/followup_12_horizon_input_diagnostics.png",
+      "data": "data/followup_12_horizon_input_diagnostics.csv",
+      "plotted_rows": 8
+    },
+    {
+      "id": "criticality_01_flexible_budget_sweep",
+      "title": "Critical Flexible preflight: selection across budget levels",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/critical-flexible-preflight-2026-11-12.md"
+      ],
+      "note": "Selection only; 160 scenarios from 40 base tasks; 1,600 context evaluations. Budget is normalized separately from each scenario's mandatory floor to its ceiling; no LLM generation. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_01_flexible_budget_sweep.svg",
+      "preview": "previews/criticality_01_flexible_budget_sweep.png",
+      "data": "data/criticality_01_flexible_budget_sweep.csv",
+      "plotted_rows": 15
+    },
+    {
+      "id": "criticality_02_pilot_first_step",
+      "title": "Critical Flexible pilot: first-step diagnostics",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md"
+      ],
+      "note": "Single-step LLM pilot; 32 scenarios per preset, 64 runs; 75% normalized budget. Email-only metrics have n=16. All runs ended at max_steps=1; these are not final task completion rates. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_02_pilot_first_step.svg",
+      "preview": "previews/criticality_02_pilot_first_step.png",
+      "data": "data/criticality_02_pilot_first_step.csv",
+      "plotted_rows": 8
+    },
+    {
+      "id": "criticality_03_pilot_resources",
+      "title": "Critical Flexible pilot: input size and reported cost",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md"
+      ],
+      "note": "Historical reported estimates for this one-step pilot; 32 runs per preset. Reported cost is approximate and is not a current pricing estimate or evidence of general cost superiority. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_03_pilot_resources.svg",
+      "preview": "previews/criticality_03_pilot_resources.png",
+      "data": "data/criticality_03_pilot_resources.csv",
+      "plotted_rows": 4
+    },
+    {
+      "id": "criticality_04_holdout_first_action",
+      "title": "Critical Flexible holdout: first-action correctness",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/critical-flexible-holdout-2026-11-12.md"
+      ],
+      "note": "160 paired scenarios from 40 base tasks; separate seeds and templates; one LLM run per preset/scenario. A=short/short, B=short/long, C=long/short, D=long/long (critical/distractor). Correctness verifies the call, required arguments and tool effect; max_steps=1, not final task completion. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_04_holdout_first_action.svg",
+      "preview": "previews/criticality_04_holdout_first_action.png",
+      "data": "data/criticality_04_holdout_first_action.csv",
+      "plotted_rows": 14
+    },
+    {
+      "id": "criticality_05_holdout_paired_outcomes",
+      "title": "Critical Flexible holdout: paired first-action outcomes",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/critical-flexible-holdout-2026-11-12.md"
+      ],
+      "note": "Totals: both correct 114, both incorrect 4, Full only 3, No packing only 39. The same 40 base tasks occur in A-D; first-action outcomes do not measure final completion. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_05_holdout_paired_outcomes.svg",
+      "preview": "previews/criticality_05_holdout_paired_outcomes.png",
+      "data": "data/criticality_05_holdout_paired_outcomes.csv",
+      "plotted_rows": 16
+    },
+    {
+      "id": "criticality_06_packing_alpha_development",
+      "title": "Packing alpha: long critical memory with short distractors",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/packing-alpha-development-2026-11-12.md"
+      ],
+      "note": "Condition C, 75% normalized budget; same development data, not an independent holdout. Score=utility / tokens**alpha. LLM: 40 scenarios per tested alpha, 120 one-step runs; alpha=0.5 was selection-only. Critical context inclusion equals first-action correctness in all reported LLM arms. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_06_packing_alpha_development.svg",
+      "preview": "previews/criticality_06_packing_alpha_development.png",
+      "data": "data/criticality_06_packing_alpha_development.csv",
+      "plotted_rows": 10
+    },
+    {
+      "id": "criticality_07_selection_policies",
+      "title": "Task Criticality: critical-memory inclusion at 75% budget",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md"
+      ],
+      "note": "480 selection-only contexts; same 160 development scenarios as the earlier Flexible preflight, not a new holdout. A=short/short, B=short/long, C=long/short, D=long/long. All policies retrieved 160/160 critical memories; no LLM generation or tool execution. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_07_selection_policies.svg",
+      "preview": "previews/criticality_07_selection_policies.png",
+      "data": "data/criticality_07_selection_policies.csv",
+      "plotted_rows": 15
+    },
+    {
+      "id": "criticality_08_stress_slot_signals",
+      "title": "S2/S3/S5 stress preflight: selection and slot-detection signals",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md",
+        "docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md"
+      ],
+      "note": "Each measure has 40 scenarios. v0.1 and v0.2 reuse the same development dataset; 480 contexts per run. S2 reverses importance; S3 tests valid/missing evidence; S5 tests conflict. Selection and detection signals are different measures; neither execution blocking nor LLM correctness is measured. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_08_stress_slot_signals.svg",
+      "preview": "previews/criticality_08_stress_slot_signals.png",
+      "data": "data/criticality_08_stress_slot_signals.csv",
+      "plotted_rows": 16
+    },
+    {
+      "id": "criticality_09_stress_memory_exposure",
+      "title": "S2/S3/S5 stress preflight: context exposure before and after v0.2",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md",
+        "docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md"
+      ],
+      "note": "Bars count memory items summed across 40 scenarios per variant, not scenario success rates. v0.2 removes invalid S3 evidence, while S5's two conflicting memories remain exposed in every scenario. Selection-only development data; no LLM generation or tool execution. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_09_stress_memory_exposure.svg",
+      "preview": "previews/criticality_09_stress_memory_exposure.png",
+      "data": "data/criticality_09_stress_memory_exposure.csv",
+      "plotted_rows": 12
+    },
+    {
+      "id": "criticality_10_safety_gate_versions",
+      "title": "Safety Gate v0.3: fixed scripted actions with gate OFF / ON",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/task-criticality-safety-gate-2026-11-15.md"
+      ],
+      "note": "160 scenarios and 320 pipeline runs per freeze version. Gate ON allowed all 80 valid actions and blocked all 80 invalid actions. ScriptedPlanner, max_steps=1, LLM generation=0; these counts do not estimate LLM safety or task success. Freeze 1.0.5 changed the blocking reason in 40 approval-email rows, while aggregate outcomes stayed identical. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_10_safety_gate_versions.svg",
+      "preview": "previews/criticality_10_safety_gate_versions.png",
+      "data": "data/criticality_10_safety_gate_versions.csv",
+      "plotted_rows": 16
+    },
+    {
+      "id": "criticality_11_safety_gate_variant_actions",
+      "title": "Safety Gate ON: allowed and blocked scripted actions by variant",
+      "category": "criticality",
+      "sources": [
+        "docs/experiments/reports/task-criticality-safety-gate-2026-11-15.md"
+      ],
+      "note": "Identical aggregate results in Freeze 1.0.4 and 1.0.5; 40 scenarios per variant. Fixed valid S2/S3_VALID actions were allowed; deliberately ungrounded S3_EMPTY/S5 actions were blocked before ToolExecutor. No LLM generation or multi-step agent evaluation. Report aggregates; individual run files unavailable locally. No confidence intervals reported.",
+      "svg": "svg/criticality_11_safety_gate_variant_actions.svg",
+      "preview": "previews/criticality_11_safety_gate_variant_actions.png",
+      "data": "data/criticality_11_safety_gate_variant_actions.csv",
+      "plotted_rows": 8
+    },
+    {
+      "id": "audit_01_narrative_retrieval",
+      "title": "Narrative modes: offline retrieval sensitivity",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/narrative-bias-audit-2026-11-10.md"
+      ],
+      "note": "Published report table; 40 paired tasks per mode; Proposed general pool is retrieval only, before selection. No Agent/LLM generation or confidence intervals.",
+      "svg": "svg/audit_01_narrative_retrieval.svg",
+      "preview": "previews/audit_01_narrative_retrieval.png",
+      "data": "data/audit_01_narrative_retrieval.csv",
+      "plotted_rows": 6
+    },
+    {
+      "id": "audit_02_narrative_paired_changes",
+      "title": "Narrative modes: paired retrieval changes",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/narrative-bias-audit-2026-11-10.md"
+      ],
+      "note": "Published report table; each contrast reuses the same 40 tasks. Differences are descriptive; mode comparisons are not additional independent samples.",
+      "svg": "svg/audit_02_narrative_paired_changes.svg",
+      "preview": "previews/audit_02_narrative_paired_changes.png",
+      "data": "data/audit_02_narrative_paired_changes.csv",
+      "plotted_rows": 6
+    },
+    {
+      "id": "audit_03_narrative_factorial",
+      "title": "Target/noise padding: 2 x 2 offline retrieval audit",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/narrative-factorial-audit-2026-11-11.md"
+      ],
+      "note": "Published report tables; 40 paired tasks; paired bootstrap 4,000 resamples. Target effects match at both noise settings; noise effects match at both target settings. No Agent execution.",
+      "svg": "svg/audit_03_narrative_factorial.svg",
+      "preview": "previews/audit_03_narrative_factorial.png",
+      "data": "data/audit_03_narrative_factorial.csv",
+      "plotted_rows": 14
+    },
+    {
+      "id": "audit_04_final_context_recovery",
+      "title": "Final-context audit: initial misses recovered",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/narrative-final-context-audit-2026-11-11.md"
+      ],
+      "note": "Published report tables; 40 paired tasks per mode, no LLM generation. Token whiskers show observed min-max, not confidence intervals. Final context overflow: 0/80 rows.",
+      "svg": "svg/audit_04_final_context_recovery.svg",
+      "preview": "previews/audit_04_final_context_recovery.png",
+      "data": "data/audit_04_final_context_recovery.csv",
+      "plotted_rows": 14
+    },
+    {
+      "id": "audit_05_narrative_llm_behavior",
+      "title": "Narrative modes: actual Agent/Tool behavior",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/narrative-llm-execution-audit-2026-11-11.md"
+      ],
+      "note": "Published report table; same 40 paired tasks, one execution per strategy/mode. Task bootstrap: 2,000 resamples. Constraint violations: 0/20 in all four conditions; not pooled with Main.",
+      "svg": "svg/audit_05_narrative_llm_behavior.svg",
+      "preview": "previews/audit_05_narrative_llm_behavior.png",
+      "data": "data/audit_05_narrative_llm_behavior.csv",
+      "plotted_rows": 4
+    },
+    {
+      "id": "audit_06_narrative_llm_resources",
+      "title": "Narrative modes: measured Agent resources",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/narrative-llm-execution-audit-2026-11-11.md"
+      ],
+      "note": "Published report means; 40 executions per condition. Cost is provider-usage-based estimated cost, scaled to 1,000 runs for readability; not a billing total. No resource confidence intervals reported.",
+      "svg": "svg/audit_06_narrative_llm_resources.svg",
+      "preview": "previews/audit_06_narrative_llm_resources.png",
+      "data": "data/audit_06_narrative_llm_resources.csv",
+      "plotted_rows": 4
+    },
+    {
+      "id": "audit_07_attachment_recheck",
+      "title": "Attachment recheck: one task repeated five times per mode",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/attachment-recheck-2026-11-11.md"
+      ],
+      "note": "Published report tables; ONE fixed approval task, five repeats per mode. Repeats are not five independent tasks or a general mode-effect estimate. No actual email was sent.",
+      "svg": "svg/audit_07_attachment_recheck.svg",
+      "preview": "previews/audit_07_attachment_recheck.png",
+      "data": "data/audit_07_attachment_recheck.csv",
+      "plotted_rows": 14
+    },
+    {
+      "id": "audit_08_action_time_budget",
+      "title": "Action-time preflight: flexible-memory selection by budget",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/action-time-preflight-2026-11-11.md"
+      ],
+      "note": "Published report table; 40 paired tasks at each normalized level; 400 context evaluations, all valid. No critical-memory labels or LLM actions; recovery is not correctness or task success.",
+      "svg": "svg/audit_08_action_time_budget.svg",
+      "preview": "previews/audit_08_action_time_budget.png",
+      "data": "data/audit_08_action_time_budget.csv",
+      "plotted_rows": 5
+    },
+    {
+      "id": "audit_09_constraint_coverage",
+      "title": "Constraint coverage: legacy inputs and balanced generator",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/constraint-coverage-audit-2026-11-13.md",
+        "docs/experiments/audits/balanced-generator-2026-11-13.md",
+        "docs/results/constraint_coverage_20261113/summary.json",
+        "docs/results/constraint_coverage_20261113/tracked_main_summary.json",
+        "docs/results/constraint_coverage_balanced_v2_20261113/summary.json"
+      ],
+      "note": "Coverage JSON plus published reports; 40 task identities per dataset. Legacy prohibited files do not restrict actual visible candidates. Declared applicability and behavioral necessity differ; no new LLM performance results.",
+      "svg": "svg/audit_09_constraint_coverage.svg",
+      "preview": "previews/audit_09_constraint_coverage.png",
+      "data": "data/audit_09_constraint_coverage.csv",
+      "plotted_rows": 3
+    },
+    {
+      "id": "audit_10_constraint_retention_controls",
+      "title": "Constraint retention and separate synthetic evaluator controls",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/constraint-coverage-audit-2026-11-13.md",
+        "docs/results/constraint_coverage_20261113/summary.json"
+      ],
+      "note": "Left: existing LLM Ablation runs, 40 tasks x 2 repeats; preservation disabled does not delete constraints. Right: artificial evaluator traces only, no LLM. The two panels have different scopes and denominators.",
+      "svg": "svg/audit_10_constraint_retention_controls.svg",
+      "preview": "previews/audit_10_constraint_retention_controls.png",
+      "data": "data/audit_10_constraint_retention_controls.csv",
+      "plotted_rows": 4
+    },
+    {
+      "id": "audit_11_balanced_generator_validation",
+      "title": "Balanced generator: answer positions and offline validation",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/balanced-generator-2026-11-13.md",
+        "docs/results/constraint_coverage_balanced_v2_20261113/validation.json"
+      ],
+      "note": "Offline provisional tokenizer, constant test embedding, integration top-k 20. 480 appearances reuse 40 task identities across 12 cells. These checks do not measure LLM or experimental top-k 5 performance.",
+      "svg": "svg/audit_11_balanced_generator_validation.svg",
+      "preview": "previews/audit_11_balanced_generator_validation.png",
+      "data": "data/audit_11_balanced_generator_validation.csv",
+      "plotted_rows": 21
+    },
+    {
+      "id": "audit_12_smoke_readiness",
+      "title": "4K/8K readiness gate: prompt instrumentation",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/smoke-4k8k-readiness-2026-11-08.md"
+      ],
+      "note": "Published report table; eight fixed tasks x four strategies per budget. Operational readiness only; no comparative performance inference. Safety margin: 32 tokens.",
+      "svg": "svg/audit_12_smoke_readiness.svg",
+      "preview": "previews/audit_12_smoke_readiness.png",
+      "data": "data/audit_12_smoke_readiness.csv",
+      "plotted_rows": 2
+    },
+    {
+      "id": "audit_13_pipeline_smoke",
+      "title": "Pipeline smoke: five fixed inputs and execution checks",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/pipeline-smoke-2026-11-12.md"
+      ],
+      "note": "Published report tables; latest of three snapshots using the same five tasks. A pipeline diagnostic, not a strategy performance estimate; repeated snapshots are not independent tasks.",
+      "svg": "svg/audit_13_pipeline_smoke.svg",
+      "preview": "previews/audit_13_pipeline_smoke.png",
+      "data": "data/audit_13_pipeline_smoke.csv",
+      "plotted_rows": 8
+    },
+    {
+      "id": "audit_14_smoke_execution_archive",
+      "title": "Repeated smoke snapshots: observation archive",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/early-runner-and-smoke-archive-2026-11-15.md",
+        "docs/experiments/audits/pipeline-smoke-2026-11-12.md"
+      ],
+      "note": "Published report tables; same five tasks in every snapshot, with different code commits. Nov 8 snapshots are dirty. Counts are separate records; no pooled success rate or temporal/causal trend is estimated.",
+      "svg": "svg/audit_14_smoke_execution_archive.svg",
+      "preview": "previews/audit_14_smoke_execution_archive.png",
+      "data": "data/audit_14_smoke_execution_archive.csv",
+      "plotted_rows": 32
+    },
+    {
+      "id": "audit_15_early_runner_fixtures",
+      "title": "Early runner fixtures: development diagnostics only",
+      "category": "audits",
+      "sources": [
+        "docs/experiments/audits/early-runner-and-smoke-archive-2026-11-15.md"
+      ],
+      "note": "Published archive table; provisional counter and incomplete provenance. quant_pilot_sanity contains contradictory success/selection diagnostics. These observations must not support strategy comparisons or be pooled with later experiments.",
+      "svg": "svg/audit_15_early_runner_fixtures.svg",
+      "preview": "previews/audit_15_early_runner_fixtures.png",
+      "data": "data/audit_15_early_runner_fixtures.csv",
+      "plotted_rows": 12
+    }
+  ],
+  "coverage": [
+    {
+      "source": "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+      "charts": [
+        "followup_01_ablation_quality",
+        "followup_02_ablation_retrieval_failures",
+        "followup_03_ablation_resources",
+        "followup_04_temporal_versions_deltas"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md",
+      "charts": [
+        "followup_01_ablation_quality",
+        "followup_02_ablation_retrieval_failures",
+        "followup_03_ablation_resources",
+        "followup_04_temporal_versions_deltas"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/budget-pressure-analysis-2026-11-11.md",
+      "charts": [
+        "followup_05_budget_pressure_outcomes",
+        "followup_06_budget_pressure_stages",
+        "followup_07_budget_pressure_boundary"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md",
+      "charts": [
+        "criticality_02_pilot_first_step",
+        "criticality_03_pilot_resources"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/critical-flexible-holdout-2026-11-12.md",
+      "charts": [
+        "criticality_04_holdout_first_action",
+        "criticality_05_holdout_paired_outcomes"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/critical-flexible-preflight-2026-11-12.md",
+      "charts": [
+        "criticality_01_flexible_budget_sweep"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/early-pilot-runs-2026-11-03.md",
+      "charts": [
+        "preliminary_01_early_pilots"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/long-horizon-analysis-2026-11-11.md",
+      "charts": [
+        "followup_08_horizon_state_success",
+        "followup_09_state_retrieval_recovery",
+        "followup_10_state_safety",
+        "followup_12_horizon_input_diagnostics"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/main-final-analysis-2026-11-09.md",
+      "charts": [
+        "main_01_success",
+        "main_02_behavior_reliability",
+        "main_03_context_and_action",
+        "main_04_retrieval_diagnostics",
+        "main_05_selection_diagnostics",
+        "main_06_tokens",
+        "main_07_cost_and_latency",
+        "main_08_paired_effects",
+        "main_09_failure_tags",
+        "main_10_task_subgroups",
+        "main_11_performance_cost",
+        "main_12_input_accounting"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/main-phase1-h50-analysis-2026-11-09.md",
+      "charts": [
+        "main_10_task_subgroups",
+        "main_12_input_accounting"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/main-phase2-h10-analysis-2026-11-09.md",
+      "charts": [
+        "main_10_task_subgroups",
+        "main_12_input_accounting"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md",
+      "charts": [
+        "followup_04_temporal_versions_deltas"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/output-limit-2048-validation-2026-11-09.md",
+      "charts": [
+        "preliminary_03_output_limit",
+        "preliminary_04_output_limit_budget"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/packing-alpha-development-2026-11-12.md",
+      "charts": [
+        "criticality_06_packing_alpha_development"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md",
+      "charts": [
+        "followup_08_horizon_state_success",
+        "followup_09_state_retrieval_recovery",
+        "followup_10_state_safety",
+        "followup_11_sliding_subgroups",
+        "followup_12_horizon_input_diagnostics"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md",
+      "charts": [
+        "criticality_07_selection_policies"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md",
+      "charts": [
+        "criticality_08_stress_slot_signals",
+        "criticality_09_stress_memory_exposure"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md",
+      "charts": [
+        "criticality_08_stress_slot_signals",
+        "criticality_09_stress_memory_exposure"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/task-criticality-safety-gate-2026-11-15.md",
+      "charts": [
+        "criticality_10_safety_gate_versions",
+        "criticality_11_safety_gate_variant_actions"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/reports/token-budget-preflight-2026-11-08.md",
+      "charts": [
+        "preliminary_02_budget_margin"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/action-time-preflight-2026-11-11.md",
+      "charts": [
+        "audit_08_action_time_budget"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/attachment-recheck-2026-11-11.md",
+      "charts": [
+        "audit_07_attachment_recheck"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/balanced-generator-2026-11-13.md",
+      "charts": [
+        "audit_09_constraint_coverage",
+        "audit_11_balanced_generator_validation"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/constraint-coverage-audit-2026-11-13.md",
+      "charts": [
+        "audit_09_constraint_coverage",
+        "audit_10_constraint_retention_controls"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/early-runner-and-smoke-archive-2026-11-15.md",
+      "charts": [
+        "audit_14_smoke_execution_archive",
+        "audit_15_early_runner_fixtures"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/narrative-bias-audit-2026-11-10.md",
+      "charts": [
+        "audit_01_narrative_retrieval",
+        "audit_02_narrative_paired_changes"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/narrative-factorial-audit-2026-11-11.md",
+      "charts": [
+        "audit_03_narrative_factorial"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/narrative-final-context-audit-2026-11-11.md",
+      "charts": [
+        "audit_04_final_context_recovery"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/narrative-llm-execution-audit-2026-11-11.md",
+      "charts": [
+        "audit_05_narrative_llm_behavior",
+        "audit_06_narrative_llm_resources"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/pipeline-smoke-2026-11-12.md",
+      "charts": [
+        "audit_13_pipeline_smoke",
+        "audit_14_smoke_execution_archive"
+      ],
+      "status": "visualized"
+    },
+    {
+      "source": "docs/experiments/audits/smoke-4k8k-readiness-2026-11-08.md",
+      "charts": [
+        "audit_12_smoke_readiness"
+      ],
+      "status": "visualized"
+    }
+  ],
+  "sources": [
+    {
+      "path": "docs/experiments/audits/action-time-preflight-2026-11-11.md",
+      "sha256": "8e28e4f301a9fe1e4923518cfeb99b0b7ca917de552e0cf3056b112910702a93"
+    },
+    {
+      "path": "docs/experiments/audits/attachment-recheck-2026-11-11.md",
+      "sha256": "5bc62b9157c5b0f184e514e0fa7921c187ae57eb0c63bd68fae901482b84465d"
+    },
+    {
+      "path": "docs/experiments/audits/balanced-generator-2026-11-13.md",
+      "sha256": "f2ba963277895fa2b66dcccdd44eb21bc7a1f1550933e2b8743d513fad9157c6"
+    },
+    {
+      "path": "docs/experiments/audits/constraint-coverage-audit-2026-11-13.md",
+      "sha256": "05de7179fe7fc4f509209138a98316bd27d3d6a9a6510c15bb3eaa19e6e6786e"
+    },
+    {
+      "path": "docs/experiments/audits/early-runner-and-smoke-archive-2026-11-15.md",
+      "sha256": "68c168146f331e868868b8dfafa3b5507c161b6f470dbe28c90f0d7164758577"
+    },
+    {
+      "path": "docs/experiments/audits/narrative-bias-audit-2026-11-10.md",
+      "sha256": "51ba601126b46f71378d2cc336842d8962bbf5a5789adb0075019377a85d2e01"
+    },
+    {
+      "path": "docs/experiments/audits/narrative-factorial-audit-2026-11-11.md",
+      "sha256": "059a95ca71ea5b28c33ebdc8c65ed304c5f6830b549af4977998bbaca6580342"
+    },
+    {
+      "path": "docs/experiments/audits/narrative-final-context-audit-2026-11-11.md",
+      "sha256": "05665a8198fb0db9b76ef338d313d04648d4d1cee3ab21a415bd0595ed9270d4"
+    },
+    {
+      "path": "docs/experiments/audits/narrative-llm-execution-audit-2026-11-11.md",
+      "sha256": "1ce1ddd9f3a032a2c6ef1a22b784d7791fcb5d88dd48ad47655954c840db16b5"
+    },
+    {
+      "path": "docs/experiments/audits/pipeline-smoke-2026-11-12.md",
+      "sha256": "ef909b808b56ea2b4f3a9c4886a47a46eab87b34f4a82bdc75cf95d161bf0988"
+    },
+    {
+      "path": "docs/experiments/audits/smoke-4k8k-readiness-2026-11-08.md",
+      "sha256": "eee0b36290e922b7b1eaad674b11fb8bbb2d9820f3f9d00641caa7447519422a"
+    },
+    {
+      "path": "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+      "sha256": "12c74a6bdec34ef5cdc4c33265c169c99e6589cd00969116c43b1ffa52a17c05"
+    },
+    {
+      "path": "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md",
+      "sha256": "d14e71b707ac269e77acfc2f26509a671f49578750a90b73262d8f03e75b6bcb"
+    },
+    {
+      "path": "docs/experiments/reports/budget-pressure-analysis-2026-11-11.md",
+      "sha256": "ffee3142513a10e13ec5675f57d5a5b6db374c72d700fc22ffa1168a2e3241ef"
+    },
+    {
+      "path": "docs/experiments/reports/critical-flexible-agent-pilot-2026-11-12.md",
+      "sha256": "24acbbaf10ce2d578e5b8d3ef06627eca74e4eb058285f593369388f1d185b9c"
+    },
+    {
+      "path": "docs/experiments/reports/critical-flexible-holdout-2026-11-12.md",
+      "sha256": "7e9f7859e6323c049e93d1931b694a3346fc2039867e489b7c006fb2a3b4e097"
+    },
+    {
+      "path": "docs/experiments/reports/critical-flexible-preflight-2026-11-12.md",
+      "sha256": "5238cd6750dd938a9dcd581e39498806509437beffe4f1f4105d1628f4b27b4c"
+    },
+    {
+      "path": "docs/experiments/reports/early-pilot-runs-2026-11-03.md",
+      "sha256": "8466a0e573c5250292cdb92b8d644a17da0174ea8b84802a8082de902f79259a"
+    },
+    {
+      "path": "docs/experiments/reports/long-horizon-analysis-2026-11-11.md",
+      "sha256": "3d782c4e13fd1d514f76cb0e87e867474f30c0654ef284e8f61370c734e26ca2"
+    },
+    {
+      "path": "docs/experiments/reports/main-final-analysis-2026-11-09.md",
+      "sha256": "7c8591e897e5e2948b6f2e0802cfe04ffd35d5718dbc259a758d3ecade3f0b99"
+    },
+    {
+      "path": "docs/experiments/reports/main-phase1-h50-analysis-2026-11-09.md",
+      "sha256": "9bd28983f2369c7117371e02405f08787865b743d4592291e7c4eaa18419dbde"
+    },
+    {
+      "path": "docs/experiments/reports/main-phase2-h10-analysis-2026-11-09.md",
+      "sha256": "d2668730d5701194be1d43430e07bfb8996a609321ebd01d263a543c4e20e346"
+    },
+    {
+      "path": "docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md",
+      "sha256": "e425e60253134a0f20829b2ded5ad3265100e8c6db68e0a1331e3d2d4d0eb063"
+    },
+    {
+      "path": "docs/experiments/reports/output-limit-2048-validation-2026-11-09.md",
+      "sha256": "34df5218230181a52d714946bee5a060b788f38b23eee0c9e77b34d37df4931a"
+    },
+    {
+      "path": "docs/experiments/reports/packing-alpha-development-2026-11-12.md",
+      "sha256": "4d7a77749f6e931c38b2434152879c4360cda43584df2170b1860bcfc3f4a31b"
+    },
+    {
+      "path": "docs/experiments/reports/state-update-h100-analysis-2026-11-11.md",
+      "sha256": "6b23e8b5e1a99694ef2785459f14baad97ff59214f500411402213897e333467"
+    },
+    {
+      "path": "docs/experiments/reports/task-criticality-75-selection-preflight-2026-11-12.md",
+      "sha256": "a3a9739440e959616563b38811a3f94fdfb5760d082bff2849ef167494b08fd9"
+    },
+    {
+      "path": "docs/experiments/reports/task-criticality-s235-stress-preflight-2026-11-12.md",
+      "sha256": "5cdaf5e10f2dde24b5a11728fc34baa1d1fa41a972483c30c43d87e8fca22301"
+    },
+    {
+      "path": "docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md",
+      "sha256": "fed4945dfbdecba0510b7df1a81c23ab18bd8f31389a82adb5469f84c005f020"
+    },
+    {
+      "path": "docs/experiments/reports/task-criticality-safety-gate-2026-11-15.md",
+      "sha256": "92a1e2f8c533883d062c6ec68d476f825ff627822bbf1c263e7515cfe9200147"
+    },
+    {
+      "path": "docs/experiments/reports/token-budget-preflight-2026-11-08.md",
+      "sha256": "59085e3c47d75d822e303535a0c2d8e79c83fdac6481556b579b78b6faab58da"
+    },
+    {
+      "path": "docs/results/ablation_2k_h100_20261111/deltas.json",
+      "sha256": "ffdfee63d0b7fd6aac7c54c01cc5fe7de0c6cb278e5e78b475cf2ad147e6cbb4"
+    },
+    {
+      "path": "docs/results/ablation_2k_h100_20261111/summary.json",
+      "sha256": "bf257bb1afefa3e35f9cb6bcb9357874b7cbddbec00a6a2dc74be8068ed54389"
+    },
+    {
+      "path": "docs/results/constraint_coverage_20261113/summary.json",
+      "sha256": "e046071e0ac9d2a9fee377f45d00f51bfb0e171a35b4922639f1e5e71ffdf08c"
+    },
+    {
+      "path": "docs/results/constraint_coverage_20261113/tracked_main_summary.json",
+      "sha256": "f2dbd38b758f10b45c6d040a714c14f3216b4228d65c08114149083aca1882be"
+    },
+    {
+      "path": "docs/results/constraint_coverage_balanced_v2_20261113/summary.json",
+      "sha256": "0268ec8a03321e839c18c47772b6955d795fe10ac71234a90fc14274f1079191"
+    },
+    {
+      "path": "docs/results/constraint_coverage_balanced_v2_20261113/validation.json",
+      "sha256": "1afcdaf9a98ea6912e92134b44042fcfb4c2ee32db6b20c9513d72ac36a453c9"
+    },
+    {
+      "path": "docs/results/main_20261109/deltas.json",
+      "sha256": "d41a4da1feb70f6a88b3e17da086ed559ceaf03d0e9a33974431dab2b036bf7a"
+    },
+    {
+      "path": "docs/results/main_20261109/summary.json",
+      "sha256": "b04c818f6e1c1077879e1c24c02d0fdf781ed9e8f88f23d8243bad7c8345b353"
+    },
+    {
+      "path": "experiments/results/pilot_offline_20261103_182136/summary.json",
+      "sha256": "311095eee6224a1097873e3344ed8310f70e19bdbba30e790226abecf7aee951"
+    }
+  ],
+  "limitations": [
+    "Missing run logs were not reconstructed. Report tables are explicitly identified.",
+    "Existing confidence intervals are preserved; no new intervals are inferred from aggregates.",
+    "Main phases are subsets of the final Main experiment, not independent extra runs.",
+    "Offline selection, scripted safety gates, smoke tests, and LLM outcomes are separate experiments.",
+    "No model calls, evaluator changes, or edits to original experiment data were made."
+  ]
+}

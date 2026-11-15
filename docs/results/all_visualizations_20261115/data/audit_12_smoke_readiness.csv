@@ -1,0 +1,3 @@
+﻿budget,effective_budget,runs_completed,runs_planned,actual_llm_runs,prompt_calls_verified,prompt_calls,counted_prompt_max,actual_prompt_max,overflow_count,incomplete_cost_count,readiness
+4096,4064,32,32,32,61,61,2473,2474,0,0,PASS
+8192,8160,32,32,32,61,61,2473,2474,0,0,PASS

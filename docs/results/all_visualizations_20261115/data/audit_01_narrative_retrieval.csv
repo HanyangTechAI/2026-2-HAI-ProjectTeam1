@@ -1,0 +1,7 @@
+﻿mode,pool,state_recall_pct,general_recall_pct,target_rank,target_similarity,marker_mean,n_scenarios
+1,baseline,87.5,90.0,4.225,0.6,7.2,40
+1,proposed_general,90,92.5,3.575,0.6,7.2,40
+2,baseline,80,82.5,4.5,0.5988,0,40
+2,proposed_general,80,82.5,3.75,0.5988,0,40
+3,baseline,82.5,85,4.2,0.6119,3.475,40
+3,proposed_general,87.5,90,3.55,0.6119,3.475,40

@@ -1,0 +1,16 @@
+﻿flexible_budget_percent,series,count,denominator,percent
+0,Feasible critical memory,0,160,0.0
+25,Feasible critical memory,40,160,25.0
+50,Feasible critical memory,120,160,75.0
+75,Feasible critical memory,160,160,100.0
+100,Feasible critical memory,160,160,100.0
+0,Full: critical selected,0,160,0.0
+25,Full: critical selected,40,160,25.0
+50,Full: critical selected,120,160,75.0
+75,Full: critical selected,120,160,75.0
+100,Full: critical selected,160,160,100.0
+0,No packing: critical selected,0,160,0.0
+25,No packing: critical selected,40,160,25.0
+50,No packing: critical selected,120,160,75.0
+75,No packing: critical selected,160,160,100.0
+100,No packing: critical selected,160,160,100.0

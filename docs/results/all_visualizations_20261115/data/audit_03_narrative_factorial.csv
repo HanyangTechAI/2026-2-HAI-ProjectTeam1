@@ -1,0 +1,15 @@
+﻿kind,pool,target,noise,recall_pct,n_scenarios,effect,effect_pp,ci95_low_pp,ci95_high_pp
+condition,baseline,1,1,87.5,40,,,,
+condition,baseline,1,2,87.5,40,,,,
+condition,baseline,2,1,80,40,,,,
+condition,baseline,2,2,80,40,,,,
+condition,proposed_general,1,1,90,40,,,,
+condition,proposed_general,1,2,90,40,,,,
+condition,proposed_general,2,1,80,40,,,,
+condition,proposed_general,2,2,80,40,,,,
+effect,baseline,,,,40,Target,-7.5,-20,5
+effect,proposed_general,,,,40,Target,-10,-22.5,0
+effect,baseline,,,,40,Noise,0,0,0
+effect,proposed_general,,,,40,Noise,0,0,0
+effect,baseline,,,,40,Interaction,0,0,0
+effect,proposed_general,,,,40,Interaction,0,0,0

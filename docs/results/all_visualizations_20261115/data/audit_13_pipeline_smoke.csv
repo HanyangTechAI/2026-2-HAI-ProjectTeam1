@@ -1,0 +1,9 @@
+﻿strategy,successes,tasks,completed_runs,snapshot,check,count,denominator
+Proposed,5,5,5,2026-11-12 21:09,,,
+Sliding Window,4,5,5,2026-11-12 21:09,,,
+Vector Top-k,5,5,5,2026-11-12 21:09,,,
+Utility-per-Token,5,5,5,2026-11-12 21:09,,,
+,,,,,expected_tool_call,19,20
+,,,,,constraint_violation,0,8
+,,,,,overflow,0,20
+,,,,,interrupted_retry_completed,0,20

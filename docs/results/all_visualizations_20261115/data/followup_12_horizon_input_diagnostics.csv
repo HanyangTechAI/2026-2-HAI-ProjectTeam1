@@ -1,0 +1,9 @@
+﻿item,metric,min_tokens,max_tokens,target_tokens
+H100 / U2,history_tokens,128942,128946,128000
+H100 / U5,history_tokens,128934,128943,128000
+H100 / U10,history_tokens,128930,128938,128000
+H1000 / U2,history_tokens,127012,127040,128000
+H1000 / U5,history_tokens,126880,127060,128000
+H1000 / U10,history_tokens,126896,127038,128000
+Correct State,memory_tokens,548,641,
+Other State versions,memory_tokens,81,114,

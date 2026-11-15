@@ -1,0 +1,25 @@
+﻿group,series,count
+"S3_VALID:
+invalid evidence",Full,74
+"S3_EMPTY:
+invalid evidence",Full,76
+"S5:
+conflicting memories",Full,80
+"S3_VALID:
+invalid evidence",No packing,74
+"S3_EMPTY:
+invalid evidence",No packing,80
+"S5:
+conflicting memories",No packing,80
+"S3_VALID:
+invalid evidence",Criticality v0.1,74
+"S3_EMPTY:
+invalid evidence",Criticality v0.1,76
+"S5:
+conflicting memories",Criticality v0.1,80
+"S3_VALID:
+invalid evidence",Criticality v0.2,0
+"S3_EMPTY:
+invalid evidence",Criticality v0.2,0
+"S5:
+conflicting memories",Criticality v0.2,80

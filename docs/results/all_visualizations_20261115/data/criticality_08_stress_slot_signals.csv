@@ -1,0 +1,33 @@
+﻿group,series,count,denominator,percent
+"S2: gold
+included",Full,0,40,0.0
+"S3_VALID: gold
+included",Full,40,40,100.0
+"S3_EMPTY: missing
+slot detected",Full,0,40,0.0
+"S5: conflicting
+slot detected",Full,0,40,0.0
+"S2: gold
+included",No packing,0,40,0.0
+"S3_VALID: gold
+included",No packing,24,40,60.0
+"S3_EMPTY: missing
+slot detected",No packing,0,40,0.0
+"S5: conflicting
+slot detected",No packing,0,40,0.0
+"S2: gold
+included",Criticality v0.1,40,40,100.0
+"S3_VALID: gold
+included",Criticality v0.1,40,40,100.0
+"S3_EMPTY: missing
+slot detected",Criticality v0.1,40,40,100.0
+"S5: conflicting
+slot detected",Criticality v0.1,40,40,100.0
+"S2: gold
+included",Criticality v0.2,40,40,100.0
+"S3_VALID: gold
+included",Criticality v0.2,40,40,100.0
+"S3_EMPTY: missing
+slot detected",Criticality v0.2,40,40,100.0
+"S5: conflicting
+slot detected",Criticality v0.2,40,40,100.0

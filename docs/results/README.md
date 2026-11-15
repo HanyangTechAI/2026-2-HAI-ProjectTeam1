@@ -2,6 +2,8 @@
 
 이 폴더에는 분석 보고서가 사용하는 소형 집계 파일과 그래프가 있습니다. 전체 원본 실행 데이터는 각 실험 보고서에 적힌 `experiments/results/` 경로에 보존됩니다.
 
+- [전체 실험 matplotlib 시각화 · 2026-11-15](all_visualizations_20261115/README.md) — 31개 보고서의 실험을 SVG 54개와 수치 CSV로 정리했다. [미리보기 갤러리](all_visualizations_20261115/index.html) · [전체 ZIP](all_visualizations_20261115/all_experiment_svg_20261115.zip).
+
 - [Main 12셀 결과 아카이브 · 2026-11-09](main_20261109/README.md)
 - [2K/H100 Ablation 집계 · 2026-11-11](ablation_2k_h100_20261111/)
 - [Constraint Coverage 점검 · 2026-11-13](constraint_coverage_20261113/) — 시나리오별 제약 적용 비율과 로컬 평가기 진단.

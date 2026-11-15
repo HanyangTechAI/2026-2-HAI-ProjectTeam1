@@ -1,0 +1,6 @@
+﻿rho_percent,first_step_retention_percent,all_valid_steps_retention_percent,final_step_retention_percent,selector_exclusion_events,builder_exclusion_events,runs_per_pressure
+0,89.2,45.4,0,166,20,80
+25,99.2,51.3,1.7,104,62,80
+50,100,58.2,15,62,78,80
+75,100,76.2,51.7,2,78,80
+100,100,100,100,0,0,80

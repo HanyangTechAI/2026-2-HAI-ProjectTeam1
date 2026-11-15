@@ -1,0 +1,13 @@
+﻿archive,strategy,successes,n_fixtures,valid_research_performance,selection_failure
+runner_integration,Proposed,18,27,False,
+runner_integration,Sliding Window,12,27,False,
+runner_integration,Vector Top-k,12,27,False,
+runner_integration,Utility-per-Token,12,27,False,
+quant_pilot_sanity,Proposed,1,1,False,1
+quant_pilot_sanity,Sliding Window,1,1,False,not transcribed
+quant_pilot_sanity,Vector Top-k,0,1,False,not transcribed
+quant_pilot_sanity,Utility-per-Token,0,1,False,not transcribed
+pipeline_adapter_check,Sliding Window,1,1,False,
+pipeline_adapter_check,Vector Top-k,1,1,False,
+pipeline_adapter_check,Utility-per-Token,1,1,False,
+runner_smoke,Sliding Window,0,27,False,

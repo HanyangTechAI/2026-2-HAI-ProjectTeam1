@@ -1,0 +1,17 @@
+﻿group,series,count,denominator,percent
+"Expected first
+Tool call",Full,24,32,75.0
+"Critical target
+omission",Full,8,32,25.0
+"Required state
+correct (email)",Full,12,16,75.0
+"Constraint violation
+(email)",Full,0,16,0.0
+"Expected first
+Tool call",No packing,32,32,100.0
+"Critical target
+omission",No packing,0,32,0.0
+"Required state
+correct (email)",No packing,16,16,100.0
+"Constraint violation
+(email)",No packing,0,16,0.0

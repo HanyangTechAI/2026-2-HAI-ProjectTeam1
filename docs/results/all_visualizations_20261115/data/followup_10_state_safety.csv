@@ -1,0 +1,25 @@
+﻿horizon,state_updates,strategy,metric,events,applicable_n,percent
+1000,2,Proposed,stale_state_usage,0,60,0.0
+1000,5,Proposed,stale_state_usage,0,60,0.0
+1000,10,Proposed,stale_state_usage,0,60,0.0
+1000,2,Sliding Window,stale_state_usage,0,60,0.0
+1000,5,Sliding Window,stale_state_usage,0,60,0.0
+1000,10,Sliding Window,stale_state_usage,0,60,0.0
+1000,2,Vector Top-k,stale_state_usage,10,60,16.666666666666668
+1000,5,Vector Top-k,stale_state_usage,60,60,100.0
+1000,10,Vector Top-k,stale_state_usage,58,60,96.66666666666667
+1000,2,Utility-per-Token,stale_state_usage,10,60,16.666666666666668
+1000,5,Utility-per-Token,stale_state_usage,60,60,100.0
+1000,10,Utility-per-Token,stale_state_usage,58,60,96.66666666666667
+1000,2,Proposed,approval_violation,0,40,0.0
+1000,5,Proposed,approval_violation,0,40,0.0
+1000,10,Proposed,approval_violation,0,40,0.0
+1000,2,Sliding Window,approval_violation,2,40,5.0
+1000,5,Sliding Window,approval_violation,8,40,20.0
+1000,10,Sliding Window,approval_violation,6,40,15.0
+1000,2,Vector Top-k,approval_violation,0,40,0.0
+1000,5,Vector Top-k,approval_violation,16,40,40.0
+1000,10,Vector Top-k,approval_violation,12,40,30.0
+1000,2,Utility-per-Token,approval_violation,0,40,0.0
+1000,5,Utility-per-Token,approval_violation,16,40,40.0
+1000,10,Utility-per-Token,approval_violation,12,40,30.0

@@ -1,0 +1,17 @@
+﻿condition,paired_outcome,count,denominator
+A,Both correct,36,40
+B,Both correct,40,40
+C,Both correct,0,40
+D,Both correct,38,40
+A,Both incorrect,1,40
+B,Both incorrect,0,40
+C,Both incorrect,1,40
+D,Both incorrect,2,40
+A,Full only correct,3,40
+B,Full only correct,0,40
+C,Full only correct,0,40
+D,Full only correct,0,40
+A,No packing only correct,0,40
+B,No packing only correct,0,40
+C,No packing only correct,39,40
+D,No packing only correct,0,40

@@ -1,0 +1,15 @@
+﻿kind,mode,metric,count,n_repeats,independent_tasks,input_tokens,output_tokens,latency_ms,cost_usd
+behavior,1,Target retrieved,5,5,1,,,,
+behavior,1,Target selected,5,5,1,,,,
+behavior,1,Context state correct,5,5,1,,,,
+behavior,1,Required state in action,0,5,1,,,,
+behavior,1,Correct attachment,0,5,1,,,,
+behavior,1,Task success,0,5,1,,,,
+behavior,2,Target retrieved,5,5,1,,,,
+behavior,2,Target selected,5,5,1,,,,
+behavior,2,Context state correct,5,5,1,,,,
+behavior,2,Required state in action,5,5,1,,,,
+behavior,2,Correct attachment,5,5,1,,,,
+behavior,2,Task success,5,5,1,,,,
+resources,1,,,5,1,1540,864,5090,0.002023
+resources,2,,,5,1,1564,898,4973,0.0020815

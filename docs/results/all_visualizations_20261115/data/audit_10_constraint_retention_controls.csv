@@ -1,0 +1,5 @@
+﻿kind,preset,successes,n_runs,constraint_recalled,constraint_n,rules,n_traces
+llm_ablation_report,full,78,80,40,40,,
+llm_ablation_report,no_constraint_preservation,80,80,36,40,,
+synthetic_evaluator_control,,0,,,,original,10
+synthetic_evaluator_control,,10,,,,rule_gt_removed,10

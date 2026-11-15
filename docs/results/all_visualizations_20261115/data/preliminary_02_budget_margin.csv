@@ -1,0 +1,17 @@
+﻿budget,safety_margin,strategy,successes,n,success_percent
+1024,0,proposed,0,8,0.0
+1024,0,sliding_window,0,8,0.0
+1024,0,vector_top_k,0,8,0.0
+1024,0,utility_per_token,0,8,0.0
+1024,32,proposed,0,8,0.0
+1024,32,sliding_window,0,8,0.0
+1024,32,vector_top_k,0,8,0.0
+1024,32,utility_per_token,0,8,0.0
+2048,0,proposed,8,8,100.0
+2048,0,sliding_window,5,8,62.5
+2048,0,vector_top_k,5,8,62.5
+2048,0,utility_per_token,6,8,75.0
+2048,32,proposed,8,8,100.0
+2048,32,sliding_window,5,8,62.5
+2048,32,vector_top_k,5,8,62.5
+2048,32,utility_per_token,6,8,75.0

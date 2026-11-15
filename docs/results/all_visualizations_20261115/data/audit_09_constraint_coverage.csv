@@ -1,0 +1,4 @@
+﻿dataset,n_scenarios,applicable_scenarios,stored_constraints,applicable_constraints,applicable_scenario_pct,applicable_constraint_pct,candidate_restricting_file_rules,separate_grant_facts
+Actual legacy Ablation input,40,20,120,20,50.0,16.666666666666664,0,10
+Tracked legacy main.zip,40,40,120,120,100.0,100.0,0,10
+New balanced_v2,40,40,120,120,100.0,100.0,100,0

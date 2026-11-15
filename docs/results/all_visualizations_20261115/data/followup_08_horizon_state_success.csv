@@ -1,0 +1,25 @@
+﻿horizon,state_updates,state_versions,strategy,success_percent,n_runs,n_base_tasks,budget_tokens
+100,2,3,Proposed,97.5,80,40,2048
+100,5,6,Proposed,100,80,40,2048
+100,10,11,Proposed,100,80,40,2048
+100,2,3,Sliding Window,72.5,80,40,2048
+100,5,6,Sliding Window,70,80,40,2048
+100,10,11,Sliding Window,67.5,80,40,2048
+100,2,3,Vector Top-k,87.5,80,40,2048
+100,5,6,Vector Top-k,0,80,40,2048
+100,10,11,Vector Top-k,0,80,40,2048
+100,2,3,Utility-per-Token,87.5,80,40,2048
+100,5,6,Utility-per-Token,0,80,40,2048
+100,10,11,Utility-per-Token,0,80,40,2048
+1000,2,3,Proposed,97.5,80,40,2048
+1000,5,6,Proposed,100,80,40,2048
+1000,10,11,Proposed,100,80,40,2048
+1000,2,3,Sliding Window,75,80,40,2048
+1000,5,6,Sliding Window,67.5,80,40,2048
+1000,10,11,Sliding Window,67.5,80,40,2048
+1000,2,3,Vector Top-k,87.5,80,40,2048
+1000,5,6,Vector Top-k,0,80,40,2048
+1000,10,11,Vector Top-k,0,80,40,2048
+1000,2,3,Utility-per-Token,87.5,80,40,2048
+1000,5,6,Utility-per-Token,0,80,40,2048
+1000,10,11,Utility-per-Token,0,80,40,2048

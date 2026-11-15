@@ -1,0 +1,5 @@
+﻿metric,preset,value,runs
+Mean first-step input tokens,Full,893.2,32
+Mean first-step input tokens,No packing,913.5,32
+Estimated generation cost,Full,0.000591,32
+Estimated generation cost,No packing,0.000607,32

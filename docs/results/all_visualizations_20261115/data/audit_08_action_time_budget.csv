@@ -1,0 +1,6 @@
+﻿budget_level_pct,full_flexible_recovery_pct,no_packing_flexible_recovery_pct,different_sets,n_paired_tasks,valid_contexts,mandatory_misses,overflows
+0,0,0,0,40,80,0,0
+25,1.7,1.7,0,40,80,0,0
+50,15,11.7,2,40,80,0,0
+75,51.7,40,10,40,80,0,0
+100,100,100,0,40,80,0,0

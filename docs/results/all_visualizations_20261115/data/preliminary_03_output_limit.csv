@@ -1,0 +1,9 @@
+﻿output_limit,strategy,successes,n,success_percent,parse_error_runs
+512,proposed,8,10,80,0
+512,sliding_window,6,10,60,1
+512,vector_top_k,4,10,40,3
+512,utility_per_token,6,10,60,1
+2048,proposed,8,10,80,0
+2048,sliding_window,6,10,60,0
+2048,vector_top_k,6,10,60,0
+2048,utility_per_token,6,10,60,0

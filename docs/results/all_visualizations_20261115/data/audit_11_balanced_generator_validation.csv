@@ -1,0 +1,22 @@
+﻿kind,subtype,candidate,count,subtype_n,check,result
+correct_candidate_distribution,approval/granted,1,3,10,,
+correct_candidate_distribution,approval/pending,1,3,10,,
+correct_candidate_distribution,temporal_update/current,1,2,10,,
+correct_candidate_distribution,temporal_update/historical,1,2,10,,
+correct_candidate_distribution,approval/granted,2,4,10,,
+correct_candidate_distribution,approval/pending,2,4,10,,
+correct_candidate_distribution,temporal_update/current,2,2,10,,
+correct_candidate_distribution,temporal_update/historical,2,2,10,,
+correct_candidate_distribution,approval/granted,3,3,10,,
+correct_candidate_distribution,approval/pending,3,3,10,,
+correct_candidate_distribution,temporal_update/current,3,3,10,,
+correct_candidate_distribution,temporal_update/historical,3,3,10,,
+correct_candidate_distribution,approval/granted,4,0,10,,
+correct_candidate_distribution,approval/pending,4,0,10,,
+correct_candidate_distribution,temporal_update/current,4,3,10,,
+correct_candidate_distribution,temporal_update/historical,4,3,10,,
+verification,,,,,Evaluator oracle traces,480/480 passed
+verification,,,,,Rule-planner integration,40/40 succeeded
+verification,,,,,Local validation tests,259 passed / 1 skipped
+verification,,,,,Unique task identities,40
+verification,,,,,Budget/horizon cells,12

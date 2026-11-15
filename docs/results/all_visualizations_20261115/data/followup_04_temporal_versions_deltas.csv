@@ -1,0 +1,10 @@
+﻿condition,success_percent,success_ci95_low,success_ci95_high,success_n,stale_percent,stale_n,paired_delta_pp,delta_ci95_low,delta_ci95_high,n_pairs
+Full v1.0.3,97.5,92.5,100,80,0,60,,,,
+Full v1.0.4,97.5,92.5,100,80,0,60,,,,
+No temporal v1.0.3,90,80,97.5,80,13.333333333333334,60,,,,
+No temporal v1.0.4,90,80,97.5,80,13.333333333333334,60,,,,
+No constraint (v1.0.3),,,,,,,-2.5,-7.5,0.0,80
+No temporal + mandatory (v1.0.3),,,,,,,7.5,-2.5,20.0,80
+No mandatory (v1.0.3),,,,,,,0.0,0.0,0.0,80
+No packing (v1.0.3),,,,,,,0.0,0.0,0.0,80
+No temporal ONLY (v1.0.4),,,,,,,7.5,-2.5,17.5,80

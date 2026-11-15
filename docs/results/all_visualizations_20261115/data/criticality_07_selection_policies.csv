@@ -1,0 +1,16 @@
+﻿group,series,count,denominator,percent
+A,Full,40,40,100.0
+B,Full,40,40,100.0
+C,Full,0,40,0.0
+D,Full,40,40,100.0
+All,Full,120,160,75.0
+A,No packing,40,40,100.0
+B,No packing,40,40,100.0
+C,No packing,40,40,100.0
+D,No packing,40,40,100.0
+All,No packing,160,160,100.0
+A,Criticality,40,40,100.0
+B,Criticality,40,40,100.0
+C,Criticality,40,40,100.0
+D,Criticality,40,40,100.0
+All,Criticality,160,160,100.0

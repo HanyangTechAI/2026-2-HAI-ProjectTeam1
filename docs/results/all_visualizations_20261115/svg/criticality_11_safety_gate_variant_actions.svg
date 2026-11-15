@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="812.98pt" height="421.241562pt" viewBox="0 0 812.98 421.241562" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <title>Safety Gate ON: allowed and blocked scripted actions by variant</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>Safety Gate ON: allowed and blocked scripted actions by variant</dc:title>
+    <dc:description>Identical aggregate results in Freeze 1.0.4 and 1.0.5; 40 scenarios per variant. Fixed valid S2/S3_VALID actions were allowed; deliberately ungrounded S3_EMPTY/S5 actions were blocked before ToolExecutor. No LLM generation or multi-step agent evaluation. Report aggregates; individual run files unavailable locally. No confidence intervals reported. Sources: docs/experiments/reports/task-criticality-safety-gate-2026-11-15.md</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 421.241562
+L 812.98 421.241562
+L 812.98 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 52.542344 342.2
+L 805.78 342.2
+L 805.78 78.596
+L 52.542344 78.596
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="m7abda19ca8" d="M 0 0
+L 0 3.5
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m7abda19ca8" x="157.430416" y="342.2" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="157.430416" y="356.797656" transform="rotate(-0 157.430416 356.797656)">S2</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="338.584253" y="342.2" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="338.584253" y="356.797656" transform="rotate(-0 338.584253 356.797656)">S3_VALID</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="519.738091" y="342.2" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="519.738091" y="356.797656" transform="rotate(-0 519.738091 356.797656)">S3_EMPTY</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="700.891928" y="342.2" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="700.891928" y="356.797656" transform="rotate(-0 700.891928 356.797656)">S5</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_5">
+      <path d="M 52.542344 342.2
+L 805.78 342.2
+" clip-path="url(#p5e28fb5360)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6">
+      <defs>
+       <path id="mee8207eb62" d="M 0 0
+L -3.5 0
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.542344" y="342.2" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.542344" y="345.998828" transform="rotate(-0 45.542344 345.998828)">0</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_7">
+      <path d="M 52.542344 283.880531
+L 805.78 283.880531
+" clip-path="url(#p5e28fb5360)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.542344" y="283.880531" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.542344" y="287.679359" transform="rotate(-0 45.542344 287.679359)">25</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_9">
+      <path d="M 52.542344 225.561062
+L 805.78 225.561062
+" clip-path="url(#p5e28fb5360)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.542344" y="225.561062" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.542344" y="229.35989" transform="rotate(-0 45.542344 229.35989)">50</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_11">
+      <path d="M 52.542344 167.241593
+L 805.78 167.241593
+" clip-path="url(#p5e28fb5360)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.542344" y="167.241593" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_8">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.542344" y="171.040421" transform="rotate(-0 45.542344 171.040421)">75</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_13">
+      <path d="M 52.542344 108.922124
+L 805.78 108.922124
+" clip-path="url(#p5e28fb5360)" style="fill: none; stroke: #dddddd; stroke-opacity: 0.65; stroke-width: 0.6; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#mee8207eb62" x="52.542344" y="108.922124" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_9">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: end" x="45.542344" y="112.720952" transform="rotate(-0 45.542344 112.720952)">100</text>
+     </g>
+    </g>
+    <g id="text_10">
+     <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="20.0525" y="210.398" transform="rotate(-90 20.0525 210.398)">Scenarios (%)</text>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 86.780419 342.2
+L 157.430416 342.2
+L 157.430416 108.922124
+L 86.780419 108.922124
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 267.934257 342.2
+L 338.584253 342.2
+L 338.584253 108.922124
+L 267.934257 108.922124
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 449.088094 342.2
+L 519.738091 342.2
+L 519.738091 342.2
+L 449.088094 342.2
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 630.241931 342.2
+L 700.891928 342.2
+L 700.891928 342.2
+L 630.241931 342.2
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 157.430416 342.2
+L 228.080412 342.2
+L 228.080412 342.2
+L 157.430416 342.2
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 338.584253 342.2
+L 409.23425 342.2
+L 409.23425 342.2
+L 338.584253 342.2
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 519.738091 342.2
+L 590.388087 342.2
+L 590.388087 108.922124
+L 519.738091 108.922124
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 700.891928 342.2
+L 771.541925 342.2
+L 771.541925 108.922124
+L 700.891928 108.922124
+z
+" clip-path="url(#p5e28fb5360)" style="fill: #d55e00"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 52.542344 342.2
+L 52.542344 78.596
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_12">
+    <path d="M 52.542344 342.2
+L 805.78 342.2
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="122.105417" y="103.000249" transform="rotate(-0 122.105417 103.000249)">40/40</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="303.259255" y="103.000249" transform="rotate(-0 303.259255 103.000249)">40/40</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="484.413092" y="336.278125" transform="rotate(-0 484.413092 336.278125)">0/40</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="665.56693" y="336.278125" transform="rotate(-0 665.56693 336.278125)">0/40</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="192.755414" y="336.278125" transform="rotate(-0 192.755414 336.278125)">0/40</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="373.909251" y="336.278125" transform="rotate(-0 373.909251 336.278125)">0/40</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="555.063089" y="103.000249" transform="rotate(-0 555.063089 103.000249)">40/40</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: middle" x="736.216926" y="103.000249" transform="rotate(-0 736.216926 103.000249)">40/40</text>
+   </g>
+   <g id="legend_1">
+    <g id="patch_13">
+     <path d="M 300.604609 46.085874
+L 318.604609 46.085874
+L 318.604609 39.785874
+L 300.604609 39.785874
+z
+" style="fill: #0072b2"/>
+    </g>
+    <g id="text_19">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="325.804609" y="46.085874" transform="rotate(-0 325.804609 46.085874)">Allowed valid action</text>
+    </g>
+    <g id="patch_14">
+     <path d="M 434.060547 46.085874
+L 452.060547 46.085874
+L 452.060547 39.785874
+L 434.060547 39.785874
+z
+" style="fill: #d55e00"/>
+    </g>
+    <g id="text_20">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="459.260547" y="46.085874" transform="rotate(-0 459.260547 46.085874)">Blocked invalid action</text>
+    </g>
+   </g>
+  </g>
+  <g id="text_21">
+   <text style="font-weight: 700; font-size: 14px; font-family: 'DejaVu Sans'; text-anchor: middle" x="408.78" y="17.837812" transform="rotate(-0 408.78 17.837812)">Safety Gate ON: allowed and blocked scripted actions by variant</text>
+  </g>
+  <g id="text_22">
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 392.114531)">criticality_11_safety_gate_variant_actions | Identical aggregate results in Freeze 1.0.4 and 1.0.5; 40 scenarios per variant. Fixed valid S2/S3_VALID actions</text>
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 401.716719)">were allowed; deliberately ungrounded S3_EMPTY/S5 actions were blocked before ToolExecutor. No LLM generation or multi-step agent evaluation. Report aggregates;</text>
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 411.318906)">individual run files unavailable locally. No confidence intervals reported.</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p5e28fb5360">
+   <rect x="52.542344" y="78.596" width="753.237656" height="263.604"/>
+  </clipPath>
+ </defs>
+</svg>

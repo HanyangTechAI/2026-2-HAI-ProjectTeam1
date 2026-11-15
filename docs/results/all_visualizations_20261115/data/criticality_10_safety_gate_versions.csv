@@ -1,0 +1,33 @@
+﻿freeze,group,series,count
+1.0.4,"Wrong tool
+calls executed",Gate OFF,80
+1.0.4,"False
+blocks",Gate OFF,0
+1.0.4,"Tool calls
+executed",Gate OFF,160
+1.0.4,"Expected effects
+verified",Gate OFF,80
+1.0.4,"Wrong tool
+calls executed",Gate ON,0
+1.0.4,"False
+blocks",Gate ON,0
+1.0.4,"Tool calls
+executed",Gate ON,80
+1.0.4,"Expected effects
+verified",Gate ON,80
+1.0.5 approval fix,"Wrong tool
+calls executed",Gate OFF,80
+1.0.5 approval fix,"False
+blocks",Gate OFF,0
+1.0.5 approval fix,"Tool calls
+executed",Gate OFF,160
+1.0.5 approval fix,"Expected effects
+verified",Gate OFF,80
+1.0.5 approval fix,"Wrong tool
+calls executed",Gate ON,0
+1.0.5 approval fix,"False
+blocks",Gate ON,0
+1.0.5 approval fix,"Tool calls
+executed",Gate ON,80
+1.0.5 approval fix,"Expected effects
+verified",Gate ON,80

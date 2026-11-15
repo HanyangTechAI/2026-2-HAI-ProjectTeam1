@@ -1,0 +1,17 @@
+﻿experiment,strategy,recorded_success,n,success_percent
+quant_pilot_v1,proposed,100,100,100.0
+quant_pilot_v1,sliding_window,75,100,75.0
+quant_pilot_v1,vector_top_k,1,100,1.0
+quant_pilot_v1,utility_per_token,0,100,0.0
+pilot_offline,proposed,16,16,100.0
+pilot_offline,sliding_window,12,16,75.0
+pilot_offline,vector_top_k,0,16,0.0
+pilot_offline,utility_per_token,0,16,0.0
+pilot_gemini,proposed,0,100,0.0
+pilot_gemini,sliding_window,0,100,0.0
+pilot_gemini,vector_top_k,0,100,0.0
+pilot_gemini,utility_per_token,0,100,0.0
+pilot_gemini_v2,proposed,100,100,100.0
+pilot_gemini_v2,sliding_window,75,100,75.0
+pilot_gemini_v2,vector_top_k,1,100,1.0
+pilot_gemini_v2,utility_per_token,0,100,0.0

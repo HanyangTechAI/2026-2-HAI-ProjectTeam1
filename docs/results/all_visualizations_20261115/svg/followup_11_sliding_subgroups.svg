@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="706.6pt" height="449.439375pt" viewBox="0 0 706.6 449.439375" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <title>Sliding Window: which task types fail as versions increase</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>Sliding Window: which task types fail as versions increase</dc:title>
+    <dc:description>Report-derived H100 subgroup counts. Stale-state usage is zero for Sliding, but historical versions and approval behavior still produce failures. Each condition reuses the same ten base tasks per subgroup with two repeats. Sources: docs/experiments/reports/state-update-h100-analysis-2026-11-11.md</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 449.439375
+L 706.6 449.439375
+L 706.6 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 104.4375 379.017891
+L 699.4 379.017891
+L 699.4 48.457422
+L 104.4375 48.457422
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="QuadMesh_1">
+    <path d="M 104.4375 48.457422
+L 302.758333 48.457422
+L 302.758333 131.097539
+L 104.4375 131.097539
+L 104.4375 48.457422
+" clip-path="url(#paf56ed5a16)" style="fill: #08306b"/>
+    <path d="M 302.758333 48.457422
+L 501.079167 48.457422
+L 501.079167 131.097539
+L 302.758333 131.097539
+L 302.758333 48.457422
+" clip-path="url(#paf56ed5a16)" style="fill: #08306b"/>
+    <path d="M 501.079167 48.457422
+L 699.4 48.457422
+L 699.4 131.097539
+L 501.079167 131.097539
+L 501.079167 48.457422
+" clip-path="url(#paf56ed5a16)" style="fill: #08306b"/>
+    <path d="M 104.4375 131.097539
+L 302.758333 131.097539
+L 302.758333 213.737656
+L 104.4375 213.737656
+L 104.4375 131.097539
+" clip-path="url(#paf56ed5a16)" style="fill: #e3eef9"/>
+    <path d="M 302.758333 131.097539
+L 501.079167 131.097539
+L 501.079167 213.737656
+L 302.758333 213.737656
+L 302.758333 131.097539
+" clip-path="url(#paf56ed5a16)" style="fill: #e3eef9"/>
+    <path d="M 501.079167 131.097539
+L 699.4 131.097539
+L 699.4 213.737656
+L 501.079167 213.737656
+L 501.079167 131.097539
+" clip-path="url(#paf56ed5a16)" style="fill: #f7fbff"/>
+    <path d="M 104.4375 213.737656
+L 302.758333 213.737656
+L 302.758333 296.377773
+L 104.4375 296.377773
+L 104.4375 213.737656
+" clip-path="url(#paf56ed5a16)" style="fill: #1764ab"/>
+    <path d="M 302.758333 213.737656
+L 501.079167 213.737656
+L 501.079167 296.377773
+L 302.758333 296.377773
+L 302.758333 213.737656
+" clip-path="url(#paf56ed5a16)" style="fill: #2e7ebc"/>
+    <path d="M 501.079167 213.737656
+L 699.4 213.737656
+L 699.4 296.377773
+L 501.079167 296.377773
+L 501.079167 213.737656
+" clip-path="url(#paf56ed5a16)" style="fill: #2e7ebc"/>
+    <path d="M 104.4375 296.377773
+L 302.758333 296.377773
+L 302.758333 379.017891
+L 104.4375 379.017891
+L 104.4375 296.377773
+" clip-path="url(#paf56ed5a16)" style="fill: #08306b"/>
+    <path d="M 302.758333 296.377773
+L 501.079167 296.377773
+L 501.079167 379.017891
+L 302.758333 379.017891
+L 302.758333 296.377773
+" clip-path="url(#paf56ed5a16)" style="fill: #08306b"/>
+    <path d="M 501.079167 296.377773
+L 699.4 296.377773
+L 699.4 379.017891
+L 501.079167 379.017891
+L 501.079167 296.377773
+" clip-path="url(#paf56ed5a16)" style="fill: #08306b"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="m7abda19ca8" d="M 0 0
+L 0 3.5
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m7abda19ca8" x="203.597917" y="379.017891" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="203.597917" y="392.856484" transform="rotate(-0 203.597917 392.856484)">Update 2</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="401.91875" y="379.017891" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="401.91875" y="392.856484" transform="rotate(-0 401.91875 392.856484)">Update 5</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#m7abda19ca8" x="600.239583" y="379.017891" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="600.239583" y="392.856484" transform="rotate(-0 600.239583 392.856484)">Update 10</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_4">
+      <defs>
+       <path id="mee8207eb62" d="M 0 0
+L -3.5 0
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#mee8207eb62" x="104.4375" y="89.77748" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end" x="97.4375" y="93.196777" transform="rotate(-0 97.4375 93.196777)">Current lookup</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_5">
+      <g>
+       <use xlink:href="#mee8207eb62" x="104.4375" y="172.417598" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end" x="97.4375" y="175.836895" transform="rotate(-0 97.4375 175.836895)">Historical lookup</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#mee8207eb62" x="104.4375" y="255.057715" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end" x="97.4375" y="258.477012" transform="rotate(-0 97.4375 258.477012)">Approval pending</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_7">
+      <g>
+       <use xlink:href="#mee8207eb62" x="104.4375" y="337.697832" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end" x="97.4375" y="341.117129" transform="rotate(-0 97.4375 341.117129)">Approved sending</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 104.4375 379.017891
+L 104.4375 48.457422
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 699.4 379.017891
+L 699.4 48.457422
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 104.4375 379.017891
+L 699.4 379.017891
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 104.4375 48.457422
+L 699.4 48.457422
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="203.597917" y="92.115371" transform="rotate(-0 203.597917 92.115371)">100%</text>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="401.91875" y="92.115371" transform="rotate(-0 401.91875 92.115371)">100%</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="600.239583" y="92.115371" transform="rotate(-0 600.239583 92.115371)">100%</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #17212b" x="203.597917" y="174.755488" transform="rotate(-0 203.597917 174.755488)">10%</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #17212b" x="401.91875" y="174.755488" transform="rotate(-0 401.91875 174.755488)">10%</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #17212b" x="600.239583" y="174.755488" transform="rotate(-0 600.239583 174.755488)">0%</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="203.597917" y="257.395605" transform="rotate(-0 203.597917 257.395605)">80%</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="401.91875" y="257.395605" transform="rotate(-0 401.91875 257.395605)">70%</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="600.239583" y="257.395605" transform="rotate(-0 600.239583 257.395605)">70%</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="203.597917" y="340.035723" transform="rotate(-0 203.597917 340.035723)">100%</text>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="401.91875" y="340.035723" transform="rotate(-0 401.91875 340.035723)">100%</text>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="600.239583" y="340.035723" transform="rotate(-0 600.239583 340.035723)">100%</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="401.91875" y="42.457422" transform="rotate(-0 401.91875 42.457422)">Sliding Window: subgroup success at H100 (20 runs per cell)</text>
+   </g>
+  </g>
+  <g id="text_21">
+   <text style="font-weight: 700; font-size: 14px; font-family: 'DejaVu Sans'; text-anchor: middle" x="356.4" y="17.837812" transform="rotate(-0 356.4 17.837812)">Sliding Window: which task types fail as versions increase</text>
+  </g>
+  <g id="text_22">
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 429.914531)">followup_11_sliding_subgroups | Report-derived H100 subgroup counts. Stale-state usage is zero for Sliding, but historical versions and</text>
+   <text style="font-size: 8px; font-family: 'DejaVu Sans'; fill: #555555" transform="translate(7.2 439.516719)">approval behavior still produce failures. Each condition reuses the same ten base tasks per subgroup with two repeats.</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="paf56ed5a16">
+   <rect x="104.4375" y="48.457422" width="594.9625" height="330.560469"/>
+  </clipPath>
+ </defs>
+</svg>

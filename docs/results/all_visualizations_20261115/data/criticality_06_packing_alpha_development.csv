@@ -1,0 +1,11 @@
+﻿evaluation,group,series,count,denominator,percent
+selection only,0,Critical memory selected,40,40,100.0
+selection only,0.2,Critical memory selected,31,40,77.5
+selection only,0.5,Critical memory selected,0,40,0.0
+selection only,1,Critical memory selected,0,40,0.0
+LLM first action,0,File lookup,20,20,100.0
+LLM first action,0.2,File lookup,18,20,90.0
+LLM first action,1,File lookup,0,20,0.0
+LLM first action,0,Approved email,20,20,100.0
+LLM first action,0.2,Approved email,13,20,65.0
+LLM first action,1,Approved email,0,20,0.0

@@ -1,0 +1,5 @@
+﻿mode,strategy,successes,n,success_pct,low,high,stale,stale_n,constraint_violations,constraint_n,input_tokens,output_tokens,latency_ms,cost_usd
+1,Proposed,39,40,97.5,92.5,100,0,30,0,20,1469.98,558.58,4554,0.0015626
+1,Vector Top-k,35,40,87.5,75,97.5,5,30,0,20,1616.15,824.1,5207,0.0020855
+2,Proposed,40,40,100,100,100,0,30,0,20,1473.85,567.05,4214,0.0015769
+2,Vector Top-k,32,40,80,65,92.5,8,30,0,20,1569.1,825.55,4866,0.0020544

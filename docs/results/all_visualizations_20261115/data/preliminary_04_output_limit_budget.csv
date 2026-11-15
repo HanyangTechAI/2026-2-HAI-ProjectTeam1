@@ -1,0 +1,17 @@
+﻿output_limit,budget,strategy,successes,n,success_percent
+2048,1024,proposed,0,2,0.0
+2048,2048,proposed,4,4,100.0
+2048,4096,proposed,2,2,100.0
+2048,8192,proposed,2,2,100.0
+2048,1024,sliding_window,0,2,0.0
+2048,2048,sliding_window,2,4,50.0
+2048,4096,sliding_window,2,2,100.0
+2048,8192,sliding_window,2,2,100.0
+2048,1024,vector_top_k,0,2,0.0
+2048,2048,vector_top_k,3,4,75.0
+2048,4096,vector_top_k,2,2,100.0
+2048,8192,vector_top_k,1,2,50.0
+2048,1024,utility_per_token,0,2,0.0
+2048,2048,utility_per_token,3,4,75.0
+2048,4096,utility_per_token,2,2,100.0
+2048,8192,utility_per_token,1,2,50.0

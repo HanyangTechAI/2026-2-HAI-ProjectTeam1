@@ -1,0 +1,9 @@
+﻿group,series,count,denominator,percent
+S2,Allowed valid action,40,40,100.0
+S3_VALID,Allowed valid action,40,40,100.0
+S3_EMPTY,Allowed valid action,0,40,0.0
+S5,Allowed valid action,0,40,0.0
+S2,Blocked invalid action,0,40,0.0
+S3_VALID,Blocked invalid action,0,40,0.0
+S3_EMPTY,Blocked invalid action,40,40,100.0
+S5,Blocked invalid action,40,40,100.0

@@ -1,0 +1,13 @@
+﻿horizon,strategy,subgroup,state_updates,successes,n_runs,success_percent
+100,Sliding Window,Current lookup,2,20,20,100
+100,Sliding Window,Current lookup,5,20,20,100
+100,Sliding Window,Current lookup,10,20,20,100
+100,Sliding Window,Historical lookup,2,2,20,10
+100,Sliding Window,Historical lookup,5,2,20,10
+100,Sliding Window,Historical lookup,10,0,20,0
+100,Sliding Window,Approval pending,2,16,20,80
+100,Sliding Window,Approval pending,5,14,20,70
+100,Sliding Window,Approval pending,10,14,20,70
+100,Sliding Window,Approved sending,2,20,20,100
+100,Sliding Window,Approved sending,5,20,20,100
+100,Sliding Window,Approved sending,10,20,20,100

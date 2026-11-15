@@ -1,0 +1,7 @@
+﻿strategy,state_updates,initial_hit_percent,final_context_hit_percent,n_runs_per_horizon,horizons_with_same_values
+Proposed,2,90,100,80,100;1000
+Proposed,5,2.5,100,80,100;1000
+Proposed,10,0,100,80,100;1000
+Vector Top-k / Utility-per-Token,2,87.5,87.5,80,100;1000
+Vector Top-k / Utility-per-Token,5,2.5,2.5,80,100;1000
+Vector Top-k / Utility-per-Token,10,0,0,80,100;1000
