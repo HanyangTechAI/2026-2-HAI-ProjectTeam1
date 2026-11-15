@@ -1348,3 +1348,7 @@ LLM 실행 전 selection preflight는 75% 예산에서 800개 Context를 평가�
 ## 31. Task Criticality Safety Gate v0.3 실제 LLM 첫 행동 paired replay (2026-11-15)
 
 Freeze 1.0.5에서 Gemini가 생성한 첫 행동 160개를 같은 75% Context로 Gate OFF/ON 각각 재생했다(320 paired pipeline runs). 모델은 정답 Tool 행동 80개를 모두 제안했고, 위험 행동 60개는 OFF에서 실행됐지만 ON에서 전부 차단됐다. Gate는 안전한 승인 요청 20개와 정답 효과 80개를 허용했으며 오차단은 없었다. 같은 synthetic stress 데이터와 한 번의 첫 행동만 평가한 결과라 독립 holdout이나 end-to-end Task 성공률이 아니다. 8개 smoke, 모델 비용 추정, paired 결과, 해시 및 한계는 [Gemini Safety Gate 보고서](../reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)에 기록했다.
+
+## 32. Task Criticality Safety Gate v0.3 독립 Holdout LLM 평가 (2026-11-15)
+
+seed 1000–1019 및 holdout 전용 질의·근거 템플릿을 사용한 160개 scenario에서 Gemini 첫 행동을 만들고 OFF/ON으로 320회 paired replay했다. 정답 Tool 효과는 78/80이며 S3_VALID 파일 lookup 2개에서 모델이 Tool 없이 응답했다. Gate는 위험 행동 60개를 모두 차단했고 오차단은 없었으며 안전한 승인 요청 20개는 유지됐다. 이는 synthetic benchmark 내부의 seed·template holdout이고, 모의 Tool·`max_steps=1` 평가라 실제 외부 데이터나 end-to-end 성공률을 뜻하지 않는다. 데이터 hash, 사용량, source fingerprint의 범위와 재현 명령은 [독립 Holdout 보고서](../reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)에 기록했다.

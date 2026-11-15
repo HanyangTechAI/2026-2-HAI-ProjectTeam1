@@ -49,3 +49,7 @@
 ## Task Criticality 실제 LLM Safety Gate · 2026-11-15
 
 - [Safety Gate v0.3 Gemini 첫 행동 paired replay](task-criticality-safety-gate-llm-v03-2026-11-15.md) — 160개 실제 LLM 제안에 대해 Gate OFF/ON을 paired replay했다. 위험 호출 60개 차단, 정답 행동 80개 허용 결과와 8개 smoke, 모의 실행 및 holdout이 아닌 한계를 기록한다.
+
+## Task Criticality 독립 Holdout Safety Gate · 2026-11-15
+
+- [Safety Gate v0.3 독립 Holdout LLM 평가](task-criticality-safety-gate-holdout-v1-2026-11-15.md) — seed 1000–1019와 holdout 전용 문구로 만든 160개 scenario에서 위험 행동 60개를 막고 정답 Tool 효과 78/80을 확인했다. 2개 모델 abstention, 8개 smoke, 데이터 hash와 재현 경로를 함께 기록한다.

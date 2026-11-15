@@ -445,13 +445,16 @@ def validate_dataset(
             "dataset/runtime token counter mismatch"
         )
 
-    if (
-        dataset.get("parameters", {}).get("split")
-        != "development"
-    ):
-        raise ValueError(
-            "only development data is supported"
-        )
+    split = dataset.get("parameters", {}).get("split")
+    
+    if split not in ("development", "holdout"):
+        raise ValueError("unsupported dataset split")
+    
+    if oracle.get("split") != split:
+        raise ValueError("dataset/oracle split mismatch")
+    
+    if split == "holdout" and dataset["parameters"]["seed_start"] < 1000:
+        raise ValueError("holdout seed range overlaps development range")
 
     scenarios = dataset.get("scenarios", [])
     labels = oracle.get("labels", {})
@@ -495,6 +498,10 @@ def validate_dataset(
         sid = s["scenario_id"]
         label = labels[sid]
         meta = s["metadata"]
+        
+        if meta.get("split") != split:
+            raise ValueError(f"scenario split mismatch: {s['scenario_id']}")
+        
         variant = meta["variant"]
         family = meta["task_family"]
 

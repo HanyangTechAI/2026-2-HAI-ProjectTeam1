@@ -11,7 +11,7 @@
 
 원본 JSON/CSV가 있는 경우 직접 읽고, 로컬 원본 로그가 없는 실험은 보고서 표의 수치를 코드에 명시했습니다. 보고서 기반 그림의 주석과 출처를 함께 확인하세요. 오프라인 선택·scripted gate·smoke 결과는 LLM 성능과 구분했습니다.
 
-이 갤러리의 Safety Gate 그림은 고정 scripted action 오프라인 평가까지만 포함한다. 2026-11-15 Gemini 첫 행동 paired replay와 smoke는 이 54개 그림에 포함하지 않았으며, 수치와 원본 경로는 [실제 LLM 평가 보고서](../../experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)에서 확인한다.
+이 갤러리의 Safety Gate 그림은 고정 scripted action 오프라인 평가까지만 포함한다. 2026-11-15 stress LLM replay와 독립 Holdout replay 및 각 smoke는 이 54개 그림에 포함하지 않았다. 수치와 원본 경로는 [stress LLM 보고서](../../experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md), [독립 Holdout 보고서](../../experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)에서 확인한다.
 
 신뢰구간은 저장된 값 또는 보고서에 명시된 값만 표시했습니다. Main의 각 점은 40개 기본 과제 × 2회이며, 반복·Budget·Horizon을 독립 과제로 세면 안 됩니다. Main 차수별 보고서는 최종 Main의 부분집합입니다. 실패 태그는 겹칠 수 있어 합계가 실패 실행 수와 일치하지 않을 수 있습니다.
 

@@ -327,6 +327,8 @@ Freeze 1.0.4 결과와 1.0.5 재실행을 기록했다.
 
 같은 날 Gemini 첫 행동 paired replay도 160개 stress scenario에서 수행했다. 위험 행동 60개는 Gate ON에서 모두 차단됐고, 정답 행동 80개와 안전한 승인 요청 20개는 허용됐다. 같은 데이터의 단일 step·모의 Tool 결과이므로 독립 holdout이나 Task 성공률이 아니다. [실제 LLM 평가 보고서](docs/experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)에 8개 smoke 결과, 원본 경로와 한계를 기록했다.
 
+후속 독립 Holdout은 seed 1000–1019와 전용 질의·근거 템플릿의 160개 synthetic scenario에서 수행했다. Gate ON은 위험 행동 60개를 막았고 정답 Tool 효과는 78/80이었다. S3_VALID file lookup 2건은 모델 abstention으로 남았다. 데이터·결과 hash와 제한은 [독립 Holdout 보고서](docs/experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)에 기록했다.
+
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. 표준 생성 profile은 `balanced_v2`이며 Freeze 1.0.5 config가 이를 명시한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. 기존 main ZIP은 과거 생성물로 보존하며 표준 balanced_v2 입력과 혼합하지 않는다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
@@ -450,6 +452,7 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 - [Task Criticality v0.2 S2/S3/S5 재검증](docs/experiments/reports/task-criticality-s235-v02-preflight-2026-11-13.md)
 - [Task Criticality Safety Gate v0.3 오프라인 평가](docs/experiments/reports/task-criticality-safety-gate-2026-11-15.md)
 - [Task Criticality Safety Gate v0.3 Gemini 첫 행동 평가](docs/experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)
+- [Task Criticality Safety Gate v0.3 독립 Holdout LLM 평가](docs/experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)
 - [초기 Runner·Smoke 실행 점검 아카이브](docs/experiments/audits/early-runner-and-smoke-archive-2026-11-15.md)
 - [실험용 Packing·Task Criticality 사용 가이드](docs/guides/experimental-packing.md)
 - [11월 12일 Pipeline Smoke 점검 — 20회](docs/experiments/audits/pipeline-smoke-2026-11-12.md)
