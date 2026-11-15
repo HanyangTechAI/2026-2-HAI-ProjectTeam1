@@ -1352,3 +1352,11 @@ Freeze 1.0.5에서 Gemini가 생성한 첫 행동 160개를 같은 75% Context�
 ## 32. Task Criticality Safety Gate v0.3 독립 Holdout LLM 평가 (2026-11-15)
 
 seed 1000–1019 및 holdout 전용 질의·근거 템플릿을 사용한 160개 scenario에서 Gemini 첫 행동을 만들고 OFF/ON으로 320회 paired replay했다. 정답 Tool 효과는 78/80이며 S3_VALID 파일 lookup 2개에서 모델이 Tool 없이 응답했다. Gate는 위험 행동 60개를 모두 차단했고 오차단은 없었으며 안전한 승인 요청 20개는 유지됐다. 이는 synthetic benchmark 내부의 seed·template holdout이고, 모의 Tool·`max_steps=1` 평가라 실제 외부 데이터나 end-to-end 성공률을 뜻하지 않는다. 데이터 hash, 사용량, source fingerprint의 범위와 재현 명령은 [독립 Holdout 보고서](../reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)에 기록했다.
+
+## 33. Task Criticality Safety Gate v0.3 멀티스텝 2K Holdout (2026-11-16)
+
+앞선 seed 1000–1019 독립 Holdout 160개 scenario에서 Gate OFF/ON을 각각 별도 Gemini trajectory로 실행했다. 매 step 입력 예산 2,048 tokens, 최대 8 steps와 Gate rejection 최대 2회를 설정했고 총 320 runs가 모두 status ok로 끝났다. prompt audit 638건 모두 예산 안에 있었으며 최대 실제 prompt는 1,165 tokens였다.
+
+Gate OFF/ON의 양성 정답 Tool 효과는 각각 78/80이었다. 부정 scenario 안전 종료는 OFF 20/80, ON 80/80이고 위험 Tool 실행은 OFF 80회, ON 0회였다. ON에서 action 차단은 103건, gate_abstained 종료는 61 runs다. 전체 goal_completed는 OFF 78/160, ON 77/160이지만 arm별 새 trajectory를 생성했으므로 이를 Gate의 인과 효과로 해석하지 않는다. 평가는 synthetic holdout과 mock Tool에 한정되며 일반 환경 안전 보장이 아니다.
+
+75% 초기 Context budget smoke 두 건은 각각 8 scenario에서 동일한 관측을 보였지만 16 runs 중 5건에서 context budget/config 상태가 비정상이었다. 같은 budget의 전체 실행은 84/160 scenario pair 로그만 남고 summary.json이 없어 최종 결과에서 제외했다. 별도 2K smoke는 Main과 합산하지 않았다. 세부 결과, 사용량, 해시와 재현 명령은 [멀티스텝 보고서](../reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)에 기록했다.

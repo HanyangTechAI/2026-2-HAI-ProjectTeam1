@@ -230,17 +230,31 @@ def make_proposed_policy(
 def _tool_definitions_with_feedback(
     tool_definitions: str,
     interactions: Sequence[Interaction],
+    safety_feedback: Sequence[str] = (),
 ) -> str:
-    if not interactions:
+    if not interactions and not safety_feedback:
         return tool_definitions
     
-    feedback = "\n".join(
-        f"- {interaction.content}"
-        for interaction in interactions
-    )
+    sections = [tool_definitions.rstrip()]
     
-    return tool_definitions.rstrip() + "\n\n[RECENT TOOL RESULTS]\n" + feedback
-
+    if interactions:
+        feedback = "\n".join(
+            f"- {interaction.content}"
+            for interaction in interactions
+        )
+        
+        sections.append("[RECENT TOOL RESULTS]\n" + feedback)
+        
+    if safety_feedback:
+        feedback = "\n".join(
+            f"- {item}"
+            for item in safety_feedback
+        )
+        
+        sections.append("[SAFETY GATE FEEDBACK]\n" + feedback)
+        
+    return "\n\n".join(sections)
+    
 
 class Orchestrator:
     def __init__(
@@ -253,6 +267,7 @@ class Orchestrator:
         token_counter: TokenCounter = provisional_token_count,
         max_steps: int = 8,
         goal_checker: GoalChecker | None = None,
+        max_action_rejections: int = 2,
     ) -> None:
         if not isinstance(agent, Agent):
             raise TypeError("agent must be an Agent instance")
@@ -275,6 +290,9 @@ class Orchestrator:
         if goal_checker is not None and not callable(goal_checker):
             raise TypeError("goal_checker must be callable")
         
+        if type(max_action_rejections) is not int or max_action_rejections < 0:
+            raise ValueError("max_action_rejections must be a nonnegative integer")
+        
         self.agent = agent
         self.policy = policy
         
@@ -288,6 +306,8 @@ class Orchestrator:
             goal_checker
             if goal_checker is not None else agent.goal_checker
         )
+        
+        self.max_action_rejections = max_action_rejections
         
     def run(
         self,
@@ -330,6 +350,12 @@ class Orchestrator:
         
         total_input_tokens = 0
         response: str | None = None
+        
+        safety_feedback: list[str] = []
+        
+        rejected_steps = 0
+        
+        unresolved_rejection = False
         
         self.agent.current_turn = current_turn
         
@@ -378,7 +404,8 @@ class Orchestrator:
         for step_number in range(1, self.max_steps + 1):
             effective_tool_definitions = _tool_definitions_with_feedback(
                 self.tool_definitions,
-                interactions
+                interactions,
+                safety_feedback,
             )
             
             fixed_tokens = fixed_context_tokens(
@@ -462,6 +489,38 @@ class Orchestrator:
             
             response = acted.response
             
+            if acted.stopped_reason == "action_rejected":
+                rejected_steps += 1
+                unresolved_rejection = True
+                
+                if acted.tool_calls or acted.tool_results or acted.interactions:
+                    raise AssertionError("rejected action must not execute a tool")
+                
+                if rejected_steps >= self.max_action_rejections or step_number >= self.max_steps:
+                    return finish(
+                        status=PipelineStatus.OK,
+                        reason="gate_abstained",
+                        completed=False,
+                    )
+                    
+                safe_reason = (acted.response or "grounding verification failed").replace("\n", " ")[:240]
+                
+                safety_feedback.append(
+                    "The previous proposed tool action was REJECTED "
+                    "and NOT EXECUTED. "
+                    f"Reason: {safe_reason}. "
+                    "Do not invent missing evidence or approval. "
+                    "Choose a different supported action if possible; "
+                    "otherwise return a safe abstention without a tool."
+                )
+                
+                safety_feedback = safety_feedback[-2:]
+                
+                continue
+            
+            if acted.stopped_reason == "tool_called":
+                unresolved_rejection = False
+            
             if acted.interactions:
                 for interaction in acted.interactions:
                     if interaction.session_id != session_id:
@@ -476,6 +535,13 @@ class Orchestrator:
                 )
                 
             if acted.stopped_reason == "completed":
+                if unresolved_rejection:
+                    return finish(
+                        status=PipelineStatus.OK,
+                        reason="gate_abstained",
+                        completed=False,
+                    )
+                
                 completed = False
                 
                 if self.goal_checker is not None:

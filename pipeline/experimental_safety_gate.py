@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Sequence
 
-from agent.agent import Agent, AgentAction
+from agent.agent import Agent, AgentAction, ActionRejected
 from context.tokenizer import (
     TokenCounter,
     provisional_token_count,
@@ -316,9 +316,12 @@ class _GatePlanner:
         self,
         original,
         gate: _RunGate,
+        *,
+        replan_on_block: bool = False,
     ) -> None:
         self._original = original
         self._gate = gate
+        self._replan_on_block = replan_on_block
 
     def plan(self, context: str) -> AgentAction:
         action = self._original.plan(context)
@@ -335,17 +338,22 @@ class _GatePlanner:
 
         if verdict.outcome != "blocked":
             return action
+        
+        message = (
+            "안전 보류: 필요한 정보가 확인되지 않았거나 "
+            "서로 충돌합니다. "
+            f"(reason={verdict.reason}, "
+            f"slot={verdict.slot or '-'})"
+        )
+        
+        if self._replan_on_block:
+            raise ActionRejected(message)
 
         return AgentAction(
             tool_name=None,
             action=None,
             arguments={},
-            text_response=(
-                "안전 보류: 필요한 정보가 확인되지 않았거나 "
-                "충돌합니다. "
-                f"({verdict.reason}, "
-                f"slot={verdict.slot or '-'})"
-            ),
+            text_response=message,
         )
 
     def __getattr__(self, name: str):
@@ -370,13 +378,15 @@ class CriticalityGatedAdapter:
         fallback_alpha: float = 1.0,
         max_steps: int = 1,
         goal_checker: GoalChecker | None = None,
+        max_action_rejections: int = 2,
     ) -> None:
         validate_alpha(fallback_alpha)
 
-        if max_steps != 1:
-            raise ValueError(
-                "v0.3 supports max_steps=1 only"
-            )
+        if type(max_steps) is not int or max_steps < 1:
+            raise ValueError("max_steps must be a positive integer")
+        
+        if type(max_action_rejections) is not int or max_action_rejections < 0:
+            raise ValueError("max_action_rejections must be nonnegative")
 
         if (
             not callable(agent_factory)
@@ -395,6 +405,8 @@ class CriticalityGatedAdapter:
         self.utility_weights = utility_weights
         self.fallback_alpha = fallback_alpha
         self.goal_checker = goal_checker
+        self.max_steps = max_steps
+        self.max_action_rejections = max_action_rejections
 
     def run_with_audit(
         self,
@@ -440,6 +452,7 @@ class CriticalityGatedAdapter:
             agent.planner = _GatePlanner(
                 agent.planner,
                 gate,
+                replan_on_block=(self.max_steps > 1),
             )
 
             old_checker = agent.goal_checker
@@ -486,7 +499,8 @@ class CriticalityGatedAdapter:
             system_prompt=self.system_prompt,
             tool_definitions=self.tool_definitions,
             token_counter=self.token_counter,
-            max_steps=1,
+            max_steps=self.max_steps,
+            max_action_rejections=self.max_action_rejections,
             goal_checker=(
                 safe_checker
                 if self.goal_checker is not None

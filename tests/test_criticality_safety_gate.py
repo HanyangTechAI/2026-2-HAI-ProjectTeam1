@@ -460,18 +460,18 @@ class GateTests(unittest.TestCase):
         self.assertEqual(len(first.gate_events), 1)
         self.assertEqual(len(second.gate_events), 1)
 
-    def test_multistep_not_supported(self):
-        with self.assertRaisesRegex(
-            ValueError,
-            "max_steps=1",
-        ):
-            CriticalityGatedAdapter(
-                system_prompt="",
-                tool_definitions="",
-                embedder=embedder,
-                agent_factory=Agent,
-                max_steps=2,
-            )
+    def test_multistep_supported(self):
+        adapter = CriticalityGatedAdapter(
+            system_prompt="",
+            tool_definitions="",
+            embedder=embedder,
+            agent_factory=Agent,
+            max_steps=8,
+            max_action_rejections=2,
+        )
+
+        self.assertEqual(adapter.max_steps, 8)
+        self.assertEqual(adapter.max_action_rejections, 2)
 
 
 if __name__ == "__main__":

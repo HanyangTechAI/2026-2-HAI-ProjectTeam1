@@ -329,6 +329,8 @@ Freeze 1.0.4 결과와 1.0.5 재실행을 기록했다.
 
 후속 독립 Holdout은 seed 1000–1019와 전용 질의·근거 템플릿의 160개 synthetic scenario에서 수행했다. Gate ON은 위험 행동 60개를 막았고 정답 Tool 효과는 78/80이었다. S3_VALID file lookup 2건은 모델 abstention으로 남았다. 데이터·결과 hash와 제한은 [독립 Holdout 보고서](docs/experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)에 기록했다.
 
+2026-11-16에는 같은 독립 Holdout에서 최대 8-step Safety Gate 평가를 완료했다. 2,048-token 고정 예산으로 160개 scenario의 OFF/ON 별도 LLM trajectory 320회를 실행했다. Gate ON은 부정 scenario 80/80을 안전하게 종료하고 위험 Tool 실행을 0회로 줄였으며, 양성 Tool 효과는 OFF/ON 모두 78/80이었다. 각 arm이 별도 trajectory를 생성하므로 목표 완료율의 작은 차이를 Gate의 인과 효과로 해석하지 않는다. 모의 Tool 평가와 budget·사용량 audit을 포함한 [멀티스텝 결과 보고서](docs/experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)를 참고한다.
+
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. 표준 생성 profile은 `balanced_v2`이며 Freeze 1.0.5 config가 이를 명시한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. 기존 main ZIP은 과거 생성물로 보존하며 표준 balanced_v2 입력과 혼합하지 않는다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.

@@ -44,6 +44,7 @@ class PipelineAdapter:
         token_counter: TokenCounter = provisional_token_count,
         max_steps: int = 8,
         goal_checker: GoalChecker | None = None,
+        max_action_rejections: int = 2,
     ) -> None:
         if not callable(policy):
             raise TypeError("policy must be callable")
@@ -76,6 +77,8 @@ class PipelineAdapter:
         self.max_steps = max_steps
         self.goal_checker = goal_checker
         
+        self.max_action_rejections = max_action_rejections
+        
     def __call__(
         self, 
         *,
@@ -98,6 +101,7 @@ class PipelineAdapter:
             tool_definitions=self.tool_definitions,
             token_counter=self.token_counter,
             max_steps=self.max_steps,
+            max_action_rejections=self.max_action_rejections,
             goal_checker=self.goal_checker,
         )
         

@@ -53,3 +53,7 @@
 ## Task Criticality 독립 Holdout Safety Gate · 2026-11-15
 
 - [Safety Gate v0.3 독립 Holdout LLM 평가](task-criticality-safety-gate-holdout-v1-2026-11-15.md) — seed 1000–1019와 holdout 전용 문구로 만든 160개 scenario에서 위험 행동 60개를 막고 정답 Tool 효과 78/80을 확인했다. 2개 모델 abstention, 8개 smoke, 데이터 hash와 재현 경로를 함께 기록한다.
+
+## Task Criticality 멀티스텝 Safety Gate · 2026-11-16
+
+- [Safety Gate v0.3 멀티스텝 2K Holdout 평가](task-criticality-safety-gate-multistep-v01-2026-11-16.md) — 고정 2,048-token 예산에서 160개 scenario를 OFF/ON 별도 LLM trajectory로 각 한 번씩 실행했다. 부정 안전 종료 80/80, 위험 Tool 실행 0회, 양성 정답 효과 78/80과 미완료 75% 예산 실행을 기록한다.

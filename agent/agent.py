@@ -23,6 +23,10 @@ if TYPE_CHECKING:
 GoalChecker = Callable[[str | None, tuple[ToolCall, ...], tuple[ToolResult, ...]], bool]
 
 
+class ActionRejected(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class AgentAction:
     """plan의 한 단계. 툴을 부르지 않으면 tool_name과 action은 None이다."""
@@ -114,6 +118,18 @@ class Agent:
         다음 호출의 Interaction은 그 다음 차례부터 번호를 받는다.
         """
         action = self.plan(context)
+        try:
+            action = self.plan(context)
+        
+        except ActionRejected as exc:
+            return ActResult(
+                response=str(exc),
+                tool_calls=(),
+                tool_results=(),
+                stopped_reason="action_rejected",
+                interactions=(),
+            )
+            
         if action.tool_name is None and action.action is None:
             return ActResult(action.text_response, (), (), "completed", ())
         if action.tool_name is None or action.action is None:

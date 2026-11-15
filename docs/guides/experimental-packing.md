@@ -124,10 +124,16 @@ result = pack_task_criticality(
 
 ### 실행 직전 Safety Gate
 
-`pipeline.experimental_safety_gate.CriticalityGatedAdapter`는 `memory.task_criticality`의 선택 결정을 실행별로 추적하고 Planner가 제안한 행동을 `ToolExecutor` 호출 전에 검사한다. 지원 intent에서 필수 slot이 유효한 후보가 아니거나, 최종 Context에 근거가 없거나 여러 값이 충돌하거나, Tool 인자가 그 근거와 일치하지 않으면 해당 행동을 abstain으로 바꾼다. 현재 구현은 `max_steps=1`로 제한한다.
+`pipeline.experimental_safety_gate.CriticalityGatedAdapter`는 `memory.task_criticality`의 선택 결정을 실행별로 추적하고 Planner가 제안한 행동을 `ToolExecutor` 호출 전에 검사한다. 지원 intent에서 필수 slot이 유효한 후보가 아니거나, 최종 Context에 근거가 없거나 여러 값이 충돌하거나, Tool 인자가 그 근거와 일치하지 않으면 해당 행동을 abstain으로 바꾼다. 이전 Gemini 평가는 첫 행동만 실행했지만, Adapter는 반복 실행 파이프라인 안에서 여러 step에 적용할 수 있다. 실험 runner의 step·rejection 한도는 개별 평가 설정에 따른다.
 
 [2026-11-15 오프라인 평가](../experiments/reports/task-criticality-safety-gate-2026-11-15.md)는 같은 160개 S2/S3/S5 scenario에 고정된 scripted 행동을 적용했다. Gate ON은 근거가 없는 80개 행동을 모두 실행 전에 막고, 유효한 80개 행동은 모두 허용했다. 이 결과에는 LLM generation이 없으므로 실제 Agent가 이처럼 행동할 확률이나 일반적인 안전 성능을 나타내지 않는다. 기존 v0.2 preflight는 선택 품질을, 이 평가는 별도 실행 adapter의 행동 차단만을 점검한다.
 
 [실제 LLM 첫 행동 paired replay](../experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md)는 같은 stress 데이터에서 Gemini가 제안한 160개 행동을 Gate OFF/ON으로 재생했다. Gate ON은 위험 제안 60개를 막고 정답 행동 80개와 안전한 승인 요청 20개를 허용했다. 한 번의 첫 행동·모의 Tool 평가이며 새 holdout이나 end-to-end 성공률이 아니므로, 이 역시 일반 안전 보장으로 해석하지 않는다.
 
 후속 [독립 Holdout 평가](../experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md)는 seed 1000–1019와 별도 문구의 160개 scenario를 사용했다. 위험 제안 60개를 모두 차단했지만, 양성 file lookup 2개에서 Gemini가 Tool 없이 답해 정답 효과는 78/80이었다. 이는 synthetic seed·template holdout의 첫 행동 결과이며 다중 step 성공이나 실제 Tool 부작용을 검증하지 않는다.
+
+### 멀티스텝 2K Holdout 평가
+
+[2026-11-16 멀티스텝 평가](../experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)는 같은 독립 Holdout 160개를 Gate OFF/ON 별도 LLM trajectory로 실행했다. 고정 입력 예산 2,048 tokens, 최대 8 steps, Gate action rejection 최대 2회로 320 runs를 완료했다. Gate ON은 부정 scenario 안전 종료 80/80과 위험 Tool 실행 0회를 기록했고, 양성 정답 Tool 효과는 양 arm 모두 78/80이었다. 61개 run은 gate_abstained로 끝났다.
+
+이번 runner는 동일 proposal을 재생한 paired-action 실험이 아니다. Gate 차단 후 재계획이 가능하므로 실제 다중 step 제어 동작을 관찰하지만, OFF/ON의 별도 생성 trajectory와 1회 반복 때문에 목표 완료율 차이는 인과 효과가 아니다. 모든 File·Email 실행은 mock Tool이며 운영 환경 안전성 검증으로 확장하지 않는다. 75% 초기 Context budget으로 실행한 부분 Main은 summary가 없어 최종 집계에서 제외했다.
