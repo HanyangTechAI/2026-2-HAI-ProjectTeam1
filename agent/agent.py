@@ -117,7 +117,6 @@ class Agent:
         툴을 실행하면 current_turn을 Interaction 수만큼 올린다.
         다음 호출의 Interaction은 그 다음 차례부터 번호를 받는다.
         """
-        action = self.plan(context)
         try:
             action = self.plan(context)
         
