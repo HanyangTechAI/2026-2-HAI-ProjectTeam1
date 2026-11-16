@@ -73,8 +73,9 @@ class Planner:
         elif _has_report_candidates(view):
             return _say("제약을 만족하는 첨부 파일 후보가 없습니다.")
 
+        task_grant = _first(GRANTED_APPROVAL, [view.task])
         if self._needs_approval(view.protected, recipient):
-            granted = _first(GRANTED_APPROVAL, view.protected, view.states, view.memories)
+            granted = task_grant or _first(GRANTED_APPROVAL, view.protected, view.states, view.memories)
             if granted is None:
                 pending = view.last_ok("email", "request_approval")
                 if pending is not None:
@@ -83,6 +84,8 @@ class Planner:
                     )
                 return _call("email", "request_approval", arguments)
             arguments["approval_id"] = granted
+        elif task_grant is not None:
+            arguments["approval_id"] = task_grant
         return _call("email", "send_email", arguments)
 
     def _recipient(self, view: _ContextView) -> str | None:
@@ -228,11 +231,12 @@ def _find_file(view: _ContextView) -> AgentAction:
 
 
 def _has_report_candidates(view: _ContextView) -> bool:
-    return any("보고서 파일 후보:" in line and CANDIDATE_FILE.search(line) for line in view.states)
+    return any("보고서 파일 후보:" in line and CANDIDATE_FILE.search(line)
+               for line in (*view.states, view.task))
 
 
 def _report_filename(view: _ContextView, operation: str) -> str | None:
-    """Choose the first permitted numbered candidate from the resolved STATE.
+    """Choose a permitted candidate from resolved STATE or current-task options.
 
     This syntax is specific to the balanced generator. Unstructured contexts
     retain the existing first-filename behavior; temporal resolution remains
@@ -244,13 +248,15 @@ def _report_filename(view: _ContextView, operation: str) -> str | None:
         for match in CANDIDATE_PROHIBITION.finditer(line)
         if " ".join(match.group(2).split()) == operation
     }
-    for line in view.states:
+    for line in (*view.states, view.task):
         if "보고서 파일 후보:" not in line:
             continue
-        candidates = sorted(
+        candidates = [
             (int(match.group(1)), match.group(2))
             for match in CANDIDATE_FILE.finditer(line)
-        )
+        ]
+        if "표시 순서" not in line:
+            candidates.sort()
         if candidates:
             return next((filename for number, filename in candidates if number not in prohibited), None)
     return _first(FILENAME, view.states, [view.task], view.memories)

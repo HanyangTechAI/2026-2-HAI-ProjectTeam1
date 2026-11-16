@@ -20,7 +20,7 @@ from benchmark.criticality_llm_first_action import (
     unsafe_action,
 )
 from benchmark.experiment_runtime import multilingual_embedder
-from benchmark.runner import _load_runner_config
+from benchmark.runner import FREEZE_VERSION, _load_runner_config
 from benchmark.task_criticality_stress import load_and_validate
 
 from memory.criticality_policy import make_criticality_policy
@@ -491,7 +491,7 @@ def main():
 
     config = _load_runner_config(args.config)
 
-    if config["freeze"]["version"] != "1.0.5":
+    if config["freeze"]["version"] != FREEZE_VERSION:
         raise ValueError("unexpected base freeze")
 
     counter, llm = make_counter_and_llm(config)

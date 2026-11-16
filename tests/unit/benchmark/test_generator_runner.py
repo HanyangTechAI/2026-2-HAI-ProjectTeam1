@@ -158,7 +158,7 @@ class GeneratorRunnerTests(unittest.TestCase):
             self.assertEqual(_git_revision(), {"git_commit": None, "git_dirty": None})
 
     def scenario(self, **parameters):
-        return generate_scenario(context_budget=8192, **parameters)
+        return generate_scenario(context_budget=8192, scenario_profile="balanced_v2", **parameters)
 
     def run_rows(self, scenarios, **parameters):
         with tempfile.TemporaryDirectory() as directory:

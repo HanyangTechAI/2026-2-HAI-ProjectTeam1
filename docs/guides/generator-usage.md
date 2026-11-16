@@ -4,10 +4,42 @@
 
 기존 [`benchmark/scenarios.json`](../../benchmark/scenarios.json)의 S01~S39는 모듈 경계와 예외 정책을 검사하는 최소 fixture로 유지한다. 긴 이력을 사용하는 실험 데이터와 그 fixture의 용도는 다르다. 기존 fixture 설명은 [scenarios-usage.md](scenarios-usage.md)를 참고한다.
 
-## Freeze 1.0.5: 균형 시나리오 생성
+## Freeze 1.0.6: 정보 주제별 균형 생성
 
-새 기본 시나리오 profile은 `balanced_v2`다. 표준 config에도
-`dataset.scenario_profile="balanced_v2"`를 명시한다. 두 task를 모두 사용하는 경우
+현재 기본 profile은 `topic_balanced_v3`다. `dataset.topics`에서 선택한 정보 주제를
+공통 배분 계획으로 나누며 기본 목록은 `constraint`, `temporal`, `state`, `flexible`이다.
+Main의 독립 시나리오 40개에서는 각 주제를 10개씩 생성한다. 표본 수가 나누어떨어지지
+않으면 선택한 주제별 개수 차이를 최대 1개로 제한한다. 파일 조회/이메일 등 작업 유형은
+정보 주제와 별도 축이다.
+
+주제는 이름만 붙이는 분류가 아니다. 제약은 실제 허용 행동을 바꾸고, 시간 주제는
+버전·시점 판단을, 상태 주제는 필요한 현재 상태를, Flexible 주제는 필수 보존 경로 밖의
+정답 근거를 포함하도록 생성한다. `constraint_count=0` 또는 `state_update_count=0`의
+명시적 대조 조건에서는 실제 제약·버전 경쟁이 없는 것을 그대로 집계한다.
+생성 비율은 입력 계획이며 실제 LLM 성공률·실패율을 미리 정하지 않는다.
+
+```powershell
+python -m benchmark.generator --config experiments/configs/smoke.json --scenario-profile topic_balanced_v3
+python -m benchmark.generator --config experiments/configs/main.json --gemini-token-model gemini-3.1-flash-lite --archive --output benchmark/generated/main_topic_balanced_v3.zip
+```
+
+새 기본 생성 경로와 실험 결과 경로는 `_topic_balanced_v3`로 분리한다. 표준 Runner는
+입력 profile 및 `metadata.primary_topic`이 config의 profile/선택 주제와 맞는지 API 호출
+전에 검사한다. 현재 config는 freeze `1.0.6`이며 과거 freeze `1.0.5`+`balanced_v2`
+config도 명시적으로 읽을 수 있다. 두 버전의 profile을 바꾸어 붙여 재사용하지 않는다.
+`legacy_v1`과 `balanced_v2` 생성 API는 보존한다. 기존 ZIP, 집계 및 checkpoint는
+그대로 두고 새 입력은 실제 실험 counter로 재생성·측정해 새 결과 경로에서 실행한다.
+
+아래의 `balanced_v2` 내용과 경로 예시는 이전 profile의 재현·사용법 기록이다. 현재
+주제 균형 생성에는 위 `topic_balanced_v3` 명령과 새 경로를 사용한다.
+Smoke 예시의 기본 counter는 오프라인 검증용이다. 실제 모델 실험에는 Main 예시처럼
+Gemini counter로 측정한다. 새 profile의 예산 경쟁을 계산할 때는 Planner의 시스템
+지시문을 포함한 요청 비용도 반영한다.
+
+## 과거 Freeze 1.0.5: 작업 하위 유형 균형 생성
+
+Freeze 1.0.5의 시나리오 profile은 `balanced_v2`다. 당시 표준 config에도
+`dataset.scenario_profile="balanced_v2"`를 명시했다. 두 task를 모두 사용하는 경우
 현재 보고서 조회·과거 보고서 조회·승인 대기·승인 완료를 층화 배정하며, 표본 수가
 나누어떨어지지 않아도 네 유형의 개수 차이가 최대 1개다. 작은 표본에서는 모든 유형을
 담을 수 없으므로 표본 수와 실제 유형별 개수를 함께 확인한다.

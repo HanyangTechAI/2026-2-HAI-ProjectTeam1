@@ -24,6 +24,7 @@ def mode_config():
         "name": "mode_test",
         "dataset": {
             "source": "synthetic", "samples_per_cell": 4,
+            "scenario_profile": "balanced_v2",
             "task_types": ["temporal_update", "approval"],
         },
         "seeds": [42],
@@ -44,6 +45,10 @@ VARIANTS = (
 
 
 class GeneratorModeTests(unittest.TestCase):
+    def scenario(self, **parameters):
+        parameters.setdefault("scenario_profile", "balanced_v2")
+        return generator.generate_scenario(**parameters)
+
     def test_legacy_mode_keeps_existing_content(self):
         # Captured before the selectable-mode implementation; provenance fields
         # are deliberately excluded so this checks data, rather than metadata.
@@ -55,7 +60,7 @@ class GeneratorModeTests(unittest.TestCase):
         )
         for variant, expected in zip(VARIANTS, expected_hashes):
             with self.subTest(variant=variant):
-                scenario = generator.generate_scenario(
+                scenario = self.scenario(
                     scenario_profile="legacy_v1", horizon_generation_mode=1, **variant,
                 )
                 content = {key: scenario[key] for key in (
@@ -71,8 +76,8 @@ class GeneratorModeTests(unittest.TestCase):
         scenarios = []
         for mode in (1, 2, 3):
             with self.subTest(mode=mode):
-                first = generator.generate_scenario(horizon_generation_mode=mode)
-                second = generator.generate_scenario(horizon_generation_mode=mode)
+                first = self.scenario(horizon_generation_mode=mode)
+                second = self.scenario(horizon_generation_mode=mode)
                 self.assertEqual(first, second)
                 self.assertEqual(first["metadata"]["horizon_generation_mode"], mode)
                 scenarios.append(first)
@@ -98,15 +103,15 @@ class GeneratorModeTests(unittest.TestCase):
         for mode in (1, 2, 3):
             for variant in VARIANTS:
                 with self.subTest(mode=mode, variant=variant):
-                    first = generator.generate_scenario(
+                    first = self.scenario(
                         horizon_generation_mode=mode, context_budget=1024,
                         horizon_turns=10, **variant,
                     )
-                    larger_budget = generator.generate_scenario(
+                    larger_budget = self.scenario(
                         horizon_generation_mode=mode, context_budget=8192,
                         horizon_turns=10, **variant,
                     )
-                    farther = generator.generate_scenario(
+                    farther = self.scenario(
                         horizon_generation_mode=mode, context_budget=1024,
                         horizon_turns=50, **variant,
                     )
@@ -135,7 +140,7 @@ class GeneratorModeTests(unittest.TestCase):
         for mode in (1, 2, 3):
             for variant in VARIANTS:
                 with self.subTest(mode=mode, variant=variant):
-                    scenario = generator.generate_scenario(
+                    scenario = self.scenario(
                         horizon_generation_mode=mode, **variant,
                     )
                     metadata = scenario["metadata"]
@@ -168,7 +173,7 @@ class GeneratorModeTests(unittest.TestCase):
         config = mode_config()
         with patch.object(generator, "DEFAULT_HORIZON_MODE", 2):
             self.assertEqual(
-                generator.generate_scenario()["metadata"]["horizon_generation_mode"], 2,
+                self.scenario()["metadata"]["horizon_generation_mode"], 2,
             )
             self.assertEqual(generator.generate_dataset(config)["horizon_generation_mode"], 2)
             config["dataset"]["horizon_generation_mode"] = 3
@@ -190,7 +195,7 @@ class GeneratorModeTests(unittest.TestCase):
         for mode in (1, 2, 3):
             for variant in VARIANTS:
                 with self.subTest(mode=mode, variant=variant):
-                    scenario = generator.generate_scenario(
+                    scenario = self.scenario(
                         horizon_generation_mode=mode, token_counter=weighted_counter,
                         **variant,
                     )
@@ -214,7 +219,7 @@ class GeneratorModeTests(unittest.TestCase):
         for invalid in (True, False, "2", 2.0, [1, 2, 3], 0, 6, -1):
             with self.subTest(mode=invalid):
                 with self.assertRaises((TypeError, ValueError)):
-                    generator.generate_scenario(horizon_generation_mode=invalid)
+                    self.scenario(horizon_generation_mode=invalid)
                 with self.assertRaises((TypeError, ValueError)):
                     generator.generate_dataset(mode_config(), horizon_generation_mode=invalid)
                 config = mode_config()

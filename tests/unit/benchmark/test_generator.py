@@ -30,6 +30,7 @@ def small_config(**grid_overrides):
         "name": "test",
         "dataset": {
             "source": "synthetic", "samples_per_cell": 4,
+            "scenario_profile": "balanced_v2",
             "task_types": ["temporal_update", "approval"],
         },
         "seeds": [42], "repeats": 2,
@@ -57,6 +58,7 @@ def oracle(scenario):
 class GeneratorTests(unittest.TestCase):
     def scenario(self, **overrides):
         parameters = {
+            "scenario_profile": "balanced_v2",
             "history_length_tokens": 10000, "horizon_turns": 10,
             "context_budget": 2048,
         }

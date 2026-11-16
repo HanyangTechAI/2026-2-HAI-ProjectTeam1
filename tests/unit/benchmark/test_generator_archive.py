@@ -13,6 +13,7 @@ class GeneratorArchiveTests(unittest.TestCase):
     def test_archive_is_reproducible_and_contains_complete_cells(self):
         config = {
             "dataset": {"source": "synthetic", "samples_per_cell": 2,
+                        "scenario_profile": "balanced_v2",
                         "task_types": ["temporal_update", "approval"]},
             "seeds": [42],
             "grid": {

@@ -196,8 +196,8 @@ class BalancedGeneratorTests(unittest.TestCase):
                                     if approval_id in entry["content"]))
         self.assertTrue(evaluate(scenario, oracle(scenario)).task_success)
 
-    def test_balanced_profile_is_default_and_has_disjoint_legacy_identity(self):
-        balanced = generate_scenario(constraint_count=3)
+    def test_explicit_balanced_v2_has_disjoint_legacy_identity(self):
+        balanced = generate_scenario(constraint_count=3, scenario_profile="balanced_v2")
         explicit = generate_scenario(constraint_count=3, scenario_profile="balanced_v2")
         legacy = generate_scenario(constraint_count=3, scenario_profile="legacy_v1")
         self.assertEqual(balanced, explicit)

@@ -235,9 +235,9 @@ python prototype/run_demo.py  # 현재 레거시 API 불일치로 실행 불가
 
 현재 실행 가능한 검증 경로는 `python -m unittest discover -s tests -v`와 `python -m benchmark.runner --help`이다. 레거시 데모의 출력은 실제 LLM 성능 측정이 아니며 최신 Pipeline 동작을 증명하지 않는다.
 
-Freeze 승인 전 실 Gemini 4K/8K gate는 검증된
-`benchmark/generated/main_gemini_3_1_flash_lite.zip`에서 seed 42·43의 짝지은
-시나리오를 추출해 네 전략을 각 Budget에서 32회씩, 총 64회 실행한다. 이 결과는 Main
+Freeze 승인 전 실 Gemini 4K/8K gate는 Gemini counter로 새로 생성한
+`benchmark/generated/main_topic_balanced_v3.zip`에서 seed 42·43마다 정보 주제별로
+짝지은 시나리오를 추출해 네 전략을 각 Budget에서 32회씩, 총 64회 실행한다. 이 결과는 Main
 효과 크기 보고에 합치지 않는다. `GEMINI_API_KEY`와 embedding model weight를 준비한 뒤
 다음 순서로 실행하며, 중단된 동일 실행은 `run --resume`으로 이어서 완료한다.
 
@@ -249,11 +249,11 @@ python tests/manual/smoke_4k8k.py report
 
 `report`는 실행 수와 checkpoint 완결성, 네 전략의 실제 LLM 호출, request-aware
 CountTokens, Prompt Audit·Budget 초과, Safety Margin, embedding revision 및 prompt
-checksum을 검사해 `experiments/results/smoke_4k8k/smoke_gate_report.json`에
+checksum을 검사해 `experiments/results/smoke_4k8k_topic_balanced_v3/smoke_gate_report.json`에
 `PASS` 또는 `HOLD`를 기록한다. 비용 회계 불완전은 성능 gate와 별도 warning으로
 보고하며, 해당 비용을 0으로 해석하지 않는다.
 
-2026-11-08 실행은 4K·8K에서 각 32/32 run을 완료해 `PASS`였다. 실제 prompt call 61건씩을
+이전 입력을 사용한 2026-11-08 실행은 4K·8K에서 각 32/32 run을 완료해 `PASS`였다. 실제 prompt call 61건씩을
 모두 확인했고 counted/actual overflow와 미완전 비용 계측은 없었다. 최대 counted/actual
 prompt는 2473/2474 tokens였다. 이는 운영 준비도 점검이며 전략 성능 결과가 아니다. 상세 값은
 [4K/8K Smoke Readiness Gate 감사](docs/experiments/audits/smoke-4k8k-readiness-2026-11-08.md)에 있다.
@@ -331,7 +331,9 @@ Freeze 1.0.4 결과와 1.0.5 재실행을 기록했다.
 
 2026-11-16에는 같은 독립 Holdout에서 최대 8-step Safety Gate 평가를 완료했다. 2,048-token 고정 예산으로 160개 scenario의 OFF/ON 별도 LLM trajectory 320회를 실행했다. Gate ON은 부정 scenario 80/80을 안전하게 종료하고 위험 Tool 실행을 0회로 줄였으며, 양성 Tool 효과는 OFF/ON 모두 78/80이었다. 각 arm이 별도 trajectory를 생성하므로 목표 완료율의 작은 차이를 Gate의 인과 효과로 해석하지 않는다. 모의 Tool 평가와 budget·사용량 audit을 포함한 [멀티스텝 결과 보고서](docs/experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)를 참고한다.
 
-`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 현재·과거 보고서 조회와 승인 전·후 이메일 행동을 생성한다. 표준 생성 profile은 `balanced_v2`이며 Freeze 1.0.5 config가 이를 명시한다. Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 기존 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)를 제공한다. 기존 main ZIP은 과거 생성물로 보존하며 표준 balanced_v2 입력과 혼합하지 않는다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
+`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 파일 조회와 이메일 행동을 생성한다. 표준 생성 profile은 Freeze 1.0.6의 `topic_balanced_v3`다. 제약·시간·상태·Flexible 근거 주제를 먼저 배정해 Main의 독립 시나리오 40개에서는 주제별 10개씩 생성한다. 다른 표본 수에서도 주제별 개수 차이는 최대 1개다. 각 주제에는 실제 정답에 필요한 정보와 경쟁 조건을 넣으며 실제 LLM ablation 성공률은 별도로 측정한다.
+
+Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 기존 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)는 이전 profile의 생성물로 보존한다. 새 profile은 Gemini counter로 새 경로에 생성·측정해야 한다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
 

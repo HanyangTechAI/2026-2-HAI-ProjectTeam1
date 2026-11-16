@@ -1,9 +1,9 @@
-# Architecture / Parameter Freeze v1.0.5
+# Architecture / Parameter Freeze v1.0.6
 
-- 상태: **FROZEN**
-- 기준일: 2026-11-13 (Asia/Seoul)
+- 상태: **FROZEN** (새 입력의 실제 모델 smoke 재검증 필요)
+- 기준일: 2026-11-16 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.5"`
+- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.6"`
 - 이전 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`; v1.0.3 변경은 각 실행의 `git_commit`, `git_dirty`, `resume_identity.code`와 함께 추적한다.
 
 ## Patch note - v1.0.1
@@ -103,6 +103,32 @@ Version Chain Expansion만 끄며, Mandatory State는 독립적으로 유지한�
 LLM 모델, 프롬프트, algorithm specification 및 checksum은 이번 변경에서 유지한다.
 이 변경은 시나리오의 측정 기회를 고르게 하는 것이며, ablation별 성공률 하락폭의
 동일함을 보장하지 않는다.
+
+## Patch note - v1.0.6
+
+2026-11-16, 작업 하위 유형만 균형화하던 설계를 정보 주제를 먼저 배정하는
+`topic_balanced_v3`로 바꾼다. 표준 config의 `dataset.topics`는 `constraint`,
+`temporal`, `state`, `flexible`이며 독립 시나리오 40개에는 각 주제를 10개씩
+배정한다. 나누어떨어지지 않는 표본에서도 주제별 개수 차이는 최대 1개다.
+파일 조회/이메일 작업은 각 주제 안에서 별도로 배분한다.
+
+- 제약 주제는 현재 요청에 파일 후보를 제공하고 실제 행동을 바꾸는 정책을
+  protected memory에 둔다. 시간 주제는 요청 시점에 맞는 버전을 구분하게 한다.
+- 상태 주제는 경쟁 버전 없이 필요한 현재 상태를 보존하게 하고, Flexible 주제는
+  필수 보존 대상이 아닌 FACT에 정답 근거를 둔다. 두 주제에는 예산 경쟁을 넣는다.
+  그 크기는 실제 실행 프롬프트와 counter로 계산한 기준 예산 2048에 맞추며,
+  budget sweep에서 입력 내용은 동일하게 유지한다. 더 큰 예산은 경쟁이 완화되는
+  조건이므로 제거 변형의 실패율이 모든 예산에서 같을 것을 요구하지 않는다.
+- 제약 0개/상태 변경 0회는 해당 경쟁이 없는 명시적 대조 조건으로 집계한다.
+  실제 protected retrieval의 적용성과 생성된 정답을 검사하고 coverage를 저장한다.
+- 새 기본 생성물과 결과 경로는 `*_topic_balanced_v3`다. Runner는 입력 profile과
+  주제가 config와 일치하는지 실행 전에 검사한다. 과거 `1.0.5`+`balanced_v2`
+  config는 명시적으로 재현할 수 있으며 기존 결과에 합치거나 resume하지 않는다.
+
+규칙 Planner는 현재 요청에 명시된 파일 후보와 승인 완료 번호를 읽을 수 있게 한다.
+LLM 모델·프롬프트·메모리 선택 알고리즘은 유지한다. 주제별 생성 비율은 입력 계약이며
+실제 LLM의 ablation 성공률을 정하지 않는다. 새 입력을 실제 Gemini counter로
+재생성하고 live smoke와 본실험을 다시 수행해야 결과 차이를 판단할 수 있다.
 
 ## 1. Frozen architecture
 
@@ -245,9 +271,10 @@ system instruction SHA-256을 기록한다. REST CountTokens도 Token retry 정�
 - horizon: `10, 50, 100` turns
 - history: `25000` tokens
 - noise ratio: `0.5`
-- constraints: `3`
-- state updates: `2`
+- constraints: `3` (제약 주제)
+- state updates: `2` (시간 주제)
 - task types: `temporal_update`, `approval`
+- information topics: `constraint`, `temporal`, `state`, `flexible` (주제별 10개/40개)
 - samples/cell: `20`, seeds: `42, 43`, repeats: `2`
 - retrieval metric k: `5`
 - planned agent runs: `3840`
@@ -275,7 +302,8 @@ Budget `2048`, history `15000`, horizon `50`, 5 samples, seed `42`, repeat `1`�
 본실험 효과 크기 보고에는 사용하지 않는다.
 
 Freeze 승인용 live gate는 `tests/manual/smoke_4k8k.py`로 별도 수행한다. 검증된 Gemini 3.1
-Main ZIP에서 seed `42, 43`, horizon `50`의 동일한 8개 sample을 Budget `4096`과
+`main_topic_balanced_v3.zip`에서 seed `42, 43`마다 각 정보 주제의 첫 sample을 골라
+동일한 8개 sample을 horizon `50`, Budget `4096`과
 `8192`에 짝지어 추출하고, 네 전략을 repeat `1`로 실행한다. Budget별 `32`회, 총
 `64`회의 예정 run을 모두 완료해야 한다. 이 gate 역시 Main 효과 크기 결과에는 섞지 않는다.
 
@@ -390,7 +418,7 @@ Planner와 Runner는 다음 완전성 계약을 적용한다.
 Architecture/parameter가 frozen인 것과 본실험 입력이 준비된 것은 구분한다.
 
 - 저장된 `benchmark/generated/main.zip`과 기존 Gemini ZIP은 이전 생성 설계의 입력이다.
-  v1.0.5 본실험에는 `balanced_v2`를 freeze된 Gemini counter로 새 경로에 생성·측정해야
+  v1.0.6 본실험에는 `topic_balanced_v3`를 freeze된 Gemini counter로 새 경로에 생성·측정해야
   한다. 기존 파일의 profile·freeze·`token_count_mode` label만 바꾸어 재사용하지 않는다.
 - `GEMINI_API_KEY`와 embedding model weight를 실행 환경에 준비한다.
 - 실제 사용한 Python/package 버전과 embedding model revision을 결과와 함께 기록한다.

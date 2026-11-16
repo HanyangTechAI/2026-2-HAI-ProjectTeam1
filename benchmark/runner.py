@@ -53,7 +53,12 @@ from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0.5"
+FREEZE_VERSION = "1.0.6"
+FREEZE_SCENARIO_PROFILES = {
+    "1.0.5": "balanced_v2",
+    "1.0.6": "topic_balanced_v3",
+}
+FROZEN_TOPICS = ("constraint", "temporal", "state", "flexible")
 FROZEN_MODEL = "gemini-3.1-flash-lite"
 FROZEN_SYSTEM_PROMPT_FILE = "experiments/prompts/system_v1.txt"
 FROZEN_TOOL_DEFINITIONS_FILE = "experiments/prompts/tools_v1.txt"
@@ -1278,8 +1283,11 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
     freeze = _mapping(loaded.get("freeze"), "freeze")
     if freeze.get("kind") != "architecture_parameter_freeze":
         raise ValueError("config freeze.kind must be 'architecture_parameter_freeze'")
-    if freeze.get("version") != FREEZE_VERSION:
-        raise ValueError(f"config freeze.version must be {FREEZE_VERSION!r}")
+    freeze_version = freeze.get("version")
+    if not isinstance(freeze_version, str) or freeze_version not in FREEZE_SCENARIO_PROFILES:
+        raise ValueError(
+            f"config freeze.version must be one of {tuple(FREEZE_SCENARIO_PROFILES)!r}"
+        )
     scope = loaded.get("scope")
     if not isinstance(scope, str) or not scope.strip():
         raise ValueError("config scope must be a non-empty string")
@@ -1297,8 +1305,20 @@ def _load_runner_config(path: str | Path) -> dict[str, Any]:
             raise ValueError("non-executable config must declare a reason")
 
     dataset = _mapping(loaded.get("dataset"), "dataset")
-    if dataset.get("scenario_profile") != "balanced_v2":
-        raise ValueError("config dataset.scenario_profile must be frozen to 'balanced_v2'")
+    expected_profile = FREEZE_SCENARIO_PROFILES[freeze_version]
+    if dataset.get("scenario_profile") != expected_profile:
+        raise ValueError(
+            f"config dataset.scenario_profile must be {expected_profile!r} "
+            f"for freeze {freeze_version}"
+        )
+    if expected_profile == "topic_balanced_v3":
+        topics = dataset.get("topics")
+        if (not isinstance(topics, list) or not topics
+                or any(not isinstance(topic, str) for topic in topics)
+                or len(set(topics)) != len(topics) or not set(topics) <= set(FROZEN_TOPICS)):
+            raise ValueError(
+                f"config dataset.topics must be a nonempty list of unique supported topics: {FROZEN_TOPICS!r}"
+            )
 
     model = _mapping(loaded.get("model"), "model")
     runtime = _mapping(loaded.get("runtime"), "runtime")
@@ -1389,6 +1409,7 @@ def _require_executable_config(config: Mapping[str, Any]) -> None:
 
 def _validate_configured_scenario_profile(
     payload: Any, scenarios: Sequence[Mapping[str, Any]], expected_profile: str,
+    *, expected_topics: Sequence[str] | None = None,
 ) -> None:
     """Keep frozen balanced runs from silently consuming old or mixed inputs."""
     if (isinstance(payload, Mapping) and "scenario_profile" in payload
@@ -1412,6 +1433,18 @@ def _validate_configured_scenario_profile(
                 f"{expected_profile!r}; got {actual!r}. Regenerate the input or omit "
                 "--config for an ad-hoc legacy run."
             )
+        if expected_topics is not None and metadata.get("primary_topic") not in expected_topics:
+            sample_id = scenario.get("scenario_id", scenario.get("sample_id"))
+            raise ValueError(
+                f"scenario {sample_id!r} metadata.primary_topic must belong to configured "
+                f"dataset.topics {tuple(expected_topics)!r}; got {metadata.get('primary_topic')!r}"
+            )
+    if (expected_topics is not None and isinstance(payload, Mapping) and "topics" in payload):
+        actual_topics = payload["topics"]
+        if (not isinstance(actual_topics, list) or len(actual_topics) != len(expected_topics)
+                or any(not isinstance(topic, str) for topic in actual_topics)
+                or set(actual_topics) != set(expected_topics)):
+            raise ValueError("input topics must match configured dataset.topics")
 
 
 def _config_strategy_plan(labels: Any) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -1701,6 +1734,8 @@ def main() -> None:
         try:
             _validate_configured_scenario_profile(
                 payload, scenarios, config["dataset"]["scenario_profile"],
+                expected_topics=(config["dataset"].get("topics")
+                                 if config["dataset"]["scenario_profile"] == "topic_balanced_v3" else None),
             )
         except (TypeError, ValueError) as exc:
             parser.error(str(exc))
@@ -1732,6 +1767,8 @@ def main() -> None:
         "freeze": config["freeze"],
         "scope": config["scope"],
         "status": config["status"],
+        "scenario_profile": config["dataset"]["scenario_profile"],
+        "topics": config["dataset"].get("topics"),
         "embedder": {
             "callable": embedder_spec,
             "model": runtime_config["embedding_model"],

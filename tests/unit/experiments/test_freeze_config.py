@@ -48,7 +48,8 @@ class FreezeConfigTests(unittest.TestCase):
                 config = _load_runner_config(CONFIGS / f"{name}.json")
                 self.assertEqual(config["freeze"]["version"], FREEZE_VERSION)
                 self.assertEqual(config["scope"], name)
-                self.assertEqual(config["dataset"]["scenario_profile"], "balanced_v2")
+                self.assertEqual(config["dataset"]["scenario_profile"], "topic_balanced_v3")
+                self.assertEqual(config["dataset"]["topics"], ["constraint", "temporal", "state", "flexible"])
                 self.assertEqual(config["status"], status)
                 self.assertIs(config["executable"], executable)
                 self.assertEqual(config["model"]["name"], "gemini-3.1-flash-lite")
@@ -97,7 +98,7 @@ class FreezeConfigTests(unittest.TestCase):
                 _load_runner_config(path)
 
     def test_legacy_missing_and_unknown_profiles_are_rejected_by_current_freeze(self):
-        for profile in ("legacy_v1", "unknown", None):
+        for profile in ("legacy_v1", "balanced_v2", "unknown", None):
             config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))
             if profile is None:
                 config["dataset"].pop("scenario_profile")
@@ -108,6 +109,66 @@ class FreezeConfigTests(unittest.TestCase):
                 path.write_text(json.dumps(config), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, "dataset.scenario_profile"):
                     _load_runner_config(path)
+
+    def test_previous_freeze_and_profile_remain_explicitly_reproducible(self):
+        config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))
+        config["freeze"]["version"] = "1.0.5"
+        config["dataset"]["scenario_profile"] = "balanced_v2"
+        config["dataset"].pop("topics")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "previous.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            self.assertEqual(_load_runner_config(path), config)
+            config["dataset"]["scenario_profile"] = "topic_balanced_v3"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "dataset.scenario_profile"):
+                _load_runner_config(path)
+            config["freeze"]["version"] = "1.0.4"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "freeze.version"):
+                _load_runner_config(path)
+
+    def test_current_freeze_requires_nonempty_unique_supported_topics(self):
+        for topics in (None, [], ["constraint", "constraint"], ["unknown"], "state", [["state"]]):
+            config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))
+            if topics is None:
+                config["dataset"].pop("topics")
+            else:
+                config["dataset"]["topics"] = topics
+            with self.subTest(topics=topics), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "invalid-topics.json"
+                path.write_text(json.dumps(config), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "dataset.topics"):
+                    _load_runner_config(path)
+        config = copy.deepcopy(_load_runner_config(CONFIGS / "main.json"))
+        config["dataset"]["topics"] = ["state", "flexible"]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "subset.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            self.assertEqual(_load_runner_config(path)["dataset"]["topics"], ["state", "flexible"])
+
+    def test_current_input_requires_a_primary_topic_matching_the_configured_subset(self):
+        scenario = {
+            "scenario_id": "state-case", "metadata": {
+                "scenario_profile": "topic_balanced_v3", "primary_topic": "state",
+            },
+        }
+        _validate_configured_scenario_profile(
+            {"scenario_profile": "topic_balanced_v3", "topics": ["state", "flexible"]},
+            [scenario], "topic_balanced_v3", expected_topics=["state", "flexible"],
+        )
+        for topic in (None, "unknown", "constraint"):
+            changed = copy.deepcopy(scenario)
+            changed["metadata"]["primary_topic"] = topic
+            with self.subTest(topic=topic), self.assertRaisesRegex(ValueError, "metadata.primary_topic"):
+                _validate_configured_scenario_profile(
+                    {}, [changed], "topic_balanced_v3", expected_topics=["state", "flexible"],
+                )
+        for topics in (["state"], ["state", "state"], ["unknown", "state"], "state"):
+            with self.subTest(cell_topics=topics), self.assertRaisesRegex(ValueError, "input topics"):
+                _validate_configured_scenario_profile(
+                    {"topics": topics}, [scenario], "topic_balanced_v3", expected_topics=["state", "flexible"],
+                )
 
     def test_frozen_input_profile_checks_selected_enabled_scenarios_and_cell(self):
         balanced = {"scenario_id": "balanced", "metadata": {"scenario_profile": "balanced_v2"}}

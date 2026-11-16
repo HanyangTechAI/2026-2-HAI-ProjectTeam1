@@ -25,26 +25,37 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-ARCHIVE = ROOT / "benchmark/generated/main_gemini_3_1_flash_lite.zip"
+ARCHIVE = ROOT / "benchmark/generated/main_topic_balanced_v3.zip"
 CONFIG = ROOT / "experiments/configs/main.json"
-DATA_DIR = ROOT / "benchmark/generated/smoke_4k8k"
-RESULT_ROOT = ROOT / "experiments/results/smoke_4k8k"
+DATA_DIR = ROOT / "benchmark/generated/smoke_4k8k_topic_balanced_v3"
+RESULT_ROOT = ROOT / "experiments/results/smoke_4k8k_topic_balanced_v3"
 BUDGETS = (4096, 8192)
 HORIZON = 50
 SEEDS = (42, 43)
 STRATEGIES = ("proposed", "sliding_window", "vector_top_k", "utility_per_token")
-SAMPLE_IDENTITIES = (
-    ("temporal_update", 0, "current"),
-    ("temporal_update", 5, "historical"),
-    ("approval", 10, "pending"),
-    ("approval", 11, "granted"),
-)
-SAMPLE_IDS = frozenset(
-    f"seed{seed}_{kind}_{index:03d}_{variant}"
-    for seed in SEEDS
-    for kind, index, variant in SAMPLE_IDENTITIES
-)
-EXPECTED_RUNS_PER_BUDGET = len(SAMPLE_IDS) * len(STRATEGIES)
+PROFILE = "topic_balanced_v3"
+TOPICS = ("constraint", "temporal", "state", "flexible")
+EXPECTED_SAMPLE_COUNT = len(SEEDS) * len(TOPICS)
+EXPECTED_RUNS_PER_BUDGET = EXPECTED_SAMPLE_COUNT * len(STRATEGIES)
+
+
+def select_smoke_scenarios(scenarios: list[dict]) -> list[dict]:
+    """Select one input per seed/topic without looking at model outcomes."""
+    chosen = {}
+    for scenario in sorted(scenarios, key=lambda s: (s.get("metadata", {}).get("sample_index", 0), s["scenario_id"])):
+        metadata = scenario.get("metadata", {})
+        key = (metadata.get("seed"), metadata.get("primary_topic"))
+        if key[0] in SEEDS and key[1] in TOPICS:
+            if metadata.get("scenario_profile") != PROFILE:
+                raise ValueError("Smoke input scenario profile mismatch")
+            chosen.setdefault(key, scenario)
+    expected = {(seed, topic) for seed in SEEDS for topic in TOPICS}
+    if set(chosen) != expected:
+        raise ValueError(f"Missing Smoke seed/topic groups: {sorted(expected - set(chosen))}")
+    selected = [chosen[(seed, topic)] for seed in SEEDS for topic in TOPICS]
+    if len({s["scenario_id"] for s in selected}) != EXPECTED_SAMPLE_COUNT:
+        raise ValueError("Duplicate Smoke scenario IDs")
+    return selected
 
 
 def read_json(path: Path) -> dict:
@@ -66,6 +77,9 @@ def output_path(budget: int) -> Path:
 def check_frozen_config(config: dict) -> int:
     if config.get("scope") != "main" or config.get("executable") is not True:
         raise ValueError("Expected executable frozen main config")
+    if (config["dataset"].get("scenario_profile") != PROFILE
+            or set(config["dataset"].get("topics", [])) != set(TOPICS)):
+        raise ValueError("Expected topic-balanced Main config")
     if config["model"]["name"] != "gemini-3.1-flash-lite":
         raise ValueError("Unexpected LLM model in main config")
     if config["runtime"]["token_counter"]["model"] != config["model"]["name"]:
@@ -97,15 +111,13 @@ def prepare() -> None:
             raise ValueError("Main archive model mismatch")
         if manifest.get("n_cells") != 12 or manifest.get("n_scenarios") != 480:
             raise ValueError("Main archive is not the expected 12-cell / 480-scenario dataset")
+        if manifest.get("scenario_profile") != PROFILE or set(manifest.get("topics", [])) != set(TOPICS):
+            raise ValueError("Main archive is not the current topic-balanced profile")
 
         generation_freeze = manifest.get("config", {}).get("freeze", {}).get("version")
         execution_freeze = config.get("freeze", {}).get("version")
         if generation_freeze != execution_freeze:
-            print(
-                "NOTICE: dataset generation freeze and execution freeze differ: "
-                f"{generation_freeze} -> {execution_freeze}. "
-                f"The {execution_freeze} execution freeze requires compatibility review."
-            )
+            raise ValueError("Main archive generation freeze must match the execution freeze; regenerate it")
 
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         for budget in BUDGETS:
@@ -120,13 +132,8 @@ def prepare() -> None:
             payload = json.loads(archive.read(cells[0]["path"]))
             if payload.get("token_count_mode") != manifest["token_count_mode"]:
                 raise ValueError(f"Cell {budget} token_count_mode mismatch")
-            scenarios = [s for s in payload["scenarios"] if s["scenario_id"] in SAMPLE_IDS]
+            scenarios = select_smoke_scenarios(payload["scenarios"])
             by_id = {s["scenario_id"]: s for s in scenarios}
-            if len(scenarios) != len(SAMPLE_IDS) or set(by_id) != SAMPLE_IDS:
-                raise ValueError(
-                    f"Budget {budget}: missing/duplicate sample IDs: "
-                    f"missing={sorted(SAMPLE_IDS - set(by_id))}"
-                )
             for scenario in scenarios:
                 if scenario["context_budget"] != budget:
                     raise ValueError(f"Budget mismatch for {scenario['scenario_id']}")
@@ -140,6 +147,8 @@ def prepare() -> None:
             selected_by_budget[budget] = by_id
             selected_payload = dict(payload)
             selected_payload["scenarios"] = scenarios
+            # Full-cell coverage no longer describes this eight-case subset.
+            selected_payload.pop("coverage", None)
             path = data_path(budget)
             path.write_text(
                 json.dumps(selected_payload, ensure_ascii=False, indent=2) + "\n",
@@ -148,7 +157,10 @@ def prepare() -> None:
             print(f"Prepared {relative(path)} ({len(scenarios)} scenarios)")
 
     left, right = (selected_by_budget[budget] for budget in BUDGETS)
-    for sample_id in sorted(SAMPLE_IDS):
+    sample_ids = set(left)
+    if sample_ids != set(right):
+        raise ValueError("Smoke sample IDs differ between budgets")
+    for sample_id in sorted(sample_ids):
         for field in ("query", "memory_snapshot", "current_time", "current_turn"):
             if left[sample_id].get(field) != right[sample_id].get(field):
                 raise ValueError(f"Unpaired sample content ({field}): {sample_id}")
@@ -167,7 +179,9 @@ def prepare() -> None:
         "budgets": list(BUDGETS),
         "nominal_margin": margin,
         "seed_values": list(SEEDS),
-        "sample_ids": sorted(SAMPLE_IDS),
+        "sample_ids": sorted(sample_ids),
+        "scenario_profile": PROFILE,
+        "topics": list(TOPICS),
         "strategies": list(STRATEGIES),
         "repeats": 1,
         "expected_total_runs": EXPECTED_RUNS_PER_BUDGET * len(BUDGETS),
@@ -217,6 +231,10 @@ def run(*, resume: bool) -> None:
 def report() -> int:
     config = read_json(CONFIG)
     margin = check_frozen_config(config)
+    selection = read_json(DATA_DIR / "selection_manifest.json")
+    sample_ids = set(selection["sample_ids"])
+    if len(sample_ids) != EXPECTED_SAMPLE_COUNT or selection.get("scenario_profile") != PROFILE:
+        raise ValueError("Unexpected Smoke selection; run 'prepare' with the current archive")
     issues: list[str] = []
     warnings: list[str] = []
     data: dict[str, dict] = {}
@@ -236,7 +254,7 @@ def report() -> int:
         rows = [json.loads(line) for line in (folder / "runs.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         progress = read_json(folder / "progress.json")
         experiment = read_json(folder / "experiment.json")
-        expected_keys = {(sid, strategy, 0) for sid in SAMPLE_IDS for strategy in STRATEGIES}
+        expected_keys = {(sid, strategy, 0) for sid in sample_ids for strategy in STRATEGIES}
         keys = [(row["scenario"]["scenario_id"], row["strategy"], row["repeat_id"]) for row in rows]
         if len(rows) != EXPECTED_RUNS_PER_BUDGET or set(keys) != expected_keys or len(set(keys)) != len(keys):
             issues.append(f"{budget}: incomplete/duplicate run keys ({len(rows)}/{EXPECTED_RUNS_PER_BUDGET})")

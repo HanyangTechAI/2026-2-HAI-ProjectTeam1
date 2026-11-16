@@ -25,6 +25,7 @@ from typing import Any, Callable
 import zipfile
 
 from benchmark.horizon_filler import HorizonFiller, LLMHorizonFiller
+from benchmark.scenario_topics import PROFILE, TOPICS, plan_cases, validate_topics
 from context.tokenizer import (
     GeminiTokenCounter, TokenCounter, count_tokens, provisional_token_count,
     TARGET_GEMINI_MODEL, token_count_mode,
@@ -41,8 +42,8 @@ HORIZON_MODES = {
     4: "llm_natural", 5: "llm_mixed",
 }
 TASK_TYPES = ("temporal_update", "approval")
-DEFAULT_SCENARIO_PROFILE = "balanced_v2"
-SCENARIO_PROFILES = ("legacy_v1", "balanced_v2")
+DEFAULT_SCENARIO_PROFILE = PROFILE
+SCENARIO_PROFILES = ("legacy_v1", "balanced_v2", PROFILE)
 GRID_KEYS = (
     "context_token_budget", "history_length_tokens", "horizon_turns",
     "noise_memory_ratio", "constraint_count", "state_update_count",
@@ -270,7 +271,7 @@ def _timestamp_for_turn(
     raise ValueError("history turn lies outside the generated timeline")
 
 
-def generate_scenario(
+def _generate_existing_scenario(
     *, task_type: str = "temporal_update", seed: int = 42, sample_index: int = 0,
     state_scope: str = "current", approval_status: str = "pending",
     context_budget: int = 2048, history_length_tokens: int = 10000,
@@ -674,6 +675,242 @@ def generate_scenario(
     )
 
 
+def _finish_topic_scenario(
+    scenario: dict[str, Any], counter: TokenCounter, mode: int, llm_source: Any | None,
+) -> dict[str, Any]:
+    """Measure the rendered topic, then construct its complete history once."""
+    from context.builder import fixed_context_tokens
+
+    if isinstance(counter, GeminiTokenCounter) and not counter.metadata()["request_aware_budgeting"]:
+        # Match the canonical runner's fixed request overhead before sizing
+        # budget competition. Keep an explicitly configured request intact.
+        from agent.llm_planner import SYSTEM_INSTRUCTION
+        counter.configure_request(system_instruction=SYSTEM_INSTRUCTION)
+
+    metadata = scenario["metadata"]
+    sample_id = scenario["sample_id"]
+    if mode in (4, 5):
+        source = _make_llm_source({}) if llm_source is None else llm_source
+        filler = LLMHorizonFiller(sample_id, mode, NARRATIVE_TEXT, source)
+    else:
+        filler = HorizonFiller(sample_id, mode, NARRATIVE_TEXT) if mode != 1 else None
+
+    def padding(length, key):
+        return filler.words(length, key=key) if filler else _words(length)
+
+    memories = scenario["memory_snapshot"]
+    by_id = {item["memory_id"]: item for item in memories}
+    targets = set(scenario["target_memory_ids"])
+    topic = metadata["primary_topic"]
+    # Content remains paired across the budget grid. Cost competition is
+    # designed at one declared reference budget, with larger cells as controls.
+    project_root = Path(__file__).resolve().parents[1]
+    prompt = (project_root / "experiments/prompts/system_v1.txt").read_text(encoding="utf-8")
+    tools = (project_root / "experiments/prompts/tools_v1.txt").read_text(encoding="utf-8")
+    fixed = fixed_context_tokens(prompt, tools, scenario["query"], counter)
+    reference_window = max(64, 2048 - 32 - fixed)
+    competitors = metadata.get("competitor_memory_ids", [])
+    costs = {}
+    if topic == "state":
+        costs[scenario["required_state_ids"][0]] = int(reference_window * 0.70)
+        if competitors:
+            costs[competitors[0]] = int(reference_window * 0.60)
+    elif topic == "flexible":
+        costs[scenario["required_flexible_memory_ids"][0]] = int(reference_window * 0.12)
+        for mid, fraction in zip(competitors, (0.96, 0.28)):
+            costs[mid] = int(reference_window * fraction)
+    elif targets:
+        # Compact policies still need enough token resolution for the noise
+        # ratio grid. This floor stays fixed across noise/budget conditions.
+        last_target = scenario["target_memory_ids"][-1]
+        target_tokens = sum(by_id[mid]["token_count"] for mid in targets)
+        costs[last_target] = by_id[last_target]["token_count"] + max(0, 128 - target_tokens)
+    for mid, requested_cost in costs.items():
+        item = by_id[mid]
+        def memory_padding(length, key=mid, kind=item["memory_type"]):
+            if kind == "constraint":
+                words = ("참고", "기록", "내용", "검토", "요약", "문장", "표현", "순서")
+                return " ".join(words[index % len(words)] for index in range(length))
+            return padding(length, key)
+        _pad_memory(item, max(item["token_count"], requested_cost), counter,
+                    padding=memory_padding,
+                    tolerance=1 if mode == 1 else 8,
+                    probe_length=64 if mode in (4, 5) else None)
+
+    events = sorted(memories, key=lambda item: (item["valid_from"], item["memory_id"]))
+    horizon = metadata["horizon_turns"]
+    history_turns = max(32, 2 * horizon + len(events) + 16)
+    current_turn = history_turns + 1
+    important_turn = current_turn - horizon
+    anchor = max((index for index, item in enumerate(events) if item["memory_id"] in targets), default=len(events) - 1)
+    if len(events) - 1 - anchor >= horizon:
+        raise ValueError("horizon_turns leaves no room for later topic events")
+    for index, item in enumerate(events):
+        item["turn_id"] = important_turn - anchor + index
+    current_time = datetime.fromisoformat(scenario["current_time"])
+    scenario["current_turn"] = current_turn
+    available_turns = [turn for turn in range(1, current_turn)
+                       if turn not in {item["turn_id"] for item in events}]
+    noise_notes = []
+    ratio = metadata["noise_memory_ratio"]
+    if ratio and targets:
+        minimum_noise_cost = count_tokens("참고.", counter)
+        target_cost = sum(by_id[mid]["token_count"] for mid in targets)
+        desired_noise_cost = target_cost * ratio / (1 - ratio)
+        noise_count = min(4, max(1, int(desired_noise_cost / max(1, minimum_noise_cost))))
+        for index in range(noise_count):
+            turn = available_turns[(index + 1) * len(available_turns) // 5]
+            stamp = _timestamp_for_turn(turn, events, current_turn, current_time).isoformat()
+            item = dict(
+                memory_id=f"{sample_id}_noise_{index}", session_id=scenario["session_id"],
+                turn_id=turn, memory_type="experience", content="참고.",
+                importance=0.05, is_active=True, is_protected=False, memory_key=None,
+                created_at=stamp, valid_from=stamp, valid_to=None, supersedes=None, superseded_by=None,
+            )
+            item["token_count"] = count_tokens(item["content"], counter)
+            memories.append(item)
+            noise_notes.append(item)
+    actual_noise = None
+    if targets:
+        actual_noise = 0.0
+        if ratio:
+            target_cost = sum(by_id[mid]["token_count"] for mid in targets)
+            # Fit to the admissible ratio interval. A fixed +/-8-token text
+            # tolerance is too wide for small policies at noise ratio 0.1.
+            lower_ratio = max(0.0, ratio - NOISE_TOLERANCE * 0.95)
+            upper_ratio = min(1.0 - 1e-9, ratio + NOISE_TOLERANCE * 0.95)
+            lower = math.ceil(target_cost * lower_ratio / (1 - lower_ratio))
+            upper = math.floor(target_cost * upper_ratio / (1 - upper_ratio))
+            if lower > upper:
+                raise ValueError("requested topic noise ratio has no feasible integer token count")
+            desired = min(upper, max(lower, round(target_cost * ratio / (1 - ratio))))
+            tolerance = min(desired - lower, upper - desired)
+            other_noise_cost = sum(item["token_count"] for item in noise_notes[:-1])
+            last_noise = noise_notes[-1]
+            _pad_memory(
+                last_noise, desired - other_noise_cost, counter,
+                padding=lambda length: padding(length, last_noise["memory_id"]),
+                probe_length=64 if mode in (4, 5) else None, tolerance=tolerance,
+            )
+            noise_cost = sum(item["token_count"] for item in noise_notes)
+            actual_noise = noise_cost / (target_cost + noise_cost)
+            if abs(actual_noise - ratio) > NOISE_TOLERANCE:
+                raise ValueError("token counter cannot satisfy the requested topic noise ratio")
+    by_turn = {item["turn_id"]: item for item in memories}
+    history = []
+    for turn in range(1, current_turn):
+        content = by_turn[turn]["content"] if turn in by_turn else "진행 내용을 기록했습니다."
+        history.append(dict(
+            session_id=scenario["session_id"], turn_id=turn, source="user", content=content,
+            timestamp=_timestamp_for_turn(turn, events, current_turn, current_time).isoformat(),
+        ))
+    originals = [entry["content"] for entry in history]
+
+    def build_history(length):
+        if isinstance(filler, LLMHorizonFiller):
+            segments = filler.history_segments(length, turn_count=len(history))
+            for index, entry in enumerate(history):
+                entry["content"] = " ".join(part for part in (originals[index], segments[index]) if part)
+        else:
+            per_turn, extra = divmod(length, len(history))
+            for index, entry in enumerate(history):
+                words = per_turn + (index < extra)
+                entry["content"] = originals[index] + (
+                    " " + padding(words, f"history_padding_{index}") if words else ""
+                )
+        return render_history(history)
+
+    length, measured_history = _fit_text(
+        build_history, metadata["history_length_tokens"], counter,
+        tolerance=max(1, math.floor(metadata["history_length_tokens"] * HISTORY_TOLERANCE)),
+        probe_length=256 if mode in (4, 5) else None,
+    )
+    build_history(length)
+    scenario["history"] = history
+    scenario["token_count_mode"] = token_count_mode(counter)
+    for item in memories:
+        MemoryItem.from_dict(item)
+    from memory.query_analyzer import analyze_query
+    from memory.selector import retrieve_protected
+    from memory.store import SnapshotMemoryStore
+
+    query_context = analyze_query(scenario["query"], current_turn, current_time)
+    store = SnapshotMemoryStore(tuple(MemoryItem.from_dict(item) for item in memories))
+    actual_constraints = {item.memory_id for item in retrieve_protected(query_context, store, scenario["session_id"])}
+    if actual_constraints != set(scenario["applicable_constraint_ids"]):
+        raise ValueError("rendered topic policies do not match actual protected retrieval applicability")
+    noise_ids = {item["memory_id"] for item in noise_notes}
+    metadata.update(
+        scenario_profile=PROFILE, horizon_generation_mode=mode, horizon_generation_name=HORIZON_MODES[mode],
+        horizon_natural_language_backend=("gemini_llm_v1" if mode in (4, 5) else
+                                         "local_sentence_composition_v1" if filler else None),
+        horizon_mix_basis="filler_sentence_pairs" if mode in (3, 5) else None,
+        actual_history_length_tokens=measured_history, history_length_turns=history_turns,
+        important_turn=important_turn, actual_noise_memory_ratio=actual_noise,
+        noise_ratio_applicable=bool(targets),
+        noise_memory_tokens=sum(item["token_count"] for item in noise_notes),
+        structural_distractor_tokens=sum(item["token_count"] for item in memories
+                                        if item["memory_id"] not in targets | noise_ids),
+        memory_tokens=sum(item["token_count"] for item in memories), token_count_mode=token_count_mode(counter),
+        reference_context_budget=2048, reference_memory_budget=reference_window,
+        reference_fixed_tokens=fixed, competitor_tokens=sum(by_id[mid]["token_count"] for mid in competitors),
+    )
+    if isinstance(filler, LLMHorizonFiller):
+        metadata["horizon_llm"] = filler.provenance()
+    return scenario
+
+
+def generate_scenario(
+    *, task_type: str = "temporal_update", seed: int = 42, sample_index: int = 0,
+    state_scope: str = "current", approval_status: str = "pending",
+    context_budget: int = 2048, history_length_tokens: int = 10000,
+    horizon_turns: int = 10, noise_memory_ratio: float = 0.5,
+    constraint_count: int = 1, state_update_count: int = 2,
+    token_counter: TokenCounter = provisional_token_count,
+    horizon_generation_mode: int | None = None, scenario_profile: str | None = None,
+    llm_source: Any | None = None, primary_topic: str | None = None,
+    topic_index: int | None = None, topic_variant_index: int | None = None,
+) -> dict[str, Any]:
+    """Render a planned information topic, or explicitly reproduce an old profile."""
+    profile = _scenario_profile(DEFAULT_SCENARIO_PROFILE if scenario_profile is None else scenario_profile)
+    arguments = dict(
+        task_type=task_type, seed=seed, sample_index=sample_index, state_scope=state_scope,
+        approval_status=approval_status, context_budget=context_budget,
+        history_length_tokens=history_length_tokens, horizon_turns=horizon_turns,
+        noise_memory_ratio=noise_memory_ratio, constraint_count=constraint_count,
+        state_update_count=state_update_count,
+    )
+    if profile != PROFILE:
+        if primary_topic is not None:
+            raise ValueError("primary_topic requires topic_balanced_v3")
+        return _generate_existing_scenario(
+            **arguments, scenario_profile=profile, token_counter=token_counter,
+            horizon_generation_mode=horizon_generation_mode, llm_source=llm_source,
+        )
+    from benchmark.topic_scenarios import build_topic_case
+
+    mode = _horizon_mode(DEFAULT_HORIZON_MODE if horizon_generation_mode is None else horizon_generation_mode)
+    topic = TOPICS[(seed + sample_index) % len(TOPICS)] if primary_topic is None else primary_topic
+    validate_topics([topic])
+    index = sample_index if topic_index is None else _integer("topic_index", topic_index)
+    variant_index = index if topic_variant_index is None else _integer("topic_variant_index", topic_variant_index)
+    # Build the old scaffold locally. Its placeholder text is discarded before
+    # any provider counter or natural-language source sees the new case.
+    prototype_arguments = dict(arguments, constraint_count=max(1, constraint_count))
+    prototype = _generate_existing_scenario(
+        **prototype_arguments, scenario_profile="balanced_v2", token_counter=provisional_token_count,
+        horizon_generation_mode=1,
+    )
+    case_prefix = f"{PROFILE}_{topic}_i{index}_v{variant_index}_"
+    prototype = json.loads(json.dumps(prototype).replace("balanced_v2_", case_prefix))
+    prototype["metadata"].update(
+        constraint_count=constraint_count, topic_variant_index=variant_index,
+        requested_state_scope=state_scope, requested_approval_status=approval_status,
+    )
+    rendered = build_topic_case(prototype, topic, index, token_counter)
+    return _finish_topic_scenario(rendered, token_counter, mode, llm_source)
+
+
 def _sequence(name: str, value: Any) -> list[Any]:
     if not isinstance(value, (list, tuple)) or not value:
         raise ValueError(f"{name} must be a non-empty list")
@@ -682,7 +919,7 @@ def _sequence(name: str, value: Any) -> list[Any]:
     return list(value)
 
 
-def scenario_coverage(scenarios: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def scenario_coverage(scenarios: Sequence[Mapping[str, Any]], *, topics: Sequence[str] = ()) -> dict[str, Any]:
     """Count actual opportunities, never expected ablation success differences."""
     n = len(scenarios)
     subtypes = Counter(
@@ -694,6 +931,11 @@ def scenario_coverage(scenarios: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     with_constraints = sum(bool(s["applicable_constraint_ids"]) for s in scenarios)
     with_states = sum(bool(s["required_state_ids"]) for s in scenarios)
     with_updates = sum(bool(s["temporal_version_required"]) for s in scenarios)
+    topic_counts = Counter(s["metadata"].get("primary_topic") for s in scenarios
+                           if s["metadata"].get("primary_topic") is not None)
+    for topic in topics:
+        topic_counts.setdefault(topic, 0)
+    flexible_count = sum(len(s.get("required_flexible_memory_ids", [])) for s in scenarios)
     return dict(
         n_scenarios=n, subtype_counts=dict(sorted(subtypes.items())),
         subtype_ratios={key: count / n for key, count in sorted(subtypes.items())} if n else {},
@@ -705,6 +947,11 @@ def scenario_coverage(scenarios: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         required_state_scenario_ratio=with_states / n if n else None,
         temporal_version_required_scenario_count=with_updates,
         temporal_version_required_scenario_ratio=with_updates / n if n else None,
+        topic_counts=dict(sorted(topic_counts.items())),
+        topic_ratios={key: value / n for key, value in sorted(topic_counts.items())} if n else {},
+        essential_flexible_memory_count=flexible_count,
+        essential_flexible_scenario_count=sum(bool(s.get("required_flexible_memory_ids")) for s in scenarios),
+        topic_control_scenario_count=sum(s["metadata"].get("topic_condition_active") is False for s in scenarios),
         interpretation="Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget.",
     )
 
@@ -739,6 +986,9 @@ def generate_dataset(
     seeds = _sequence("seeds", config.get("seeds"))
     for seed in seeds:
         _integer("seed", seed)
+    topics = validate_topics(dataset.get("topics", TOPICS)) if profile == PROFILE else ()
+    case_plan = {(case["seed"], case["sample_index"]): case
+                 for case in plan_cases(seeds, samples, tasks, topics)} if topics else {}
     if set(grid) != set(GRID_KEYS):
         raise ValueError(f"grid must contain exactly {GRID_KEYS}")
     axes = [_sequence(key, grid[key]) for key in GRID_KEYS]
@@ -767,7 +1017,12 @@ def generate_dataset(
         scenarios = []
         for seed_index, seed in enumerate(seeds):
             for index in range(samples):
-                if profile == "balanced_v2":
+                topic_options = {}
+                if profile == PROFILE:
+                    case = case_plan[(seed, index)]
+                    task_type, scope, approval_status = case["task_type"], case["state_scope"], case["approval_status"]
+                    topic_options = {key: case[key] for key in ("primary_topic", "topic_index", "topic_variant_index")}
+                elif profile == "balanced_v2":
                     # Continue across seeds instead of repeatedly giving the
                     # remainder to the first task/current/pending variant.
                     ordinal = seed_index * samples + index
@@ -793,6 +1048,7 @@ def generate_dataset(
                         horizon_generation_mode=mode,
                         scenario_profile=profile,
                         llm_source=llm_source,
+                        **topic_options,
                     )
                 scenario = copy.deepcopy(source_cache[source_key])
                 scenario["context_budget"] = parameters["context_token_budget"]
@@ -801,19 +1057,27 @@ def generate_dataset(
         identity = parameters if mode == 1 else dict(parameters, horizon_generation_mode=mode)
         if profile != "legacy_v1":
             identity = dict(identity, scenario_profile=profile)
+        if topics:
+            identity = dict(identity, topics=list(topics))
+            actual_counts = Counter(s["metadata"]["primary_topic"] for s in scenarios)
+            if max(actual_counts.get(topic, 0) for topic in topics) - min(actual_counts.get(topic, 0) for topic in topics) > 1:
+                raise RuntimeError("rendered topic counts differ from the balanced case plan")
         cell_id = "cell_" + hashlib.sha256(
             json.dumps(identity, sort_keys=True, allow_nan=False).encode()
         ).hexdigest()[:12]
         cells.append(dict(cell_id=cell_id, parameters=parameters, scenarios=scenarios,
-                          scenario_profile=profile, coverage=scenario_coverage(scenarios)))
+                          scenario_profile=profile, topics=list(topics), coverage=scenario_coverage(scenarios, topics=topics)))
     effective_config = copy.deepcopy(dict(config))
     effective_config["dataset"]["horizon_generation_mode"] = mode
     effective_config["dataset"]["scenario_profile"] = profile
+    if topics:
+        effective_config["dataset"]["topics"] = list(topics)
     return dict(
         schema_version="1.0", generator="benchmark.generator",
         config=effective_config, token_count_mode=token_count_mode(token_counter),
         horizon_generation_mode=mode,
         scenario_profile=profile,
+        topics=list(topics),
         description="Synthetic inputs and ground truth; not model performance measurements.",
         cells=cells,
     )
@@ -825,6 +1089,7 @@ def write_dataset(payload: Mapping[str, Any], output_directory: str | Path) -> d
     cell_records = []
     files = []
     seen = set()
+    topics = payload.get("topics", [])
     for cell in payload["cells"]:
         cell_id = cell["cell_id"]
         if (not isinstance(cell_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", cell_id)
@@ -837,12 +1102,12 @@ def write_dataset(payload: Mapping[str, Any], output_directory: str | Path) -> d
             token_count_mode=payload["token_count_mode"], parameters=cell["parameters"],
             scenarios=cell["scenarios"],
             horizon_generation_mode=payload["horizon_generation_mode"],
-            scenario_profile=payload["scenario_profile"], coverage=cell["coverage"],
+            scenario_profile=payload["scenario_profile"], topics=cell.get("topics", topics), coverage=cell["coverage"],
         )
         files.append((filename, json.dumps(record, ensure_ascii=False, indent=2, allow_nan=False) + "\n"))
         cell_records.append(dict(cell_id=cell_id, path=filename, parameters=cell["parameters"],
                                  n_scenarios=len(cell["scenarios"]), coverage=cell["coverage"],
-                                 scenario_profile=payload["scenario_profile"]))
+                                 scenario_profile=payload["scenario_profile"], topics=cell.get("topics", topics)))
     manifest = dict(
         schema_version=payload["schema_version"], generator=payload["generator"],
         config=payload["config"], token_count_mode=payload["token_count_mode"],
@@ -850,6 +1115,7 @@ def write_dataset(payload: Mapping[str, Any], output_directory: str | Path) -> d
         cells=cell_records,
         horizon_generation_mode=payload["horizon_generation_mode"],
         scenario_profile=payload["scenario_profile"],
+        topics=topics,
     )
     manifest_text = json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     # Validate/serialize everything before replacing any existing dataset file.
@@ -895,12 +1161,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="experiments/configs/smoke.json")
     parser.add_argument(
-        "--output", help="Default: benchmark/generated/<config name>_balanced_v2; modes 2-5 append "
+        "--output", help="Default: benchmark/generated/<config name>_topic_balanced_v3; modes 2-5 append "
                          "_horizon<N>; --archive adds .zip",
     )
     parser.add_argument("--archive", action="store_true", help="Write a deterministic .zip; extract before running")
     parser.add_argument("--scenario-profile", choices=SCENARIO_PROFILES,
-                        help="Scenario design, independent of horizon filler. Default: balanced_v2; legacy_v1 reproduces old inputs.")
+                        help="Scenario design, independent of horizon filler. Default: topic_balanced_v3; earlier profiles reproduce old inputs.")
     parser.add_argument(
         "--horizon-mode", type=int, choices=tuple(HORIZON_MODES),
         help="Select one filler method: 1=repeated, 2=offline random natural language, "

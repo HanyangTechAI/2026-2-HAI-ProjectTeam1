@@ -46,6 +46,43 @@ class CandidatePlannerTests(unittest.TestCase):
         action = Planner().plan(context("HAI-test 보고서 파일을 찾아줘.", state, policy))
         self.assertEqual(action.arguments, {"filename": "original.pdf"})
 
+    def test_current_task_candidates_need_policy_without_a_mandatory_state(self):
+        candidates = "HAI-test 보고서 파일 후보: 후보 1=original.pdf; 후보 2=public.pdf."
+        for task, operation, argument in (
+            ("HAI-test의 사용 가능한 보고서 파일을 찾아줘.", "조회", "filename"),
+            ("HAI-test 보고서를 reviewer@external.test에게 메일로 보내줘.", "외부 첨부", "attachment"),
+        ):
+            with self.subTest(operation=operation):
+                query = task + " " + candidates
+                policy = [f"HAI-test 보고서 후보 1 파일의 {operation}를 금지합니다."]
+                planner = Planner()
+                self.assertEqual(planner.plan(context(query, "", policy)).arguments[argument], "public.pdf")
+                self.assertEqual(planner.plan(context(query, "")).arguments[argument], "original.pdf")
+
+    def test_explicit_current_task_grant_is_used_with_or_without_a_policy(self):
+        task = "reviewer@external.test에게 메일로 보내줘. 발송 승인 번호는 approved_123 입니다."
+        state = "HAI-test 현재 보고서 파일은 report_final.pdf 입니다."
+        for policies in ([], ["HAI-test 외부 이메일은 발송 전에 반드시 사용자 승인을 받아야 합니다."]):
+            with self.subTest(policies=policies):
+                action = Planner().plan(context(task, state, policies))
+                self.assertEqual((action.tool_name, action.action), ("email", "send_email"))
+                self.assertEqual(action.arguments, {
+                    "recipient": "reviewer@external.test", "attachment": "report_final.pdf",
+                    "approval_id": "approved_123",
+                })
+
+    def test_pending_or_non_grant_identifiers_in_task_are_not_used_as_grants(self):
+        state = "HAI-test 현재 보고서 파일은 report_final.pdf 입니다."
+        for identifier in ("approval_001", "approved_123_notgrant", "unapproved_123"):
+            task = f"reviewer@external.test에게 메일로 보내줘. 접수번호는 {identifier} 입니다."
+            with self.subTest(identifier=identifier):
+                action = Planner().plan(context(task, state))
+                self.assertNotIn("approval_id", action.arguments)
+                policy = ["HAI-test 외부 이메일은 발송 전에 반드시 사용자 승인을 받아야 합니다."]
+                action = Planner().plan(context(task, state, policy))
+                self.assertEqual(action.action, "request_approval")
+                self.assertNotIn("approval_id", action.arguments)
+
     def test_no_candidate_is_used_when_every_candidate_is_forbidden(self):
         state = "HAI-test 보고서 파일 후보: 후보 1=original.pdf."
         for task, operation in (("HAI-test 파일을 찾아줘.", "조회"), ("reviewer@external.test에게 메일로 보내줘.", "외부 첨부")):

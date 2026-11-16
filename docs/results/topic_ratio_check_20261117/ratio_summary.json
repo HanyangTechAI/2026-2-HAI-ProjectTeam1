@@ -1,0 +1,113 @@
+{
+  "purpose": "offline_topic_ratio_inspection",
+  "generated_date": "2026-11-17",
+  "scenario_profile": "topic_balanced_v3",
+  "freeze_version": "1.0.6",
+  "token_count_mode": "provisional",
+  "horizon_generation_mode": 1,
+  "context_token_budget": 2048,
+  "history_length_tokens": 25000,
+  "horizon_turns": 100,
+  "noise_memory_ratio": 0.5,
+  "constraint_count": 3,
+  "state_update_count": 2,
+  "n_unique_scenarios": 40,
+  "topic_counts": {
+    "state": 10,
+    "flexible": 10,
+    "constraint": 10,
+    "temporal": 10
+  },
+  "per_topic": {
+    "constraint": {
+      "count": 10,
+      "ratio": 0.25,
+      "task_families": {
+        "file": 5,
+        "email": 5
+      }
+    },
+    "temporal": {
+      "count": 10,
+      "ratio": 0.25,
+      "task_families": {
+        "file": 5,
+        "email": 5
+      }
+    },
+    "state": {
+      "count": 10,
+      "ratio": 0.25,
+      "task_families": {
+        "file": 5,
+        "email": 5
+      }
+    },
+    "flexible": {
+      "count": 10,
+      "ratio": 0.25,
+      "task_families": {
+        "file": 5,
+        "email": 5
+      }
+    }
+  },
+  "seed_counts": {
+    "42": 20,
+    "43": 20
+  },
+  "coverage": {
+    "n_scenarios": 40,
+    "subtype_counts": {
+      "approval/granted": 2,
+      "approval/not_required": 15,
+      "approval/pending": 3,
+      "temporal_update/current": 18,
+      "temporal_update/historical": 2
+    },
+    "subtype_ratios": {
+      "approval/granted": 0.05,
+      "approval/not_required": 0.375,
+      "approval/pending": 0.075,
+      "temporal_update/current": 0.45,
+      "temporal_update/historical": 0.05
+    },
+    "stored_constraint_count": 30,
+    "applicable_constraint_count": 30,
+    "applicable_fraction_of_stored_constraints": 1.0,
+    "constraint_applicable_scenario_count": 10,
+    "constraint_applicable_scenario_ratio": 0.25,
+    "required_state_scenario_count": 20,
+    "required_state_scenario_ratio": 0.5,
+    "temporal_version_required_scenario_count": 10,
+    "temporal_version_required_scenario_ratio": 0.25,
+    "topic_counts": {
+      "constraint": 10,
+      "flexible": 10,
+      "state": 10,
+      "temporal": 10
+    },
+    "topic_ratios": {
+      "constraint": 0.25,
+      "flexible": 0.25,
+      "state": 0.25,
+      "temporal": 0.25
+    },
+    "essential_flexible_memory_count": 10,
+    "essential_flexible_scenario_count": 10,
+    "topic_control_scenario_count": 0,
+    "interpretation": "Coverage of supplied ground truth, not measured ablation effects; packing depends on effective budget."
+  },
+  "validation": {
+    "unique_ids": true,
+    "topic_counts_balanced": true,
+    "required_memory_roles_valid": true,
+    "ground_truth_consistency_cases": 40
+  },
+  "llm_experiment_executed": false,
+  "limitations": [
+    "Token counts are provisional whitespace counts; regenerate with Gemini CountTokens before model experiments.",
+    "Topic quotas do not specify ablation success rates.",
+    "Temporal cases also require STATE, so required_state_scenario_count overlaps two primary topics."
+  ]
+}
