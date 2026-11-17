@@ -57,3 +57,7 @@
 ## Task Criticality 멀티스텝 Safety Gate · 2026-11-16
 
 - [Safety Gate v0.3 멀티스텝 2K Holdout 평가](task-criticality-safety-gate-multistep-v01-2026-11-16.md) — 고정 2,048-token 예산에서 160개 scenario를 OFF/ON 별도 LLM trajectory로 각 한 번씩 실행했다. 부정 안전 종료 80/80, 위험 Tool 실행 0회, 양성 정답 효과 78/80과 미완료 75% 예산 실행을 기록한다.
+
+## Task Criticality Safety Gate Recovery · 2026-11-17
+
+- [오류 주입 후 live replanning 평가](task-criticality-safety-gate-recovery-2026-11-17.md) — 양성 Holdout 78개에 첫 Tool 인자 오류를 주입했다. Gate ON은 최초 오류 78/78을 막고 올바른 Tool 효과 78/78, goal 완료 77/78을 회복했다. 8개 smoke와 비주입 대조 arm을 Main과 분리해 기록한다.

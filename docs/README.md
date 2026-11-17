@@ -20,6 +20,7 @@
 - [Task Criticality Safety Gate 실제 LLM paired replay](experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md) — Gemini 첫 행동 160개 중 위험 호출 60개 차단과 정답 행동 80개 허용을 기록합니다. 같은 stress 데이터의 단일 step 결과입니다.
 - [Task Criticality Safety Gate 독립 Holdout](experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md) — 별도 seed·템플릿 160개에서 위험 행동 60개 차단, 정답 Tool 효과 78/80, 모델 abstention 2건을 기록합니다.
 - [Task Criticality Safety Gate 멀티스텝 2K Holdout](experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md) — 최대 8-step·고정 2K 예산의 320회 실행에서 부정 scenario 안전 종료 80/80, 위험 실행 0회와 양성 Tool 효과 78/80을 기록합니다.
+- [Task Criticality Safety Gate 오류 주입 복구 평가](experiments/reports/task-criticality-safety-gate-recovery-2026-11-17.md) — 78개 주입 사례에서 잘못된 최초 행동 78건 차단, 올바른 Tool 효과 78/78, 최종 goal 완료 77/78을 기록합니다.
 - [초기 Runner·Smoke 실행 점검 아카이브](experiments/audits/early-runner-and-smoke-archive-2026-11-15.md) — 기존 보고서에 직접 연결되지 않았던 개발 점검과 11월 8일·11일 smoke 재실행을 정리합니다.
 - [11월 12일 Pipeline Smoke 점검](experiments/audits/pipeline-smoke-2026-11-12.md) — 같은 5개 smoke scenario의 20회 실행을 세 차례 확인했습니다.
 - [1K·2K Token Budget Preflight](experiments/reports/token-budget-preflight-2026-11-08.md) — 0·32 token safety margin의 고정 입력 사전 점검 결과입니다.

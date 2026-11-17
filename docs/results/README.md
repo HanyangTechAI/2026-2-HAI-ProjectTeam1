@@ -12,6 +12,8 @@
 - [Task Criticality Safety Gate 실제 LLM 결과 · 2026-11-15](../experiments/reports/task-criticality-safety-gate-llm-v03-2026-11-15.md) — Gemini proposal 160개를 Gate OFF/ON으로 replay; 원본 proposal·CSV·validation은 `experiments/results/criticality_llm_v03_main/`, smoke 8개는 `experiments/results/criticality_llm_v03_smoke/`에 있다.
 - [Task Criticality Safety Gate 독립 Holdout · 2026-11-15](../experiments/reports/task-criticality-safety-gate-holdout-v1-2026-11-15.md) — 별도 seed·템플릿 160개 LLM 결과; 원본은 `benchmark/generated/task_criticality_holdout_v1/`, `experiments/results/criticality_holdout_v1/`에 있고 8개 smoke도 각각 `_smoke_v1/` 경로에 있다.
 - [Task Criticality Safety Gate 멀티스텝 2K Holdout · 2026-11-16](../experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md) — 160개 scenario, 320개 최대 8-step 실행; 원본은 `experiments/results/criticality_multistep_2k_full_v01/`, 2K smoke는 `criticality_multistep_2k_smoke_v01/`에 있다. 75% budget의 미완료 실행과 smoke는 보고서에서 분리한다.
+- [Task Criticality Safety Gate 오류 주입 복구 · 2026-11-17](../experiments/reports/task-criticality-safety-gate-recovery-2026-11-17.md) — 오류 주입 후 재계획 236 runs; 원본 proposal·runs·summary·manifest는 `experiments/results/criticality_recovery_full_v1/`, smoke는 `criticality_recovery_smoke_v1/`에 있다.
+- [topic_balanced_v3 비율 점검 입력 · 2026-11-17](topic_ratio_check_20261117/README.md) — 주제별 10개씩인 40개 생성 입력과 구성 요약이다. provisional token count를 이용한 생성 QA이며 LLM 성능 실험은 아니다.
 - [초기 Runner·Smoke 실행 점검 · 2026-11-15](../experiments/audits/early-runner-and-smoke-archive-2026-11-15.md) — 과거 runner fixture 결과와 동일한 5개 입력의 2K smoke 재실행을 요약한다.
 
 각 실험의 JSON 및 그림 파일은 실행·분석 코드에서 경로로 참조하므로 현재 하위 폴더 이름을 유지합니다.

@@ -519,6 +519,7 @@ class Orchestrator:
                 continue
             
             if acted.stopped_reason == "tool_called":
+                rejected_steps = 0
                 unresolved_rejection = False
             
             if acted.interactions:
@@ -535,15 +536,8 @@ class Orchestrator:
                 )
                 
             if acted.stopped_reason == "completed":
-                if unresolved_rejection:
-                    return finish(
-                        status=PipelineStatus.OK,
-                        reason="gate_abstained",
-                        completed=False,
-                    )
-                
                 completed = False
-                
+
                 if self.goal_checker is not None:
                     completed = bool(
                         self.goal_checker(
@@ -552,11 +546,25 @@ class Orchestrator:
                             tuple(tool_results),
                         )
                     )
-                    
+
+                if completed:
+                    return finish(
+                        status=PipelineStatus.OK,
+                        reason="completed",
+                        completed=True,
+                    )
+
+                if unresolved_rejection:
+                    return finish(
+                        status=PipelineStatus.OK,
+                        reason="gate_abstained",
+                        completed=False,
+                    )
+
                 return finish(
                     status=PipelineStatus.OK,
                     reason="completed",
-                    completed=completed,
+                    completed=False,
                 )
                 
             if acted.stopped_reason == "tool_failure":

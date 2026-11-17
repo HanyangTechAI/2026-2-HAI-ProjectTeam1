@@ -137,3 +137,9 @@ result = pack_task_criticality(
 [2026-11-16 멀티스텝 평가](../experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)는 같은 독립 Holdout 160개를 Gate OFF/ON 별도 LLM trajectory로 실행했다. 고정 입력 예산 2,048 tokens, 최대 8 steps, Gate action rejection 최대 2회로 320 runs를 완료했다. Gate ON은 부정 scenario 안전 종료 80/80과 위험 Tool 실행 0회를 기록했고, 양성 정답 Tool 효과는 양 arm 모두 78/80이었다. 61개 run은 gate_abstained로 끝났다.
 
 이번 runner는 동일 proposal을 재생한 paired-action 실험이 아니다. Gate 차단 후 재계획이 가능하므로 실제 다중 step 제어 동작을 관찰하지만, OFF/ON의 별도 생성 trajectory와 1회 반복 때문에 목표 완료율 차이는 인과 효과가 아니다. 모든 File·Email 실행은 mock Tool이며 운영 환경 안전성 검증으로 확장하지 않는다. 75% 초기 Context budget으로 실행한 부분 Main은 summary가 없어 최종 집계에서 제외했다.
+
+### 오류 주입 후 재계획
+
+[2026-11-17 recovery 평가](../experiments/reports/task-criticality-safety-gate-recovery-2026-11-17.md)는 양성 Holdout의 정답 최초 Tool proposal을 공유한 뒤 인자를 결정적으로 변형한 fault_on/fault_off arm을 비교했다. 최초 proposal이 정답이었던 78개에서 Gate는 변형 action 78/78을 차단했고 live Gemini 재계획으로 올바른 mock Tool 효과 78/78, 최종 goal 77/78을 회복했다. Gate를 끈 동일 fault arm에서는 효과와 goal 완료가 각각 38/78이었다.
+
+이 결과는 특정 synthetic 인자 오류에 대한 controlled recovery다. 오류 발생률, 부정 intent의 오차단, 실제 외부 Tool 부작용이나 일반적인 안전 보장은 측정하지 않았다. 원래 정답이 아닌 최초 proposal 2개는 오류 주입 비교에서 제외했다.

@@ -17,6 +17,7 @@ Main의 독립 시나리오 40개에서는 각 주제를 10개씩 생성한다. 
 정답 근거를 포함하도록 생성한다. `constraint_count=0` 또는 `state_update_count=0`의
 명시적 대조 조건에서는 실제 제약·버전 경쟁이 없는 것을 그대로 집계한다.
 생성 비율은 입력 계획이며 실제 LLM 성공률·실패율을 미리 정하지 않는다.
+2026-11-17 생성 QA에서는 독립 scenario 40개의 네 주제를 각각 10개씩 확인했다. 이 입력 구성 점검은 [topic ratio archive](../results/topic_ratio_check_20261117/README.md)에 있고, token count는 provisional이라 실제 모델 실험을 대체하지 않는다.
 
 ```powershell
 python -m benchmark.generator --config experiments/configs/smoke.json --scenario-profile topic_balanced_v3

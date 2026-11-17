@@ -1360,3 +1360,11 @@ seed 1000–1019 및 holdout 전용 질의·근거 템플릿을 사용한 160개
 Gate OFF/ON의 양성 정답 Tool 효과는 각각 78/80이었다. 부정 scenario 안전 종료는 OFF 20/80, ON 80/80이고 위험 Tool 실행은 OFF 80회, ON 0회였다. ON에서 action 차단은 103건, gate_abstained 종료는 61 runs다. 전체 goal_completed는 OFF 78/160, ON 77/160이지만 arm별 새 trajectory를 생성했으므로 이를 Gate의 인과 효과로 해석하지 않는다. 평가는 synthetic holdout과 mock Tool에 한정되며 일반 환경 안전 보장이 아니다.
 
 75% 초기 Context budget smoke 두 건은 각각 8 scenario에서 동일한 관측을 보였지만 16 runs 중 5건에서 context budget/config 상태가 비정상이었다. 같은 budget의 전체 실행은 84/160 scenario pair 로그만 남고 summary.json이 없어 최종 결과에서 제외했다. 별도 2K smoke는 Main과 합산하지 않았다. 세부 결과, 사용량, 해시와 재현 명령은 [멀티스텝 보고서](../reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)에 기록했다.
+
+## 34. Task Criticality Safety Gate 오류 주입 후 재계획 (2026-11-17)
+
+Freeze 1.0.6 및 고정 2,048-token budget으로 seed 1500–1519의 양성 file lookup·approved email Holdout 80개를 대상으로 실행했다. 최초 Gemini proposal은 arm 간 공유했고, 정답 proposal 78개에 첫 Tool 인자 오류를 결정적으로 주입했다. clean_on은 오류 없는 Gate ON 대조, fault_off는 변형 proposal을 Gate 없이 실행, fault_on은 Gate로 차단한 뒤 새 Gemini action을 생성했다. 총 236 runs이며 두 부적합 최초 제안은 fault arm에서 제외했다.
+
+fault_on은 최초 변형 action을 78/78 차단하고 올바른 mock Tool 효과 78/78, 최종 goal 77/78을 회복했다. fault_off의 올바른 효과와 goal 완료는 각각 38/78이었다. clean_on은 정답 효과 78/80, goal 완료 77/80이었다. Main status는 236/236 ok, 실제 prompt 최댓값은 1,257/2,048 tokens, budget stop은 0건이다. 이는 결정적 오류 주입과 양성 synthetic holdout에 대한 recovery 결과로, 자연 발생 오류 분포, 부정 요청의 안전성 또는 실환경 Tool 부작용을 검증하지 않는다.
+
+같은 프로토콜의 smoke는 8 scenario, 24 runs에서 fault_on 오류 차단 8/8, Tool 효과 회복 8/8, final goal 7/8을 보였으며 Main 집계에는 합산하지 않았다. 세부 실행 설정, bootstrap 구간, 사용량, 데이터 hash와 재현 명령은 [오류 주입 복구 보고서](../reports/task-criticality-safety-gate-recovery-2026-11-17.md)에 기록했다.

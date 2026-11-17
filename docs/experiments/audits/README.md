@@ -1,5 +1,9 @@
 ﻿# 검증 및 감사 자료
 
+## 2026-11-17
+
+- [topic_balanced_v3 주제 비율 입력 점검](../../results/topic_ratio_check_20261117/README.md) — 40개 생성 scenario에서 네 주제를 10개씩 확인한 데이터 구성 점검이다. provisional token count를 사용했으며 LLM 성능 실행은 포함하지 않는다.
+
 ## 2026-11-15
 
 - [초기 Runner·Smoke 실행 점검 아카이브](early-runner-and-smoke-archive-2026-11-15.md) — 직접 연결되지 않았던 개발용 Runner 자료와 11월 8일·11일 2K smoke 기록을 성능 실험과 구분해 정리한다.

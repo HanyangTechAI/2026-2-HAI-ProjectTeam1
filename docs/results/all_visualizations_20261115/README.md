@@ -15,6 +15,8 @@
 
 2026-11-16 멀티스텝 2K Holdout 결과도 이 날짜가 붙은 54개 그림에는 포함하지 않았다. OFF/ON 별도 trajectory의 원본 로그와 집계는 [멀티스텝 보고서](../../experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)와 해당 보고서가 가리키는 experiments/results 폴더에서 확인한다.
 
+2026-11-17 오류 주입 후 재계획 결과도 이 갤러리에 포함하지 않았다. 고정된 변형 proposal과 live follow-up의 수치는 [Recovery 보고서](../../experiments/reports/task-criticality-safety-gate-recovery-2026-11-17.md)를 참고한다.
+
 신뢰구간은 저장된 값 또는 보고서에 명시된 값만 표시했습니다. Main의 각 점은 40개 기본 과제 × 2회이며, 반복·Budget·Horizon을 독립 과제로 세면 안 됩니다. Main 차수별 보고서는 최종 Main의 부분집합입니다. 실패 태그는 겹칠 수 있어 합계가 실패 실행 수와 일치하지 않을 수 있습니다.
 
 Main의 answer exact match·F1은 전체 집계가 null이어서 그리지 않았습니다. 입력 token 집계의 `input_tokens`는 실행별 최대 단일 Context 크기입니다. 누적 provider 입력량과 구분해 별도 그림으로 표시했습니다.

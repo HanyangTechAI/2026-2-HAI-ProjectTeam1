@@ -331,9 +331,11 @@ Freeze 1.0.4 결과와 1.0.5 재실행을 기록했다.
 
 2026-11-16에는 같은 독립 Holdout에서 최대 8-step Safety Gate 평가를 완료했다. 2,048-token 고정 예산으로 160개 scenario의 OFF/ON 별도 LLM trajectory 320회를 실행했다. Gate ON은 부정 scenario 80/80을 안전하게 종료하고 위험 Tool 실행을 0회로 줄였으며, 양성 Tool 효과는 OFF/ON 모두 78/80이었다. 각 arm이 별도 trajectory를 생성하므로 목표 완료율의 작은 차이를 Gate의 인과 효과로 해석하지 않는다. 모의 Tool 평가와 budget·사용량 audit을 포함한 [멀티스텝 결과 보고서](docs/experiments/reports/task-criticality-safety-gate-multistep-v01-2026-11-16.md)를 참고한다.
 
+2026-11-17에는 양성 Holdout에 첫 Tool 인자 오류를 주입해 Safety Gate 차단 후 live replanning을 점검했다. Gate ON은 정답 최초 제안이었던 78개에서 변형 행동을 전부 차단하고 후속 올바른 Tool 효과 78/78, goal 완료 77/78을 기록했다. 동일 오류를 Gate 없이 실행한 arm은 38/78에서 올바른 Tool 효과를 냈다. 이 시험은 synthetic 오류 주입과 mock Tool 평가이며, 세부 분모·비용·한계는 [오류 주입 후 복구 보고서](docs/experiments/reports/task-criticality-safety-gate-recovery-2026-11-17.md)에 기록했다.
+
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 파일 조회와 이메일 행동을 생성한다. 표준 생성 profile은 Freeze 1.0.6의 `topic_balanced_v3`다. 제약·시간·상태·Flexible 근거 주제를 먼저 배정해 Main의 독립 시나리오 40개에서는 주제별 10개씩 생성한다. 다른 표본 수에서도 주제별 개수 차이는 최대 1개다. 각 주제에는 실제 정답에 필요한 정보와 경쟁 조건을 넣으며 실제 LLM ablation 성공률은 별도로 측정한다.
 
-Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. Horizon 채움은 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 기존 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)는 이전 profile의 생성물로 보존한다. 새 profile은 Gemini counter로 새 경로에 생성·측정해야 한다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
+Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. 11월 17일 40개 입력의 주제 비율 사전 점검은 [topic ratio 결과 아카이브](docs/results/topic_ratio_check_20261117/README.md)에 기록했다. Horizon 채움은 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 기존 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)는 이전 profile의 생성물로 보존한다. 새 profile은 Gemini counter로 새 경로에 생성·측정해야 한다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
 `memory/retrieval.py`는 embedder 출력 검증, 코사인 유사도, 점수 내림차순·`memory_id` 오름차순 동률 정렬과 Top-K 검색을 공통 제공한다. Vector Top-k와 Utility-per-Token Baseline 및 `selector.retrieve_candidates()`가 이 구현을 공유한다. General Retrieval은 현재 Session과 `current_turn`을 기준으로 후보를 제한하고, 별도 Protected 경로에서 처리할 활성·보호 Constraint를 일반 후보에서 제외한다.
 
