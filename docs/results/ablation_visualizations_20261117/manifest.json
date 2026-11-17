@@ -1,0 +1,161 @@
+{
+  "generated_on": "2026-11-17",
+  "experiment_date": "2026-11-11",
+  "engine": "matplotlib",
+  "scope": "Archived memory component ablation, 2K/4K H100; independent temporal-only rerun separated",
+  "source_commit": "2f5e6bc599ade6ba4286a7f3513fd2603de9e450",
+  "chart_count": 7,
+  "charts": [
+    {
+      "id": "ablation_01_task_success",
+      "title": "Ablation: task success at 2K and 4K",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; Gemini 3.1 Flash-Lite; horizon=100 turns. 40 base tasks x 2 repeats per condition; repeats are not independent tasks. Legacy v1.0.3 no_temporal removes BOTH temporal resolution and mandatory state. Error bars: reported sample-cluster bootstrap 95% CI. Matched 2K/4K outcomes are identical; do not pool as independent tasks. A zero-width empirical CI does not imply zero population uncertainty.",
+      "svg": "svg/ablation_01_task_success.svg",
+      "preview": "previews/ablation_01_task_success.png",
+      "data": "data/ablation_01_task_success.csv",
+      "plotted_rows": 10,
+      "title_ko": "작업 성공률",
+      "description_ko": "2K와 4K에서 Full과 네 제거 조건을 비교합니다. 두 예산의 400개 대응 실행은 같은 결과였으며, v1.0.3의 No temporal은 필수 상태 보존도 함께 제거했습니다."
+    },
+    {
+      "id": "ablation_02_memory_and_behavior",
+      "title": "Ablation: memory preservation and behavior reliability",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; Gemini 3.1 Flash-Lite; horizon=100 turns. 40 base tasks x 2 repeats per condition; repeats are not independent tasks. Legacy v1.0.3 no_temporal removes BOTH temporal resolution and mandatory state. 2K means and saved 95% CI; 4K means match. Context correctness and action correctness are distinct. All action-level constraint violations are 0/40; this does not guarantee perfect memory retention.",
+      "svg": "svg/ablation_02_memory_and_behavior.svg",
+      "preview": "previews/ablation_02_memory_and_behavior.png",
+      "data": "data/ablation_02_memory_and_behavior.csv",
+      "plotted_rows": 20,
+      "title_ko": "기억 보존과 행동 신뢰성",
+      "description_ko": "보호 기억 회수, 시간 문맥 정확성, 실제 상태 사용, 오래된 상태 사용을 나눠 보여줍니다. 성공률이 높아도 보호 기억 보존이 낮아질 수 있습니다."
+    },
+    {
+      "id": "ablation_03_paired_success_difference",
+      "title": "Ablation: paired success differences and 95% CI",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/deltas.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; Gemini 3.1 Flash-Lite; horizon=100 turns. 40 base tasks x 2 repeats per condition; repeats are not independent tasks. Legacy v1.0.3 no_temporal removes BOTH temporal resolution and mandatory state. 2K: 80 sample/repeat pairs, clustered by 40 base tasks; 2,000 bootstrap resamples, seed 42. All intervals touch or include zero; no multiplicity adjustment or equivalence test.",
+      "svg": "svg/ablation_03_paired_success_difference.svg",
+      "preview": "previews/ablation_03_paired_success_difference.png",
+      "data": "data/ablation_03_paired_success_difference.csv",
+      "plotted_rows": 4,
+      "title_ko": "Full 대비 성공률 차이",
+      "description_ko": "같은 과제와 반복을 맞춘 Full − 제거 조건의 차이입니다. 저장된 짝지은 신뢰구간이 모두 0에 닿거나 포함하므로 확정적 우위나 동등성으로 해석하지 않습니다."
+    },
+    {
+      "id": "ablation_04_token_usage",
+      "title": "Ablation: peak input and cumulative output tokens",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; Gemini 3.1 Flash-Lite; horizon=100 turns. 40 base tasks x 2 repeats per condition; repeats are not independent tasks. Legacy v1.0.3 no_temporal removes BOTH temporal resolution and mandatory state. Saved 2K means and 95% CI; 4K means match. Input is a per-run maximum single context, not cumulative provider prompt usage. Output is cumulative across all calls in a run.",
+      "svg": "svg/ablation_04_token_usage.svg",
+      "preview": "previews/ablation_04_token_usage.png",
+      "data": "data/ablation_04_token_usage.csv",
+      "plotted_rows": 10,
+      "title_ko": "입력과 출력 토큰",
+      "description_ko": "왼쪽 입력은 실행별 최대 단일 Context의 평균이고, 오른쪽 출력은 실행 전체 누적 출력의 평균입니다. 입력 곡선을 여러 호출의 누적 입력량으로 읽으면 안 됩니다."
+    },
+    {
+      "id": "ablation_05_cost_and_latency",
+      "title": "Ablation: estimated generation cost and recorded latency",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; Gemini 3.1 Flash-Lite; horizon=100 turns. 40 base tasks x 2 repeats per condition; repeats are not independent tasks. Legacy v1.0.3 no_temporal removes BOTH temporal resolution and mandatory state. Cost bars use saved 95% CI scaled to 1,000 runs; this is a rate, not an actual 1,000-run experiment or total bill. Latency bars have no invented CI; OS and commit differ, so differences are not a causal budget effect.",
+      "svg": "svg/ablation_05_cost_and_latency.svg",
+      "preview": "previews/ablation_05_cost_and_latency.png",
+      "data": "data/ablation_05_cost_and_latency.csv",
+      "plotted_rows": 15,
+      "title_ko": "추정 비용과 지연 시간",
+      "description_ko": "실행당 생성 비용과 두 실행 환경에서의 지연 시간을 비교합니다. 2K와 4K의 OS·commit이 달라 지연 차이를 예산 효과로 해석하지 않습니다."
+    },
+    {
+      "id": "ablation_06_retrieval_and_failures",
+      "title": "Ablation: retrieval and overlapping failure diagnostics",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; Gemini 3.1 Flash-Lite; horizon=100 turns. 40 base tasks x 2 repeats per condition; repeats are not independent tasks. Legacy v1.0.3 no_temporal removes BOTH temporal resolution and mandatory state. 2K means; 4K means match. Recall/precision/MRR are multiplied by 100. Constraint violations use n=40; remaining shown diagnostics use n=80. Failure metrics overlap and must not be summed. Cells are vector shapes.",
+      "svg": "svg/ablation_06_retrieval_and_failures.svg",
+      "preview": "previews/ablation_06_retrieval_and_failures.png",
+      "data": "data/ablation_06_retrieval_and_failures.csv",
+      "plotted_rows": 45,
+      "title_ko": "검색 성능과 실패 진단",
+      "description_ko": "초기 검색 점수와 선택·상태·제약 실패를 함께 비교합니다. 실패 지표는 서로 겹칠 수 있으며, 적용 분모는 CSV에 기록했습니다."
+    },
+    {
+      "id": "ablation_07_temporal_only_rerun",
+      "title": "Temporal ablation: corrected mandatory-state-preserving rerun",
+      "category": "ablation",
+      "sources": [
+        "docs/results/ablation_2k_h100_20261111/summary.json",
+        "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md",
+        "docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md"
+      ],
+      "note": "Experiment: 11 Nov 2026; 2K/H100. Success bars: saved/reported cluster-bootstrap 95% CI; no stale-use CI was reported for corrected rerun. 80/80 legacy/corrected outcome pairs and selected ID sets match. Corrected vs historical Full: +7.5 pp, 95% CI [-2.5,+17.5]; not a concurrent rerun of all variants.",
+      "svg": "svg/ablation_07_temporal_only_rerun.svg",
+      "preview": "previews/ablation_07_temporal_only_rerun.png",
+      "data": "data/ablation_07_temporal_only_rerun.csv",
+      "plotted_rows": 3,
+      "title_ko": "Temporal 단독 제거 재실행",
+      "description_ko": "필수 상태 보존을 복구한 v1.0.4의 Temporal 단독 제거 결과를 기존 조건과 구분합니다. 수정 전후 80쌍의 성공 판정과 최종 선택 기억 집합은 같았지만, 일반적인 기능 불필요성을 입증한 결과는 아닙니다."
+    }
+  ],
+  "sources": [
+    {
+      "path": "docs/experiments/reports/ablation-2k-h100-2026-11-11.md",
+      "sha256": "12c74a6bdec34ef5cdc4c33265c169c99e6589cd00969116c43b1ffa52a17c05"
+    },
+    {
+      "path": "docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md",
+      "sha256": "d14e71b707ac269e77acfc2f26509a671f49578750a90b73262d8f03e75b6bcb"
+    },
+    {
+      "path": "docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md",
+      "sha256": "e425e60253134a0f20829b2ded5ad3265100e8c6db68e0a1331e3d2d4d0eb063"
+    },
+    {
+      "path": "docs/results/ablation_2k_h100_20261111/deltas.json",
+      "sha256": "ffdfee63d0b7fd6aac7c54c01cc5fe7de0c6cb278e5e78b475cf2ad147e6cbb4"
+    },
+    {
+      "path": "docs/results/ablation_2k_h100_20261111/summary.json",
+      "sha256": "bf257bb1afefa3e35f9cb6bcb9357874b7cbddbec00a6a2dc74be8068ed54389"
+    },
+    {
+      "path": "docs/results/ablation_2k_h100_20261111/validation.json",
+      "sha256": "3222838058321eaaf95ec614e27251ddfa17657e161c3dca04f2a978e08bb711"
+    }
+  ],
+  "limitations": [
+    "Current freeze 1.0.6 and topic_balanced_v3 config are not the experiment configuration.",
+    "11 Nov ablation results are separate from 17 Nov safety-gate recovery and input-generation QA.",
+    "The v1.0.3 temporal ablation removes two components; v1.0.4 temporal-only rerun is separate.",
+    "4K values come from the published comparison report; 2K values from canonical checked-in aggregates.",
+    "Existing confidence intervals are preserved. No raw runs or new confidence intervals were reconstructed.",
+    "No experiments or model calls were made. 40 shared base tasks, not 800 independent tasks."
+  ]
+}

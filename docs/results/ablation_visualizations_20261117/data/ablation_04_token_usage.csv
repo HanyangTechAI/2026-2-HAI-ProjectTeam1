@@ -1,0 +1,11 @@
+﻿strategy,metric,mean,ci95_low,ci95_high,n,n_samples,display_factor,budget,freeze,origin
+proposed,input_tokens,1469.975,1445.275,1493.775,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_constraint_preservation,input_tokens,1473.95,1453.625,1494.425,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_temporal,input_tokens,1633.325,1573.7,1688.25,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_state_mandatory,input_tokens,1469.975,1445.525,1492.625,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_budget_aware_packing,input_tokens,1470.025,1445.625,1493.775,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed,output_tokens,558.575,503.475,615.8,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_constraint_preservation,output_tokens,549.05,499.525,599.7,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_temporal,output_tokens,808.175,708.75,922.675,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_state_mandatory,output_tokens,558.575,505.425,613.825,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_budget_aware_packing,output_tokens,552.7,500.7,609.55,80,40,1,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json

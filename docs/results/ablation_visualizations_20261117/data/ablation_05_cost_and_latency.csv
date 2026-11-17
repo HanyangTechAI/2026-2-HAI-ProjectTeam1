@@ -1,0 +1,16 @@
+﻿strategy,metric,mean,ci95_low,ci95_high,n,n_samples,display_factor,budget,freeze,origin
+proposed,total_llm_cost,0.0015626250000000002,0.001465125,0.001665975,80,40,1000,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_constraint_preservation,total_llm_cost,0.0015667437499999998,0.0014724375,0.00167956875,80,40,1000,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_temporal,total_llm_cost,0.00207000625,0.00187869375,0.0022791625,80,40,1000,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_state_mandatory,total_llm_cost,0.0015626250000000002,0.0014684625,0.0016690187500000002,80,40,1000,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_budget_aware_packing,total_llm_cost,0.001553825,0.00146485625,0.00165875625,80,40,1000,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed,planning_latency_ms,3378.6378234421136,3165.693403025216,3598.5078427227563,80,40,0.001,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_constraint_preservation,planning_latency_ms,3270.7845181954326,3132.805000405642,3428.624356702494,80,40,0.001,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_temporal,planning_latency_ms,3989.9804473971017,3611.9983821568894,4425.752800966438,80,40,0.001,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_state_mandatory,planning_latency_ms,3272.0304015412694,3076.0564849202638,3484.845177049283,80,40,0.001,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed/no_budget_aware_packing,planning_latency_ms,3316.1471484272624,3080.957834875153,3576.8850020351238,80,40,0.001,2048,1.0.3,docs/results/ablation_2k_h100_20261111/summary.json
+proposed,planning_latency_ms,4260.1,,,80,40,0.001,4096,1.0.3,docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md
+proposed/no_constraint_preservation,planning_latency_ms,4337.7,,,80,40,0.001,4096,1.0.3,docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md
+proposed/no_temporal,planning_latency_ms,4810.6,,,80,40,0.001,4096,1.0.3,docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md
+proposed/no_state_mandatory,planning_latency_ms,4240.700000000001,,,80,40,0.001,4096,1.0.3,docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md
+proposed/no_budget_aware_packing,planning_latency_ms,4283.400000000001,,,80,40,0.001,4096,1.0.3,docs/experiments/reports/ablation-2k-h100-analysis-2026-11-11.md

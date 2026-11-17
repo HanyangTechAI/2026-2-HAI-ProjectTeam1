@@ -1,0 +1,4 @@
+﻿condition,freeze,temporal_resolution,mandatory_state,task_success_pct,success_n,success_ci95_low,success_ci95_high,stale_usage_pct,stale_count,stale_n,origin
+Full v1.0.3; Temporal ON; Mandatory ON,1.0.3,True,True,97.5,80,92.5,100.0,0,0,60,docs/results/ablation_2k_h100_20261111/summary.json
+Legacy v1.0.3; Temporal OFF; Mandatory OFF,1.0.3,False,False,90.0,80,80.0,97.5,13.333333333333334,8,60,docs/results/ablation_2k_h100_20261111/summary.json
+Corrected v1.0.4; Temporal OFF; Mandatory ON,1.0.4,False,True,90,80,80,97.5,13.333333333333334,8,60,docs/experiments/reports/no-temporal-v104-2k-h100-2026-11-11.md

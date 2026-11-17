@@ -1,0 +1,29 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ablation SVG 시각화</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f6fa;color:#172234;font:15px/1.65 system-ui,sans-serif}
+header{max-width:1360px;padding:36px 24px 24px;margin:auto}h1{margin:0 0 10px;font-size:28px}header p{max-width:1050px}
+main{max-width:1360px;margin:auto;padding:0 24px 40px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,500px),1fr));gap:24px}
+article{background:white;border:1px solid #d9e0e8;border-radius:10px;overflow:hidden}article div{padding:20px}img{display:block;width:100%;height:330px;object-fit:contain;border-bottom:1px solid #e1e6ee}
+h2{font-size:20px;margin:7px 0}small{font:12px monospace;color:#536076}a{color:#006ba4}p{color:#4b586b}</style>
+<header><h1>Ablation 실험 SVG 7개</h1><p>실험일 2026년 11월 11일 · 생성일 2026년 11월 17일<br>
+2K·4K 구성요소 제거와 Temporal 단독 제거 재실행입니다. 새 topic_balanced_v3 성능 실험이나 Safety Gate 복구 결과와 구분했습니다.</p>
+<a href="ablation_svg_20261117.zip">전체 ZIP 다운로드</a> · <a href="README.md">출처와 해석</a></header><main><article><a href="svg/ablation_01_task_success.svg" target="_blank"><img src="previews/ablation_01_task_success.png" alt="작업 성공률"></a>
+<div><small>ablation_01_task_success.svg</small><h2>작업 성공률</h2><p>2K와 4K에서 Full과 네 제거 조건을 비교합니다. 두 예산의 400개 대응 실행은 같은 결과였으며, v1.0.3의 No temporal은 필수 상태 보존도 함께 제거했습니다.</p>
+<a href="svg/ablation_01_task_success.svg" download>SVG 다운로드</a> · <a href="data/ablation_01_task_success.csv" download>수치 CSV</a></div></article>
+<article><a href="svg/ablation_02_memory_and_behavior.svg" target="_blank"><img src="previews/ablation_02_memory_and_behavior.png" alt="기억 보존과 행동 신뢰성"></a>
+<div><small>ablation_02_memory_and_behavior.svg</small><h2>기억 보존과 행동 신뢰성</h2><p>보호 기억 회수, 시간 문맥 정확성, 실제 상태 사용, 오래된 상태 사용을 나눠 보여줍니다. 성공률이 높아도 보호 기억 보존이 낮아질 수 있습니다.</p>
+<a href="svg/ablation_02_memory_and_behavior.svg" download>SVG 다운로드</a> · <a href="data/ablation_02_memory_and_behavior.csv" download>수치 CSV</a></div></article>
+<article><a href="svg/ablation_03_paired_success_difference.svg" target="_blank"><img src="previews/ablation_03_paired_success_difference.png" alt="Full 대비 성공률 차이"></a>
+<div><small>ablation_03_paired_success_difference.svg</small><h2>Full 대비 성공률 차이</h2><p>같은 과제와 반복을 맞춘 Full − 제거 조건의 차이입니다. 저장된 짝지은 신뢰구간이 모두 0에 닿거나 포함하므로 확정적 우위나 동등성으로 해석하지 않습니다.</p>
+<a href="svg/ablation_03_paired_success_difference.svg" download>SVG 다운로드</a> · <a href="data/ablation_03_paired_success_difference.csv" download>수치 CSV</a></div></article>
+<article><a href="svg/ablation_04_token_usage.svg" target="_blank"><img src="previews/ablation_04_token_usage.png" alt="입력과 출력 토큰"></a>
+<div><small>ablation_04_token_usage.svg</small><h2>입력과 출력 토큰</h2><p>왼쪽 입력은 실행별 최대 단일 Context의 평균이고, 오른쪽 출력은 실행 전체 누적 출력의 평균입니다. 입력 곡선을 여러 호출의 누적 입력량으로 읽으면 안 됩니다.</p>
+<a href="svg/ablation_04_token_usage.svg" download>SVG 다운로드</a> · <a href="data/ablation_04_token_usage.csv" download>수치 CSV</a></div></article>
+<article><a href="svg/ablation_05_cost_and_latency.svg" target="_blank"><img src="previews/ablation_05_cost_and_latency.png" alt="추정 비용과 지연 시간"></a>
+<div><small>ablation_05_cost_and_latency.svg</small><h2>추정 비용과 지연 시간</h2><p>실행당 생성 비용과 두 실행 환경에서의 지연 시간을 비교합니다. 2K와 4K의 OS·commit이 달라 지연 차이를 예산 효과로 해석하지 않습니다.</p>
+<a href="svg/ablation_05_cost_and_latency.svg" download>SVG 다운로드</a> · <a href="data/ablation_05_cost_and_latency.csv" download>수치 CSV</a></div></article>
+<article><a href="svg/ablation_06_retrieval_and_failures.svg" target="_blank"><img src="previews/ablation_06_retrieval_and_failures.png" alt="검색 성능과 실패 진단"></a>
+<div><small>ablation_06_retrieval_and_failures.svg</small><h2>검색 성능과 실패 진단</h2><p>초기 검색 점수와 선택·상태·제약 실패를 함께 비교합니다. 실패 지표는 서로 겹칠 수 있으며, 적용 분모는 CSV에 기록했습니다.</p>
+<a href="svg/ablation_06_retrieval_and_failures.svg" download>SVG 다운로드</a> · <a href="data/ablation_06_retrieval_and_failures.csv" download>수치 CSV</a></div></article>
+<article><a href="svg/ablation_07_temporal_only_rerun.svg" target="_blank"><img src="previews/ablation_07_temporal_only_rerun.png" alt="Temporal 단독 제거 재실행"></a>
+<div><small>ablation_07_temporal_only_rerun.svg</small><h2>Temporal 단독 제거 재실행</h2><p>필수 상태 보존을 복구한 v1.0.4의 Temporal 단독 제거 결과를 기존 조건과 구분합니다. 수정 전후 80쌍의 성공 판정과 최종 선택 기억 집합은 같았지만, 일반적인 기능 불필요성을 입증한 결과는 아닙니다.</p>
+<a href="svg/ablation_07_temporal_only_rerun.svg" download>SVG 다운로드</a> · <a href="data/ablation_07_temporal_only_rerun.csv" download>수치 CSV</a></div></article></main></html>

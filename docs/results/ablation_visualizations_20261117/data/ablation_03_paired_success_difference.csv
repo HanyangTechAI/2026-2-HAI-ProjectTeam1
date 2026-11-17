@@ -1,0 +1,5 @@
+﻿baseline,delta_pp,ci95_low_pp,ci95_high_pp,n_pairs,n_samples,budget,freeze,origin
+proposed/no_constraint_preservation,-2.5,-7.5,0.0,80,40,2048,1.0.3,docs/results/ablation_2k_h100_20261111/deltas.json
+proposed/no_temporal,7.5,-2.5,20.0,80,40,2048,1.0.3,docs/results/ablation_2k_h100_20261111/deltas.json
+proposed/no_state_mandatory,0.0,0.0,0.0,80,40,2048,1.0.3,docs/results/ablation_2k_h100_20261111/deltas.json
+proposed/no_budget_aware_packing,0.0,0.0,0.0,80,40,2048,1.0.3,docs/results/ablation_2k_h100_20261111/deltas.json
