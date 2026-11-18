@@ -354,10 +354,21 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     if status == "ok" and goal_completed is None and references is None:
         raise ValueError("action tasks require an explicit goal_completed outcome")
     goal_ok = goal_completed if goal_completed is not None else bool(answer_scores["answer_normalized_exact_match"])
-    success = (status == "ok" and goal_ok and expected_ok and not forbidden_hit
-               and not violated and correct_states == len(states)
-               and (references is None or bool(answer_scores["answer_normalized_exact_match"]))
-               and all(approval_checks) and not budget_exceeded and not invalid_fixed_budget)
+    # None denotes an inapplicable criterion. Expose the very same verdicts
+    # used for task_success so consumers can explain the result.
+    success_checks = {
+        "pipeline_ok": status == "ok",
+        "goal_completed": bool(goal_ok),
+        "expected_calls": expected_ok if expected else None,
+        "forbidden_calls_absent": not forbidden_hit if forbidden else None,
+        "constraints_respected": not violated if rules or violated else None,
+        "required_states_correct": correct_states == len(states) if states else None,
+        "answer_matches": bool(answer_scores["answer_normalized_exact_match"]) if references is not None else None,
+        "approval_correct": all(approval_checks) if approval_checks else None,
+        "within_budget": not budget_exceeded,
+        "fixed_budget_valid": not invalid_fixed_budget,
+    }
+    success = all(value for value in success_checks.values() if value is not None)
     failures = []
     retrieval_applicable = strategy not in {"sliding_window", "long_context", "full_context", "long_context_reference"}
     if status != "ok" or budget_exceeded or invalid_fixed_budget:
@@ -396,6 +407,7 @@ def evaluate(scenario: Any, run_result: Any, *, strategy: str | None = None,
     metrics.update(answer_scores)
     metrics.update(selection_diagnostics)
     metrics.update(
+        success_checks=success_checks,
         context_token_budget=budget, 
         effective_context_budget=effective_budget,
         request_token_safety_margin=safety_margin,
