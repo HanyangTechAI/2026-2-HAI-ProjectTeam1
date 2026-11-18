@@ -5,8 +5,10 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from huggingface_hub import try_to_load_from_cache
-from sentence_transformers import SentenceTransformer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 from agent.agent import Agent
 from agent.tools.email import EmailTool
@@ -23,12 +25,14 @@ def _get_model() -> SentenceTransformer:
     global _model
     
     if _model is None:
+        from sentence_transformers import SentenceTransformer
         _model = SentenceTransformer(EXPERIMENT_EMBEDDING_MODEL)
         
     return _model
 
 
 def _cached_model_revision(model_id: str) -> str | None:
+    from huggingface_hub import try_to_load_from_cache
     cached = try_to_load_from_cache(
         model_id,
         "config.json",

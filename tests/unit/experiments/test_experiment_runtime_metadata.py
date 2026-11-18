@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from benchmark.experiment_runtime import (
     _cached_model_revision,
@@ -13,25 +14,18 @@ from benchmark.experiment_settings import (
 class ExperimentRuntimeMetadataTests(
     unittest.TestCase
 ):
-    @patch(
-        "benchmark.experiment_runtime."
-        "try_to_load_from_cache"
-    )
-    def test_cached_revision_is_extracted(
-        self,
-        cached,
-    ):
-        cached.return_value = (
+    def test_cached_revision_is_extracted(self):
+        cached = Mock(return_value=(
             "C:/cache/"
             "models--sentence-transformers--model/"
             "snapshots/"
             + ("a" * 40)
             + "/config.json"
-        )
+        ))
 
-        revision = _cached_model_revision(
-            EXPERIMENT_EMBEDDING_MODEL
-        )
+        hub = SimpleNamespace(try_to_load_from_cache=cached)
+        with patch.dict("sys.modules", {"huggingface_hub": hub}):
+            revision = _cached_model_revision(EXPERIMENT_EMBEDDING_MODEL)
 
         self.assertEqual(
             revision,
