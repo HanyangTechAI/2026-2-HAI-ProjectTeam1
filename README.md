@@ -467,6 +467,6 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 - [실험용 Packing·Task Criticality 사용 가이드](docs/guides/experimental-packing.md)
 - [11월 12일 Pipeline Smoke 점검 — 20회](docs/experiments/audits/pipeline-smoke-2026-11-12.md)
 - [실험 계획과 실행 결과](docs/experiments/plans/experiment-plan.md)
-- [Architecture / Parameter Freeze v1.0](docs/architecture_parameter_freeze_v1.md)
+- [Architecture / Parameter Freeze v1.0.6 + opt-in idempotency snapshot](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/research/constraint-preserving-budget-aware-memory.docx)
 - [연구 질문 및 평가 방향](docs/research/research-questions.md)

@@ -1,10 +1,12 @@
 # Architecture / Parameter Freeze v1.0.6
 
-- 상태: **FROZEN** (새 입력의 실제 모델 smoke 재검증 필요)
+- 상태: **FROZEN** (표준 V1.0.6 기준; opt-in 실행 확장은 아래 별도 snapshot으로 고정)
 - 기준일: 2026-11-16 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: `experiments/configs/*.json`의 `freeze.version = "1.0.6"`
+- 기계 판독 기준: 표준 `experiments/configs/*.json`의 `freeze.version = "1.0.6"`
 - 이전 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`; v1.0.3 변경은 각 실행의 `git_commit`, `git_dirty`, `resume_identity.code`와 함께 추적한다.
+
+2026-11-18에 추가한 실행별 side-effect idempotency는 표준 Memory 선택·Main 실행 경로에서 기본 비활성인 별도 실험 확장이다. 따라서 기존 `1.0.6` config와 실행물의 freeze identity는 유지하고, 확장 구현의 snapshot은 아래에 따로 고정한다.
 
 ## Patch note - v1.0.1
 
@@ -442,3 +444,18 @@ Freeze 항목 변경 절차는 다음과 같다.
 
 버그 수정이 결과를 바꿀 수 있으면 parameter 값이 같아도 새 patch freeze로 취급한다.
 로깅·문서·성능 최적화처럼 결과 의미를 바꾸지 않는 수정만 V1.0 안에서 허용한다.
+
+## 8. Opt-in execution extension snapshot — Run-scoped Side-Effect Idempotency
+
+- Snapshot date: 2026-11-18 (Asia/Seoul)
+- Core architecture/config freeze: V1.0.6; all standard config files remain at `freeze.version = "1.0.6"`.
+- Code snapshot: commit `1091a7f491a80dcc087b51a359dc552e42996f02` (`feat: Run-scoped Side-Effect Idempotency`); tracked source at that commit was clean.
+- Scope: `CriticalityGatedAdapter` only, enabled by explicit `enable_side_effect_idempotency=True`; recovery runner opt-in is `--side-effect-idempotency`. Default remains disabled.
+- Enabled recovery arms: `clean_on`, `fault_on`; `fault_off` and `fault_off_retry` remain disabled.
+- Ledger scope: one pipeline run. Successful registered side-effect calls are tracked; failed calls are not marked complete. `email.send_email` is limited to one successful send per run regardless of changed arguments; the other registered side effects use canonical sorted JSON arguments. Read-only tools are excluded.
+- Frozen source SHA-256: `pipeline/side_effect_idempotency.py` `8933eb5d85666263a83f24215ed1cc982ed92d29c9d19d682621e3199f2eb514`; `pipeline/experimental_safety_gate.py` `81b6015577772b10ac3829e40822d160ba234af43faa9271e26c537a6cd39e5d`; `benchmark/criticality_recovery.py` `6cb3f788083b4b5aa473dbab30191febb287f17b6955e527e045f3803ab84a7a`.
+- Regression coverage source: `tests/test_side_effect_idempotency.py` SHA-256 `1a59818b843831b7d238eab59b340ab27ed9c253d4448f18798921f7fed191bf` (8 test cases).
+- Existing `idempotency_full_v1` and `idempotency_smoke_v1` remain historical V1.0.6 runs. Their manifest records the pre-freeze runner source hash; the frozen commit includes a reporting-key correction and a summary/event consistency check. Keep those outputs unchanged and use a new output directory for future runs.
+- Validation record: the archived [experiment report](experiments/reports/side-effect-idempotency-recovery-2026-11-18.md) includes an 80-candidate Main and an 8-candidate smoke. The full `unittest` suite was not rerun as part of this snapshot record.
+
+The extension snapshot does not alter the standard `select_memory()` policy, standard Runner behavior, dataset profile, prompts, or model parameters. If the extension is later enabled by default or wired into the standard benchmark path, issue a new core patch freeze and rerun its readiness gates.
