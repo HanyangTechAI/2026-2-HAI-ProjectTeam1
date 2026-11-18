@@ -1674,6 +1674,8 @@ tool_called   툴을 실행함. Interaction을 반영해 다시 조립한 contex
 tool_failure  툴이 실패했거나, tool_name과 action 중 하나만 있음.
 ```
 
+`PipelineAdapter`와 `Orchestrator`의 `tool_failure_retries`는 실패한 단일 Tool 호출과 결과 Interaction 뒤 허용할 추가 계획 횟수다. 기본값은 0이며, 재계획 시 실패 결과 Interaction을 반영한 새 Context를 사용한다. 기존 Tool call을 자동으로 재실행하지 않는다. 재시도를 모두 사용하면 `stopped_reason=tool_failure`로 종료한다.
+
 `goal_completed`는 `run_task` 출력의 한 칸이다. `stopped_reason`이 `completed`이고 `goal_checker`가 응답, `ToolCall`, `ToolResult`를 보고 참을 돌려줄 때만 True다. checker가 없으면 False다. 툴을 호출했다는 사실 자체가 이 값의 참은 아니다. Evaluator는 이 값을 과제 성공의 한 조건으로 읽고, 선택 결과와 행동 평가는 Evaluator Interface에서 따로 한다.
 
 ---

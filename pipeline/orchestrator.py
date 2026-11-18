@@ -268,6 +268,7 @@ class Orchestrator:
         max_steps: int = 8,
         goal_checker: GoalChecker | None = None,
         max_action_rejections: int = 2,
+        tool_failure_retries: int = 0,
     ) -> None:
         if not isinstance(agent, Agent):
             raise TypeError("agent must be an Agent instance")
@@ -293,6 +294,9 @@ class Orchestrator:
         if type(max_action_rejections) is not int or max_action_rejections < 0:
             raise ValueError("max_action_rejections must be a nonnegative integer")
         
+        if type(tool_failure_retries) is not int or tool_failure_retries < 0:
+            raise ValueError("tool_failure_retries must be a nonnegative integer")
+        
         self.agent = agent
         self.policy = policy
         
@@ -308,6 +312,8 @@ class Orchestrator:
         )
         
         self.max_action_rejections = max_action_rejections
+        
+        self.tool_failure_retries = tool_failure_retries
         
     def run(
         self,
@@ -356,6 +362,8 @@ class Orchestrator:
         rejected_steps = 0
         
         unresolved_rejection = False
+        
+        tool_failure_retries_used = 0
         
         self.agent.current_turn = current_turn
         
@@ -521,6 +529,8 @@ class Orchestrator:
             if acted.stopped_reason == "tool_called":
                 rejected_steps = 0
                 unresolved_rejection = False
+                
+                tool_failure_retries_used = 0
             
             if acted.interactions:
                 for interaction in acted.interactions:
@@ -568,9 +578,19 @@ class Orchestrator:
                 )
                 
             if acted.stopped_reason == "tool_failure":
+                retryable_result = len(acted.tool_calls) == 1 and len(acted.tool_results) == 1 and len(acted.interactions) == 1 and acted.tool_results[0].success is False
+                
+                can_retry = retryable_result and tool_failure_retries_used < self.tool_failure_retries and step_number < self.max_steps
+                
+                if can_retry:
+                    tool_failure_retries_used += 1
+                    
+                    continue
+                
                 return finish(
                     status=PipelineStatus.OK,
                     reason="tool_failure",
+                    completed=False,
                 )
                 
             if acted.stopped_reason != "tool_called":

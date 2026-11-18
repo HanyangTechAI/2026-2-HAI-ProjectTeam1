@@ -944,6 +944,8 @@ TaskTool
 
 Tool 실행 결과는 `Interaction(source="tool")`로 바꾼다. `Agent.act`가 Interaction을 만들고, Orchestrator는 이를 다음 단계의 Tool feedback으로 Context에 반영한다. 현재 Orchestrator는 Interaction을 Memory Store에 영속화하거나 Memory Analyzer로 새 Memory를 생성하지 않으며, 실행 시작 시 받은 Memory snapshot으로 선택을 반복한다.
 
+`PipelineAdapter`와 `Orchestrator`는 `tool_failure_retries`로 Tool 실패 후 새 계획 횟수를 설정할 수 있다. 기본값은 `0`이라 실패 시 바로 종료한다. 양수이면 단일 Tool call과 단일 실패 결과 및 Interaction이 있는 경우에만 실패한 호출을 그대로 반복하지 않고, Tool feedback을 반영한 새 Context에서 Planner를 다시 부른다. 재계획 횟수는 `max_steps`에도 제한된다.
+
 ---
 
 # 13. Benchmark Run Records

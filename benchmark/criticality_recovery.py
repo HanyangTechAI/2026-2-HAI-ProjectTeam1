@@ -30,10 +30,11 @@ from pipeline.experimental_safety_gate import CriticalityGatedAdapter
 from pipeline.pipeline_adapter import PipelineAdapter
 
 
-ARMS = ("clean_on", "fault_on", "fault_off")
+ARMS = ("clean_on", "fault_on", "fault_off", "fault_off_retry")
 BUDGET = 2048
 MAX_STEPS = 8
 REJECTION_LIMIT = 2
+TOOL_FAILURE_RETRIES = 1
 
 
 def digest(data: bytes) -> str:
@@ -386,7 +387,7 @@ def evaluate(
         "goal_checker": goal,
     }
 
-    if arm == "fault_off":
+    if arm in ("fault_off", "fault_off_retry"):
         policy = make_criticality_policy(
             embedder=multilingual_embedder,
             top_k=top_k,
@@ -395,6 +396,10 @@ def evaluate(
 
         adapter = PipelineAdapter(
             policy=policy,
+            tool_failure_retries=(
+                TOOL_FAILURE_RETRIES
+                if arm == "fault_off_retry" else 0
+            ),
             **shared,
         )
         outcome = adapter(**inputs)
@@ -454,10 +459,10 @@ def evaluate(
             )
 
     # Fault OFF는 실제로 잘못된 첫 Tool을 실행해야 함.
-    if injected and arm == "fault_off":
+    if injected and arm in ("fault_off", "fault_off_retry"):
         if not first_step.action_result.tool_calls:
             raise RuntimeError(
-                "fault_off did not execute injected action"
+                "GATE OFF did not execute injected action"
             )
 
     usage = outcome.llm_usage or {}
@@ -543,6 +548,24 @@ def evaluate(
         outcome.tool_calls,
         outcome.tool_results,
     )
+    
+    first_fault_executed = bool(injected and first_step.action_result is not None and first_step.action_result.tool_calls)
+    
+    first_results = (
+        first_step.action_result.tool_results
+        if first_step.action_result is not None else ()
+    )
+    
+    first_fault_tool_failed = bool(injected and first_results and first_results[0].success is False)
+
+    tool_failure_count = sum(
+        result.success is False
+        for result in outcome.tool_results
+    )
+    
+    post_fault_correct_effect = bool(injected and later_effect)
+    
+    post_fault_goal = bool(injected and later_effect and outcome.goal_completed)
 
     return {
         "scenario_id": case["scenario_id"],
@@ -599,6 +622,15 @@ def evaluate(
         "prompt_audit": prompt_audit,
         "followup_llm_usage": usage,
         "response": outcome.response,
+        "first_fault_executed": first_fault_executed,
+        "first_fault_tool_failed": first_fault_tool_failed,
+        "tool_failure_count": tool_failure_count,
+        "post_fault_correct_effect": post_fault_correct_effect,
+        "post_fault_goal": post_fault_goal,
+        "tool_failure_retry_policy": (
+            TOOL_FAILURE_RETRIES
+            if arm == "fault_off_retry" else 0
+        )
     }
 
 
@@ -731,6 +763,100 @@ def summarize(scenarios, proposals, rows):
         isinstance(value, (int, float))
         for value in costs
     )
+    
+    def compare_fault_recovery(rows):
+        on = {
+            row["scenario_id"]: row
+            for row in rows
+            if row["arm"] == "fault_on"
+        }
+        
+        off_retry = {
+            row["scenario_id"]: row
+            for row in rows
+            if row["arm"] == "fault_off_retry"
+        }
+        
+        if not off_retry:
+            return None
+        
+        if set(on) != set(off_retry):
+            raise ValueError("Fault ON and OFF Retry scenarios are not paired")
+        
+        n = len(on)
+        
+        if n == 0:
+            return None
+        
+        on_effect = sum(
+            bool(row["post_fault_correct_effect"])
+            for row in on.values()
+        )
+        
+        off_effect = sum(
+            bool(row["post_fault_correct_effect"])
+            for row in off_retry.values()
+        )
+        
+        on_goal = sum(
+            bool(row["post_fault_goal"])
+            for row in on.values()
+        )
+        
+        off_goal = sum(
+            bool(row["post_fault_goal"])
+            for row in off_retry.values()
+        )
+        
+        on_only = sum(
+            on[sid]["post_fault_goal"] and not off_retry[sid]["post_fault_goal"]
+            for sid in on
+        )
+        
+        off_only = sum(
+            off_retry[sid]["post_fault_goal"] and not on[sid]["post_fault_goal"]
+            for sid in on
+        )
+        
+        both = sum(
+            on[sid]["post_fault_goal"] and off_retry[sid]["post_fault_goal"]
+            for sid in on
+        )
+        
+        return {
+            "n_paired": n,
+            "fault_on": {
+                "effect": on_effect,
+                "goal": on_goal,
+                "first_fault_executed": sum(
+                    row["first_fault_executed"]
+                    for row in on.values()
+                ),
+            },
+            "fault_off_retry": {
+                "effect": off_effect,
+                "goal": off_goal,
+                "first_fault_executed": sum(
+                    row["first_fault_executed"]
+                    for row in off_retry.values()
+                ),
+                "first_fault_tool_failed": sum(
+                    row["first_fault_tool_failed"]
+                    for row in off_retry.values()
+                ),
+                "tool_failure_count": sum(
+                    row["tool_failure_count"]
+                    for row in off_retry.values()
+                ),
+            },
+            "goal_delta_on_minus_off_retry": (on_goal - off_goal) / n,
+            "paired_goal_outcomes": {
+                "both_success": both,
+                "gate_on_only": on_only,
+                "off_retry_only": off_only,
+                "both_failed": n - both - on_only - off_only,
+            },
+        }
 
     return {
         "n_candidate_scenarios": len(scenarios),
@@ -786,6 +912,7 @@ def summarize(scenarios, proposals, rows):
         },
 
         "arm_breakdown": breakdown,
+        "fault_on_vs_off_retry": compare_fault_recovery(rows),
     }
 
 
@@ -895,7 +1022,7 @@ def main():
     )
 
     manifest = {
-        "kind": "recovery_fault_injection_live_replanning_v1",
+        "kind": "recovery_fault_injection_live_replanning_v2",
         "first_action_source": (
             "Gemini generated, shared across arms"
         ),
@@ -933,6 +1060,13 @@ def main():
         "max_steps": MAX_STEPS,
         "max_action_rejections": REJECTION_LIMIT,
         "arms": list(ARMS),
+        "tool_failure_retry_policy": {
+            "fault_off_retry": TOOL_FAILURE_RETRIES,
+            "clean_on": 0,
+            "fault_on": 0,
+            "fault_off": 0,
+        },
+        "tool_failure_retry_semantics": "Maximum additional planning attempts after consecutive failed ToolExecutor calls"
     }
 
     if manifest_path.exists():
@@ -1008,11 +1142,13 @@ def main():
                 "clean_on",
                 "fault_on",
                 "fault_off",
+                "fault_off_retry",
             )
 
             if index % 2 == 0:
                 arms = (
                     "clean_on",
+                    "fault_off_retry",
                     "fault_off",
                     "fault_on",
                 )
@@ -1061,12 +1197,15 @@ def main():
         if proposals[
             case["scenario_id"]
         ]["original_gold_match"]
-        for arm in ("fault_on", "fault_off")
+        for arm in ("fault_on", "fault_off", "fault_off_retry")
     }
 
     if set(rows) != expected:
+        missing = expected - set(rows)
+        extra = set(rows) - expected
+        
         raise RuntimeError(
-            "missing or extraneous recovery arm results"
+            f"incomplete recovery arms: missing={sorted(missing)}, extra={sorted(extra)}"
         )
 
     summary = summarize(

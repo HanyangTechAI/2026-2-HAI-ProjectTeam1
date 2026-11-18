@@ -45,6 +45,7 @@ class PipelineAdapter:
         max_steps: int = 8,
         goal_checker: GoalChecker | None = None,
         max_action_rejections: int = 2,
+        tool_failure_retries: int = 0,
     ) -> None:
         if not callable(policy):
             raise TypeError("policy must be callable")
@@ -67,6 +68,9 @@ class PipelineAdapter:
         if goal_checker is not None and not callable(goal_checker):
             raise TypeError("goal_checker must be callable")
         
+        if type(tool_failure_retries) is not int or tool_failure_retries < 0:
+            raise ValueError("tool_failure_retries must be a nonnegative integer")
+        
         self.policy = policy
         self.agent_factory = agent_factory
         
@@ -78,6 +82,8 @@ class PipelineAdapter:
         self.goal_checker = goal_checker
         
         self.max_action_rejections = max_action_rejections
+        
+        self.tool_failure_retries = tool_failure_retries
         
     def __call__(
         self, 
@@ -102,6 +108,7 @@ class PipelineAdapter:
             token_counter=self.token_counter,
             max_steps=self.max_steps,
             max_action_rejections=self.max_action_rejections,
+            tool_failure_retries=self.tool_failure_retries,
             goal_checker=self.goal_checker,
         )
         

@@ -143,3 +143,6 @@ result = pack_task_criticality(
 [2026-11-17 recovery 평가](../experiments/reports/task-criticality-safety-gate-recovery-2026-11-17.md)는 양성 Holdout의 정답 최초 Tool proposal을 공유한 뒤 인자를 결정적으로 변형한 fault_on/fault_off arm을 비교했다. 최초 proposal이 정답이었던 78개에서 Gate는 변형 action 78/78을 차단했고 live Gemini 재계획으로 올바른 mock Tool 효과 78/78, 최종 goal 77/78을 회복했다. Gate를 끈 동일 fault arm에서는 효과와 goal 완료가 각각 38/78이었다.
 
 이 결과는 특정 synthetic 인자 오류에 대한 controlled recovery다. 오류 발생률, 부정 intent의 오차단, 실제 외부 Tool 부작용이나 일반적인 안전 보장은 측정하지 않았다. 원래 정답이 아닌 최초 proposal 2개는 오류 주입 비교에서 제외했다.
+### 오류 주입 후 재계획 v2
+
+[2026-11-18 recovery v2 비교](../experiments/reports/task-criticality-safety-gate-recovery-v2-2026-11-18.md)는 같은 방식의 양성 오류 주입에 Tool 실패 후 최대 1회 새 계획을 허용한 arm을 추가했다. 최초 proposal 정답 79개에서 Gate ON과 재시도 arm은 모두 goal 79/79를 완료했지만, Gate ON은 변형 호출을 79/79 막았고 재시도 arm은 79/79 실행한 뒤 승인 ID 오류 40건의 Tool failure를 재계획으로 복구했다. Gate 없는 무재시도 arm은 file lookup의 결과 피드백으로 39건을 회복했지만, approved email 40건은 실패 상태로 끝났다. 이 비교도 mock Tool·synthetic 오류에 한정되며 실제 side effect를 검증하지 않는다.

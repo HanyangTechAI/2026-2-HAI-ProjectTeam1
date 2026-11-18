@@ -1368,3 +1368,11 @@ Freeze 1.0.6 및 고정 2,048-token budget으로 seed 1500–1519의 양성 file
 fault_on은 최초 변형 action을 78/78 차단하고 올바른 mock Tool 효과 78/78, 최종 goal 77/78을 회복했다. fault_off의 올바른 효과와 goal 완료는 각각 38/78이었다. clean_on은 정답 효과 78/80, goal 완료 77/80이었다. Main status는 236/236 ok, 실제 prompt 최댓값은 1,257/2,048 tokens, budget stop은 0건이다. 이는 결정적 오류 주입과 양성 synthetic holdout에 대한 recovery 결과로, 자연 발생 오류 분포, 부정 요청의 안전성 또는 실환경 Tool 부작용을 검증하지 않는다.
 
 같은 프로토콜의 smoke는 8 scenario, 24 runs에서 fault_on 오류 차단 8/8, Tool 효과 회복 8/8, final goal 7/8을 보였으며 Main 집계에는 합산하지 않았다. 세부 실행 설정, bootstrap 구간, 사용량, 데이터 hash와 재현 명령은 [오류 주입 복구 보고서](../reports/task-criticality-safety-gate-recovery-2026-11-17.md)에 기록했다.
+
+## 35. Task Criticality Safety Gate 복구와 Tool 실패 재시도 비교 (2026-11-18)
+
+Freeze 1.0.6 및 고정 2,048-token budget으로 seed 1700–1719에서 고른 양성 file lookup·approved email 80개를 실행했다. Gemini 최초 proposal은 arm 간 공유했고, 최초 proposal이 gold와 일치한 79개에 인자 오류를 결정적으로 주입했다. clean_on은 정상 대조, fault_on은 Gate로 오류 action 차단, fault_off는 Gate와 재시도 없이 실행, fault_off_retry는 Gate 없이 Tool failure 후 최대 한 번 새 Gemini 계획을 허용했다. Main은 317 runs다.
+
+fault_on은 변형 첫 action 79/79를 Tool 실행 전에 차단해 올바른 mock Tool 효과와 goal을 각각 79/79 달성했다. fault_off는 39/79에서 효과와 goal을 달성했으며, 남은 40개 승인 ID 오류는 Tool 실패로 끝났다. fault_off_retry는 잘못된 첫 호출 79/79를 실행했지만, Tool 실패 뒤의 1회 재계획으로 전체 효과와 goal을 79/79 회복했다. smoke 8개에서도 해당 arm의 goal 결과는 각각 8/8, 4/8, 8/8이었다. 두 회복 경로의 목표 결과가 같아도, 재시도는 오류 첫 호출을 실행한다는 차이를 분리해 해석한다.
+
+Main의 실제 prompt 최댓값은 1,257/2,048 tokens, budget stop은 0건, 비용 추정은 USD 0.35198이다. 양성 synthetic 작업만 포함하고 File·Email은 mock Tool이다. 자연 오류 분포, 부정 요청의 안전성, 외부 side effect는 검증하지 않았다. 상세 arm 결과, 40개 Tool failure의 분류, 데이터 hash와 재현 명령은 [복구 v2 보고서](../reports/task-criticality-safety-gate-recovery-v2-2026-11-18.md)에 기록했다.
