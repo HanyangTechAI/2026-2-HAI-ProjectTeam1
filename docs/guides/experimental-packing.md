@@ -146,3 +146,11 @@ result = pack_task_criticality(
 ### 오류 주입 후 재계획 v2
 
 [2026-11-18 recovery v2 비교](../experiments/reports/task-criticality-safety-gate-recovery-v2-2026-11-18.md)는 같은 방식의 양성 오류 주입에 Tool 실패 후 최대 1회 새 계획을 허용한 arm을 추가했다. 최초 proposal 정답 79개에서 Gate ON과 재시도 arm은 모두 goal 79/79를 완료했지만, Gate ON은 변형 호출을 79/79 막았고 재시도 arm은 79/79 실행한 뒤 승인 ID 오류 40건의 Tool failure를 재계획으로 복구했다. Gate 없는 무재시도 arm은 file lookup의 결과 피드백으로 39건을 회복했지만, approved email 40건은 실패 상태로 끝났다. 이 비교도 mock Tool·synthetic 오류에 한정되며 실제 side effect를 검증하지 않는다.
+
+### 실행별 Side-Effect Idempotency
+
+`RunSideEffectLedger`는 `CriticalityGatedAdapter`의 opt-in 기능이다. 기본값은 비활성이다. 활성화하면 한 pipeline run 안에서 `ToolExecutor`가 성공 처리한 side-effect action을 추적하고 중복 action이 다시 제안될 때 실행 전에 `duplicate_side_effect`로 차단한다. Tool 실패는 완료로 기록하지 않는다. 대상은 `email.send_email`, `email.request_approval`, `email.draft_email`, `calendar.create_event`, `task.update_task`, `file.select_file`, `file.delete_file`이다. `send_email`은 인자나 본문이 달라도 한 run에서 한 번만 허용하고, 나머지 action은 정렬된 JSON 인자 값으로 중복을 판정한다. read-only action은 ledger 대상이 아니다.
+
+[2026-11-18 v2.1 평가 보고서](../experiments/reports/side-effect-idempotency-recovery-2026-11-18.md)는 이 기능을 `clean_on`과 `fault_on`에 켜고 독립 synthetic Holdout 79개에서 복구 실험을 수행했다. Main raw log에서 성공 이메일을 재발송하려던 action 1건과 smoke에서 1건이 차단됐으며 중복 성공 발송은 없었다. 원 결과의 `summary.json` 집계기는 row 필드의 `side_effect_duplicate_bloacks` 오타를 놓쳐 0으로 집계한다. 이 한 차단 사례는 일반적인 차단율이나 외부 서비스의 exactly-once 보장을 입증하지 않는다.
+
+현재 side-effect 목록과 run-local key 규칙은 [`pipeline/side_effect_idempotency.py`](../../pipeline/side_effect_idempotency.py), Gate 연결 지점은 [`pipeline/experimental_safety_gate.py`](../../pipeline/experimental_safety_gate.py)에서 확인한다. 이 기능은 실험 adapter의 opt-in 경로이며 기본 Proposed 실행이나 실제 외부 Tool에 대한 보장으로 해석하지 않는다.

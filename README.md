@@ -335,6 +335,8 @@ Freeze 1.0.4 결과와 1.0.5 재실행을 기록했다.
 
 2026-11-18 v2에서는 seed 1700–1719의 양성 80개를 대상으로 Gate와 Tool 실패 후 재계획을 비교했다. 최초 제안이 정답인 79개에서 Gate는 변형 호출 79/79를 막았고, 재시도 arm은 변형 호출 실행 후 1회 계획 재시도로 79/79 goal을 완료했다. Gate 없는 무재시도 arm은 39/79에서 완료했다. 전 arm은 mock Tool 평가이며 [v2 보고서](docs/experiments/reports/task-criticality-safety-gate-recovery-v2-2026-11-18.md)에 방법, 사용량, 한계를 기록했다.
 
+같은 날 새 seed 1900–1919 평가에서 실행별 side-effect ledger를 Gate ON arm에 켰다. Main의 raw run log에서는 올바른 이메일 발송 뒤 재시도된 호출 1건이 차단됐고, 중복 성공 발송은 없었다. 보고용 `summary.json`은 필드명 오타로 이 차단을 0건으로 집계하므로 [별도 보고서](docs/experiments/reports/side-effect-idempotency-recovery-2026-11-18.md)에 원본 기록과 집계 차이를 남겼다. 이는 mock Tool 기반 실행별 동작 관측이며 일반적인 idempotency 보장이나 실제 외부 발송 결과는 아니다.
+
 `benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 파일 조회와 이메일 행동을 생성한다. 표준 생성 profile은 Freeze 1.0.6의 `topic_balanced_v3`다. 제약·시간·상태·Flexible 근거 주제를 먼저 배정해 Main의 독립 시나리오 40개에서는 주제별 10개씩 생성한다. 다른 표본 수에서도 주제별 개수 차이는 최대 1개다. 각 주제에는 실제 정답에 필요한 정보와 경쟁 조건을 넣으며 실제 LLM ablation 성공률은 별도로 측정한다.
 
 Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. 11월 17일 40개 입력의 주제 비율 사전 점검은 [topic ratio 결과 아카이브](docs/results/topic_ratio_check_20261117/README.md)에 기록했다. Horizon 채움은 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 기존 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)는 이전 profile의 생성물로 보존한다. 새 profile은 Gemini counter로 새 경로에 생성·측정해야 한다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.

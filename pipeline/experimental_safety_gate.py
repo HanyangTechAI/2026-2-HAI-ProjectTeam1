@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Callable, Sequence
 
 from agent.agent import Agent, AgentAction, ActionRejected
+from agent.tools.executor import ToolExecutor
+
 from context.tokenizer import (
     TokenCounter,
     provisional_token_count,
@@ -26,6 +28,7 @@ from pipeline.orchestrator import (
     PipelineRunResult,
 )
 from pipeline.pipeline_adapter import PipelineAdapter
+from pipeline.side_effect_idempotency import RunSideEffectLedger
 
 
 @dataclass(frozen=True)
@@ -45,11 +48,18 @@ class GatedRun:
 class _RunGate:
     """실행마다 독립적으로 생성되는 Gate 상태."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        enable_side_effect_idempotency: bool = False,
+    ) -> None:
         self.decision: CriticalPackingResult | None = None
         self.selection: SelectionResult | None = None
         self.query: str | None = None
         self.events: list[GateEvent] = []
+        
+        self.enable_side_effect_idempotency = enable_side_effect_idempotency
+        self.side_effect_ledger: RunSideEffectLedger | None = None
 
     def reset_step(self) -> None:
         self.decision = None
@@ -81,6 +91,18 @@ class _RunGate:
 
         self.selection = selection
         self.query = query
+        
+    def attach_executor(
+        self,
+        executor: ToolExecutor,
+    ) -> None:
+        if not self.enable_side_effect_idempotency:
+            return
+        
+        if self.side_effect_ledger is not None:
+            raise RuntimeError("Side-effect ledger already attached")
+        
+        self.side_effect_ledger = RunSideEffectLedger(executor)
 
     def _visible_values(
         self,
@@ -165,6 +187,13 @@ class _RunGate:
             return self._event(
                 "blocked",
                 "missing_gate_state",
+                actual,
+            )
+            
+        if self.side_effect_ledger is not None and self.side_effect_ledger.already_completed(action):
+            return self._event(
+                "blocked",
+                "duplicate_side_effect",
                 actual,
             )
 
@@ -339,6 +368,14 @@ class _GatePlanner:
         if verdict.outcome != "blocked":
             return action
         
+        if verdict.reason == "duplicate_side_effect":
+            return AgentAction(
+                tool_name=None,
+                action=None,
+                arguments={},
+                text_response="이 사용자 작업에서 동일한 부작용 Tool 작업이 이미 성공적으로 실행되었습니다. 중복 실행을 생략했습니다."
+            )
+        
         message = (
             "안전 보류: 필요한 정보가 확인되지 않았거나 "
             "서로 충돌합니다. "
@@ -379,6 +416,7 @@ class CriticalityGatedAdapter:
         max_steps: int = 1,
         goal_checker: GoalChecker | None = None,
         max_action_rejections: int = 2,
+        enable_side_effect_idempotency: bool = False,
     ) -> None:
         validate_alpha(fallback_alpha)
 
@@ -395,6 +433,9 @@ class CriticalityGatedAdapter:
             raise TypeError(
                 "agent_factory and embedder must be callable"
             )
+            
+        if type(enable_side_effect_idempotency) is not bool:
+            raise TypeError("enable_side_effect_idempotency must be bool")
 
         self.system_prompt = system_prompt
         self.tool_definitions = tool_definitions
@@ -407,6 +448,7 @@ class CriticalityGatedAdapter:
         self.goal_checker = goal_checker
         self.max_steps = max_steps
         self.max_action_rejections = max_action_rejections
+        self.enable_side_effect_idempotency = enable_side_effect_idempotency
 
     def run_with_audit(
         self,
@@ -418,7 +460,7 @@ class CriticalityGatedAdapter:
         current_turn: int,
         current_time: datetime | None = None,
     ) -> GatedRun:
-        gate = _RunGate()
+        gate = _RunGate(enable_side_effect_idempotency=self.enable_side_effect_idempotency)
 
         critical_policy = make_criticality_policy(
             embedder=self.embedder,
@@ -448,6 +490,8 @@ class CriticalityGatedAdapter:
                 raise TypeError(
                     "v0.3 requires an unmodified Agent instance"
                 )
+                
+            gate.attach_executor(agent.executor)
 
             agent.planner = _GatePlanner(
                 agent.planner,

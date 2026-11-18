@@ -25,6 +25,7 @@ python -m unittest discover -s tests/unit/memory -t tests -v
 | [`unit/memory/`](unit/memory/) | Memory Store, State, retrieval, selector, ablation |
 | [`unit/pipeline/`](unit/pipeline/) | Pipeline 및 adapter 단위 계약 |
 | [`integration/`](integration/) | Store·Context·Agent 연결 통합 및 smoke 테스트 |
+| [`test_side_effect_idempotency.py`](test_side_effect_idempotency.py) | 실험용 Safety Gate와 run-local side-effect ledger의 통합 동작 8개 사례 |
 | [`manual/`](manual/) | API 호출이 필요한 수동 preflight 및 smoke gate |
 
 `manual/`의 스크립트는 전체 `unittest discover`에 포함되지 않습니다. 실제 API를 호출하므로 필요한 환경 설정을 확인한 뒤 개별 실행합니다.

@@ -62,6 +62,10 @@
 
 - [오류 주입 후 복구와 Tool 실패 재시도 비교](task-criticality-safety-gate-recovery-v2-2026-11-18.md) — 정답 최초 제안 79개에서 Gate는 변형 호출 79/79를 차단했다. Gate 없는 1회 재계획 arm도 goal 79/79를 완료했지만 변형 호출을 79/79 실행했고, 그중 40개가 Tool 실패를 냈다.
 
+## Run-scoped Side-Effect Idempotency · 2026-11-18
+
+- [실행별 부작용 중복 억제와 Recovery v2.1](side-effect-idempotency-recovery-2026-11-18.md) — 새 seed Holdout 79개에서 Gate ON과 Tool 실패 후 재시도가 모두 goal 79/79를 완료했다. raw run log에는 재발송 차단 1건이 있고 `summary.json`의 필드명 불일치도 기록했다.
+
 ## Task Criticality Safety Gate Recovery · 2026-11-17
 
 - [오류 주입 후 live replanning 평가](task-criticality-safety-gate-recovery-2026-11-17.md) — 양성 Holdout 78개에 첫 Tool 인자 오류를 주입했다. Gate ON은 최초 오류 78/78을 막고 올바른 Tool 효과 78/78, goal 완료 77/78을 회복했다. 8개 smoke와 비주입 대조 arm을 Main과 분리해 기록한다.

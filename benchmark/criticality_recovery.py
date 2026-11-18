@@ -308,6 +308,7 @@ def evaluate(
     tools,
     top_k,
     weights,
+    side_effect_idempotency: bool = False,
 ):
     """하나의 Arm을 끝까지 실행하고 Recovery를 평가."""
     original = action_from(
@@ -411,6 +412,7 @@ def evaluate(
             top_k=top_k,
             utility_weights=weights,
             max_action_rejections=REJECTION_LIMIT,
+            enable_side_effect_idempotency=side_effect_idempotency,
             **shared,
         )
 
@@ -567,6 +569,25 @@ def evaluate(
     
     post_fault_goal = bool(injected and later_effect and outcome.goal_completed)
 
+    side_effect_duplicate_blocks = sum(
+        event["reason"] == "duplicate_side_effect"
+        for event in events
+    )
+    
+    successful_email_sends = sum(
+        call.tool_name == "email" and call.action == "send_email" and result.success
+        for call, result in zip(
+            outcome.tool_calls,
+            outcome.tool_results,
+            strict=True,
+        )
+    )
+    
+    duplicate_successful_email_sends = max(
+        0,
+        successful_email_sends - 1,
+    )
+
     return {
         "scenario_id": case["scenario_id"],
         "base_case_id": case["metadata"]["base_case_id"],
@@ -630,7 +651,11 @@ def evaluate(
         "tool_failure_retry_policy": (
             TOOL_FAILURE_RETRIES
             if arm == "fault_off_retry" else 0
-        )
+        ),
+        "side_effect_idempotency_enabled": bool(side_effect_idempotency and arm in ("clean_on", "fault_on")),
+        "side_effect_duplicate_blocks": side_effect_duplicate_blocks,
+        "successful_email_sends": successful_email_sends,
+        "duplicate_successful_email_sends": duplicate_successful_email_sends,
     }
 
 
@@ -693,6 +718,17 @@ def summarize(scenarios, proposals, rows):
         groups[
             (row["arm"], "ALL", "ALL")
         ].append(row)
+        
+        expected_blocks = sum(
+            event["reason"] == "duplicate_side_effect"
+            for event in row["gate_events"]
+        )
+
+        if row["side_effect_duplicate_blocks"] != expected_blocks:
+            raise ValueError(
+                f"Duplicate-block audit mismatch: "
+                f"{row['scenario_id']} {row['arm']}"
+            )
 
     breakdown = []
 
@@ -726,6 +762,15 @@ def summarize(scenarios, proposals, rows):
             ),
             "budget_stopped": sum(
                 row["budget_stopped"]
+                for row in group
+            ),
+            "side_effect_duplicate_blocks": sum(
+                row.get("side_effect_duplicate_blocks", 0)
+                for row in group
+            ),
+
+            "duplicate_successful_email_sends": sum(
+                row.get("duplicate_successful_email_sends", 0)
                 for row in group
             ),
         })
@@ -937,6 +982,11 @@ def main():
         "--resume",
         action="store_true",
     )
+    parser.add_argument(
+        "--side-effect-idempotency",
+        action="store_true",
+        help="Enable run-local side-effect deduplication for gated arms",
+    )
 
     args = parser.parse_args()
 
@@ -1019,10 +1069,11 @@ def main():
         "pipeline/experimental_safety_gate.py",
         "memory/criticality_policy.py",
         "memory/task_criticality.py",
+        "pipeline/side_effect_idempotency.py",
     )
 
     manifest = {
-        "kind": "recovery_fault_injection_live_replanning_v2",
+        "kind": "recovery_fault_injection_live_replanning_v2_1",
         "first_action_source": (
             "Gemini generated, shared across arms"
         ),
@@ -1066,7 +1117,17 @@ def main():
             "fault_on": 0,
             "fault_off": 0,
         },
-        "tool_failure_retry_semantics": "Maximum additional planning attempts after consecutive failed ToolExecutor calls"
+        "tool_failure_retry_semantics": "Maximum additional planning attempts after consecutive failed ToolExecutor calls",
+        "side_effect_idempotency": {
+            "enabled": args.side_effect_idempotency,
+            "enabled_arms": (
+                ["clean_on", "fault_on"]
+                if args.side_effect_idempotency
+                else []
+            ),
+            "scope": "single_pipeline_run",
+            "send_email_policy": "once_per_task_run",
+        },
     }
 
     if manifest_path.exists():
@@ -1173,6 +1234,7 @@ def main():
                 tools=tools,
                 top_k=top_k,
                 weights=weights,
+                side_effect_idempotency=args.side_effect_idempotency,
             )
 
             append_jsonl(runs_path, result)
