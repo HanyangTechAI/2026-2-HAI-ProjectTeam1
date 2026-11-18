@@ -1,0 +1,102 @@
+﻿.lab {
+  --canvas: #101215;
+  --amber: #e8b571;
+  --panel: #1a1d21;
+  --edge: #34383c;
+  --ink: #f3f4ee;
+  --sub: #b2b7b6;
+  --accent: #c8ec97;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 15px/1.55 Inter, "Malgun Gothic", sans-serif;
+}
+:root {color-scheme:dark}
+* {box-sizing:border-box}
+[hidden] {display:none!important}
+body,h1,h2,h3,p {margin:0}
+button,input,select {font:inherit}
+button {border:0;background:transparent;color:inherit;cursor:pointer}
+button:hover {background:rgba(255,255,255,.045)}
+button:disabled {cursor:not-allowed;opacity:.7}
+:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+a {color:inherit}
+select {border-radius:7px}
+p {line-height:1.7}
+code,pre {font-family:Consolas,monospace}
+pre {padding:16px;overflow:auto;max-height:420px;border-radius:8px;background:#11151c}
+.mint {color:#62debc}
+.amber {color:var(--amber)}
+.mast {border-bottom: 1px solid var(--edge); background: #141619}
+.mast-inner,.studio {width: min(1180px, 92%); margin: auto}
+.mast-inner {display:flex; align-items:center; gap:44px; min-height:72px}
+.wordmark {font-size:22px;letter-spacing:-1px}
+.chapters {display:flex;align-items:stretch;align-self:stretch;gap:24px}
+.chapters button {position:relative;color:var(--sub);font-size:14px;padding:0 2px;border-radius:0}
+.chapters [aria-current=step] {color:var(--ink)}
+.chapters [aria-current=step]::after {content:"";position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent)}
+main.studio {height:auto;overflow:visible;padding:36px 0 60px}
+.intro {margin-bottom:24px}
+.intro h1 {font-size:clamp(29px,3.4vw,43px);margin:0 0 8px;line-height:1.23;letter-spacing:-1.8px}
+.intro p,.outcome p {color:var(--sub)}
+.setup {display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.scenario-panel,#controls,.outcome,.table-scroll {background:var(--panel);border:1px solid var(--edge);border-radius:14px}
+.scenario-panel,#controls {padding:24px;min-width:0}
+.lab label,.query-block span {font-size:12px;color:var(--sub);font-weight:550}
+.lab select,.lab input[type=number] {display:block;width:100%;min-width:0;height:38px;margin:6px 0 0;padding:0 10px;color:var(--ink);background:#111417;border:1px solid #43494d;font-size:14px}
+.query-block {border-left:3px solid var(--accent);margin:21px 0 15px;padding:0 14px}
+.query-block span {color:var(--accent)}
+.query-block h2 {font-size:clamp(18px,2vw,23px);margin:5px 0;line-height:1.5;overflow-wrap:anywhere;word-break:keep-all}
+.lab details {color:var(--sub);margin:12px 0 0;font-size:13px}
+.lab summary {color:#c9d1cd;cursor:pointer}
+.catalog-label {color:var(--sub);font-size:12px}
+#catalog {position:relative;margin-top:6px;border:1px solid var(--edge);border-radius:8px;background:#131619}
+#catalog-path {padding:10px 12px;color:var(--ink);font-weight:600}
+#scenario-folders {position:absolute;z-index:4;inset:calc(100% + 4px) -1px auto;max-height:330px;overflow:auto;padding:6px;background:var(--panel);border:1px solid var(--edge);border-radius:8px;box-shadow:0 8px 24px #0005}
+#scenario-folders .catalog-back {color:var(--sub);border-bottom:1px solid var(--edge);border-radius:0}
+#scenario-folders button {display:block;width:100%;text-align:left;border-radius:5px;padding:8px 12px;color:var(--ink)}
+#scenario-folders button[aria-pressed=true] {background:#273121;color:var(--accent)}
+#scenario-folders button span {display:block;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#history p {display:grid;grid-template-columns:48px 1fr;gap:10px;border-top:1px solid var(--edge);margin-top:10px;padding-top:10px}
+#history b {color:var(--accent)}
+#controls {display:flex;flex-direction:column}
+#controls h2,.board-heading h2 {font-size:19px}
+.fields {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 8px}
+.runtime {color:var(--sub);font-size:12px;line-height:1.7;margin:0 0 16px}
+#run {margin-top:auto;background:var(--accent);color:#182313;font-size:15px;font-weight:700;border-radius:8px;height:40px}
+#run:hover {background:#dcffae}
+#run:disabled {opacity:.55}
+.cache-actions {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px;color:var(--sub);font-size:12px}
+#clear-cache {color:inherit;text-decoration:underline;text-underline-offset:3px;padding:4px 0}
+.board-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:30px 0 12px}
+#progress {color:var(--sub);font-size:13px}
+.table-scroll {overflow:auto}
+.overview {width:100%;border-collapse:collapse;text-align:left;min-width:640px}
+.overview th,.overview td {padding:13px 18px;border-bottom:1px solid var(--edge)}
+.overview thead th {font-size:12px;font-weight:500;color:var(--sub);background:#202428}
+.overview tbody th {font-size:15px;width:29%;font-weight:600}
+.overview tr:last-child>* {border-bottom:0}
+.overview small {display:block;font-weight:400;color:var(--sub);font-size:12px}
+.overview td {font-size:13px}
+.overview tr.running {background:#263023}
+.overview code {font-size:13px;color:#e2e9df}
+.wait {color:#909894}
+#results {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:20px;align-items:start}
+.outcome {padding:20px;min-width:0}
+.outcome header {display:flex;justify-content:space-between;align-items:center;gap:10px}
+.outcome header b {font-size:13px}
+.outcome h3 {font-size:17px}
+.outcome p {font-size:13px;margin:10px 0;overflow-wrap:anywhere}
+.outcome .amber {color:var(--amber)}
+.outcome pre {white-space:pre-wrap;overflow-wrap:anywhere}
+.outcome li {margin:5px 0}
+.trace {margin:12px 0;background:#131619;border-radius:8px;padding:14px}
+.trace b {display:block;margin:10px 0 3px}
+.trace code {overflow-wrap:anywhere}
+#connection {padding:16px;margin-top:16px;border:1px solid var(--amber);border-radius:8px}
+#connection a {text-decoration:underline}
+@media (max-width:740px) {
+  .mast-inner {gap:15px;min-height:58px}.wordmark {font-size:16px}
+  .chapters {gap:10px}.chapters button {font-size:12px}
+  .setup,#results {grid-template-columns:1fr}.scenario-panel,#controls {padding:18px}
+  main.studio {padding-top:24px}.board-heading {flex-wrap:wrap}
+}

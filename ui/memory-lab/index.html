@@ -1,0 +1,57 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Memory Lab · 실험실</title>
+  <link rel="stylesheet" href="live.css">
+  <script defer src="live.js"></script>
+</head>
+<body class="lab">
+  <header class="mast"><div class="mast-inner">
+    <b class="wordmark">Memory Lab</b>
+    <nav class="chapters" aria-label="실험 종류">
+      <button data-mode="compare" aria-current="step">전략 비교</button>
+      <button data-mode="ablation">Ablation 실험</button>
+    </nav>
+  </div></header>
+  <main class="studio">
+    <header class="intro"><h1 id="title">네 가지 기억 전략 비교</h1>
+      <p id="intro">동일한 요청과 예산에서 각 전략이 남긴 기억과 첫 행동을 비교합니다.</p>
+    </header>
+    <div class="setup">
+      <section class="scenario-panel">
+        <b class="catalog-label">Main 벤치마크 시나리오</b>
+        <details id="catalog">
+          <summary id="catalog-path">시나리오 선택</summary>
+          <div id="scenario-folders"></div>
+        </details>
+        <div class="query-block"><span>사용자 요청</span><h2 id="query">시나리오 불러오는 중…</h2></div>
+        <details><summary>요청 이전의 상태와 제약</summary><div id="history"></div></details>
+      </section>
+      <form id="controls"><h2>실행 설정</h2>
+        <div class="fields"><label>입력 예산 · tokens<select id="budget"><option>1024</option><option selected>2048</option><option>4096</option><option>8192</option></select></label>
+        <label>Horizon · 턴<input id="horizon" type="number" min="1" step="1" required value="50" list="horizon-presets" title="중요 기억과 사용자 요청 사이의 턴 수"></label>
+        <datalist id="horizon-presets"><option value="10"></option><option value="50"></option><option value="100"></option></datalist>
+        <label>행동 판단<select id="planner"><option value="rules">규칙 기반</option><option value="gemini">Gemini API</option></select></label></div>
+        <p class="runtime"><span id="planner-info">규칙 기반 Planner · 추정 토큰 수</span><br>단어 빈도 해시 벡터 · 모의 파일 및 이메일 도구</p>
+        <button id="run" disabled><span aria-hidden="true">▷</span> 실험 실행</button>
+        <div class="cache-actions">
+          <button type="button" id="clear-cache">실험 결과 캐시 전체 삭제</button>
+          <span id="cache-status" role="status"></span>
+        </div>
+      </form>
+    </div>
+    <div id="connection" hidden><p id="connection-message"></p><a href="http://127.0.0.1:4174/">실험 서버에서 열기 ↗</a>
+      <button type="button" id="retry">목록 다시 불러오기</button><p>프로젝트 루트에서 <code>python -m ui.memory-lab.server</code>를 실행하세요.</p>
+    </div>
+    <section id="comparison-board" hidden>
+    <header class="board-heading"><h2>실행 비교</h2><span id="progress" role="status"></span></header>
+    <div class="table-scroll"><table class="overview"><thead><tr><th>전략 · 조건</th><th>선택한 기억</th><th>첫 도구 호출 · 파일</th><th>과제 평가</th></tr></thead><tbody id="overview"></tbody></table></div>
+    <details id="run-details" hidden>
+      <summary>조건별 판단 과정 보기</summary>
+      <section id="results" aria-label="조건별 실행 상세"></section>
+    </details>
+    </section>
+  </main>
+</body></html>
