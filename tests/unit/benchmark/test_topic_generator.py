@@ -389,7 +389,7 @@ class TopicGeneratorTests(unittest.TestCase):
                     self.assertEqual(saved["scenarios"], payload["cells"][0]["scenarios"])
 
     def test_live_smoke_selection_covers_topics_and_stays_paired(self):
-        from tests.manual.smoke_4k8k import select_smoke_scenarios
+        from tests.archived.smoke_4k8k import select_smoke_scenarios
 
         options = config()
         options["grid"]["context_token_budget"] = [4096, 8192]
