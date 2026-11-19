@@ -153,4 +153,6 @@ result = pack_task_criticality(
 
 [2026-11-18 v2.1 평가 보고서](../experiments/reports/side-effect-idempotency-recovery-2026-11-18.md)는 이 기능을 `clean_on`과 `fault_on`에 켜고 독립 synthetic Holdout 79개에서 복구 실험을 수행했다. Main raw log에서 성공 이메일을 재발송하려던 action 1건과 smoke에서 1건이 차단됐으며 중복 성공 발송은 없었다. 원 결과의 `summary.json` 집계기는 row 필드의 `side_effect_duplicate_bloacks` 오타를 놓쳐 0으로 집계한다. 이 한 차단 사례는 일반적인 차단율이나 외부 서비스의 exactly-once 보장을 입증하지 않는다.
 
+[2026-11-19 성공 후 중복 재생 평가](../experiments/reports/post-success-duplicate-replay-2026-11-19.md)는 첫 이메일 발송 성공 뒤 동일한 action을 결정적으로 다시 제안하도록 구성했다. 실행별 idempotency ON은 Holdout의 승인 이메일 40쌍 모두에서 두 번째 발송을 막았고 OFF는 40건을 실행했다. read-only 파일 조회 대조군은 ON에서 39쌍 중 오차단이 없었다. 이 결과는 해당 mock Tool·synthetic Holdout에서의 제어된 중복 재생 결과이며, 앞선 오류 복구 비교와 분리해 해석한다.
+
 현재 side-effect 목록과 run-local key 규칙은 [`pipeline/side_effect_idempotency.py`](../../pipeline/side_effect_idempotency.py), Gate 연결 지점은 [`pipeline/experimental_safety_gate.py`](../../pipeline/experimental_safety_gate.py)에서 확인한다. 이 기능은 실험 adapter의 opt-in 경로이며 기본 Proposed 실행이나 실제 외부 Tool에 대한 보장으로 해석하지 않는다.

@@ -4,7 +4,7 @@
 `benchmark/evaluator.py`는 전달받은 Scenario/실행 snapshot의 deterministic 평가,
 JSONL 출력, sample 단위 bootstrap 집계와 paired ΔSuccess를 구현한다.
 실험 설정은 `experiments/configs/`에 있으며 Generator, Runner와 실제 Gemini Planner가
-연결되어 있다. 2026-11-09 Main 12셀 결과의 고정 기준은 freeze 1.0.3과 공통 출력 상한 2048 token이며, 이후 후속 실험은 각 절에 기록한 freeze와 설정을 따른다. 2026-11-18 최신 Task Criticality 실행 제어 평가는 freeze 1.0.6의 2,048-token budget을 사용했다.
+연결되어 있다. 2026-11-09 Main 12셀 결과의 고정 기준은 freeze 1.0.3과 공통 출력 상한 2048 token이며, 이후 후속 실험은 각 절에 기록한 freeze와 설정을 따른다. 2026-11-19 최신 Task Criticality 실행 제어 평가는 freeze 1.0.6의 2,048-token budget을 사용했다.
 2026-11-09에 완료한 1차 H50·2차 H10의 관측 결과는
 [16절](#16-2026-11-09-실행-현황과-12차-관측-결과)에 별도로 기록한다.
 H100까지 포함한 12셀·3840회의 최종 결과는
@@ -1382,3 +1382,11 @@ Main의 실제 prompt 최댓값은 1,257/2,048 tokens, budget stop은 0건, 비�
 seed 1900–1919의 새 synthetic Holdout 80개 후보에서 최초 제안이 정답인 79개를 오류 주입 비교에 포함했다. Main은 317 runs이며, clean arm 80개 중 하나는 최초 proposal abstention이다. `fault_on`은 변형된 첫 action 79/79를 차단하고 효과·goal 79/79를 회복했다. Gate 없이 Tool 실패 후 한 번 재계획한 arm도 효과·goal 79/79였으나 변형 action 79/79를 먼저 실행했고 approved email 40건에서 실패가 발생했다. 모든 실행은 2,048-token 예산 안에 있었고 budget stop은 0건이었다.
 
 실행별 중복 방지는 `clean_on`과 `fault_on`에서만 켰다. Main raw log는 fault_on 이메일 재시도 1건을 차단하고 중복 성공 발송 0건을 기록한다. smoke 8개에서도 차단 1건이 관측됐다. `summary.json`은 run row의 `side_effect_duplicate_bloacks` 오타 때문에 두 차단을 모두 0으로 집계하므로, 보고서는 raw events를 기준으로 이 산출물 차이를 명시한다. Tool은 mock이며, 독립적인 idempotency 효과나 외부 부작용 보장을 시험한 결과는 아니다. 전체 결과·비용·hash·재현 경로는 [실행별 중복 억제 보고서](../reports/side-effect-idempotency-recovery-2026-11-18.md)를 따른다.
+
+## 37. 성공 후 Side-Effect 중복 재생 (2026-11-19)
+
+Freeze 1.0.6과 고정 2,048-token 예산에서 seed 2100–2119의 synthetic Holdout을 사용했다. 전체 80개 긍정 후보 중 최초 Gemini proposal이 정답인 79개를 paired 비교에 포함했다. 성공한 첫 action을 두 번째 proposal로 그대로 주입하고 idempotency ON/OFF를 비교했다. Main은 158 runs이며, 승인 이메일 40쌍과 파일 조회 대조군 39쌍이다.
+
+ON은 성공 후 반복 이메일 호출 40/40을 Tool 실행 전에 차단했고 초과 발송은 0건이었다. OFF에서는 40건 모두 두 번째 발송이 실행됐다. read-only file lookup 대조군에서는 오차단 0/39였고, 두 arm 모두 goal을 79/79 완료했다. Main runs 158/158은 status ok, budget stop은 0건이며 실제 prompt 최댓값은 1,345/2,048 tokens였다. Gemini API 호출은 198회, 비용 추정은 USD 0.12171이다.
+
+별도 smoke 8개에서도 중복 이메일 4/4 차단과 파일 조회 오차단 0/4를 관측했으며 Main 수치에는 합산하지 않았다. 이 결정적 반복 주입 실험은 mock Tool과 synthetic positive Holdout에 한정되며 자연 중복 발생률이나 외부 서비스 exactly-once 동작을 평가하지 않는다. 표본·CI·해시와 재현 명령은 [성공 후 중복 재생 보고서](../reports/post-success-duplicate-replay-2026-11-19.md)에 기록했다.

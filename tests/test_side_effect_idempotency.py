@@ -415,6 +415,32 @@ class SideEffectIdempotencyTests(unittest.TestCase):
                 agent_factory=Agent,
                 enable_side_effect_idempotency="true",
             )
+            
+            
+    def test_distinct_email_operations_are_not_duplicates(self):
+        """같은 실행의 서로 다른 정상 이메일 2건은 모두 허용."""
+
+        result, executor, _ = run_email(
+            [
+                send(body="첫 번째 보고 메일입니다."),
+                send(body="두 번째 보고 메일입니다."),
+                finish(),
+            ],
+            enabled=True,
+        )
+
+        # 논리적으로 서로 다른 작업이므로 발송 2회가 필요.
+        self.assertEqual(len(executor.email.sent), 2)
+
+        self.assertEqual(
+            [item["body"] for item in executor.email.sent],
+            [
+                "첫 번째 보고 메일입니다.",
+                "두 번째 보고 메일입니다.",
+            ],
+        )
+
+        self.assertTrue(result.pipeline.goal_completed)
 
 
 if __name__ == "__main__":

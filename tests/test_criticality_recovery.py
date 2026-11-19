@@ -146,12 +146,26 @@ class RecoveryTests(unittest.TestCase):
                 "family": "file_lookup",
                 "variant": "S2",
                 "arm": "fault_on",
+
                 "correct_tool_effect": recovered,
                 "goal_completed": recovered,
                 "first_gate_blocked": True,
                 "recovered_effect": recovered,
                 "recovered_goal": recovered,
                 "budget_stopped": False,
+
+                "gate_events": [
+                    {
+                        "outcome": "blocked",
+                        "reason": "tool_argument_not_grounded",
+                        "action": "file.find_file",
+                        "slot": "filename",
+                    }
+                ],
+
+                "side_effect_duplicate_blocks": 0,
+                "duplicate_successful_email_sends": 0,
+
                 "followup_llm_usage": {
                     "api_calls": 1,
                     "estimated_cost_usd": 0.02,
