@@ -9,6 +9,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -348,7 +349,8 @@ class LLMPlanner:
                 except ValueError:
                     return _text("모델 응답을 행동으로 읽지 못했습니다.")
                 
-                return agent_action_from_model_output(payload)
+                action = agent_action_from_model_output(payload)
+                return _fill_missing_attachment(action, context)
             
             raise RuntimeError("LLM retry loop exited unexpectedly")
         
@@ -623,6 +625,51 @@ class LLMRunConfig:
             "retry_base_seconds": self.retry_base_seconds,
             "timeout_ms": self.timeout_ms,
         }
+
+
+_REPORT_FILE = re.compile(r"[\w.-]+\.(?:pdf|docx?|xlsx?|pptx?|hwp|txt|csv|zip)\b", re.I | re.ASCII)
+_REPORT_CANDIDATE = re.compile(r"후보\s+(\d+)\s*=\s*(" + _REPORT_FILE.pattern + ")", re.I | re.ASCII)
+_BLOCKED_ATTACHMENT = re.compile(r"보고서\s+후보\s+(\d+)\s+파일의\s+외부\s+첨부를\s+금지")
+
+
+def _fill_missing_attachment(action: AgentAction, context: str) -> AgentAction:
+    """Resolve omitted email attachments from the same visible sections as the rule planner."""
+    if (action.tool_name != "email" or action.action not in ("request_approval", "send_email")
+            or action.arguments.get("attachment")):
+        return action
+
+    sections = {name: [] for name in ("PROTECTED CONSTRAINTS", "STATE", "CURRENT TASK", "RELEVANT MEMORY")}
+    section = None
+    for raw in context.splitlines():
+        line = raw.strip()
+        if re.fullmatch(r"\[[A-Z][A-Z ]*\]", line):
+            section = sections.get(line[1:-1])
+            continue
+        line = line.removeprefix("- ").strip()
+        if section is not None and line and not re.match(r"^\w+\.\w+ success=(true|false) output=", line):
+            section.append(line)
+
+    blocked = {int(n) for line in sections["PROTECTED CONSTRAINTS"] for n in _BLOCKED_ATTACHMENT.findall(line)}
+    state_and_task = [*sections["STATE"], " ".join(sections["CURRENT TASK"])]
+    for line in state_and_task:
+        if "보고서 파일 후보:" not in line:
+            continue
+        candidates = [(int(n), name) for n, name in _REPORT_CANDIDATE.findall(line)]
+        if not candidates:
+            continue
+        if "표시 순서" not in line:
+            candidates.sort()
+        filename = next((name for n, name in candidates if n not in blocked), None)
+        if filename is None:
+            return _text("제약을 만족하는 첨부 파일 후보가 없습니다.")
+        break
+    else:
+        match = _REPORT_FILE.search("\n".join([*state_and_task, *sections["RELEVANT MEMORY"]]))
+        if match is None:
+            return action
+        filename = match.group()
+
+    return AgentAction(action.tool_name, action.action, {**action.arguments, "attachment": filename}, action.text_response)
 
 
 def agent_action_from_model_output(payload: Any) -> AgentAction:
