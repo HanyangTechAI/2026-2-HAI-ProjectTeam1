@@ -1,0 +1,360 @@
+{
+  "reevaluated_matches": 3840,
+  "llm_executed_runs": 3780,
+  "actual_prompt_budget_exceeded": 0,
+  "counted_budget_exceeded": 0,
+  "live_prompt_audit_incomplete": 0,
+  "final_parse_fallbacks": 2,
+  "api_calls": 8122,
+  "successful_response_calls": 8120,
+  "billing_uncertain_attempts": 2,
+  "known_cost_runs": 3838,
+  "proposed_1k_failed_with_tool_calls": 60,
+  "repeat_pairs": 1920,
+  "repeat_pairs_disagreeing": 0,
+  "n_cells": 12,
+  "n_unique_scenarios": 40,
+  "saved_summaries_matched": 12,
+  "finish_reasons": {
+    "STOP": 8116,
+    "MAX_TOKENS": 4
+  },
+  "maximum_single_prompt_tokens": 3554,
+  "maximum_single_response_tokens_including_thinking": 2033,
+  "known_cost_usd": "7.0756496999999999870",
+  "proposed_1k_failed_pipeline_statuses": {
+    "insufficient_context_budget": 120
+  },
+  "proposed_failures_2k_and_above": [
+    {
+      "sample_id": "topic_balanced_v3_constraint_i5_v2_seed43_approval_002_pending",
+      "failure_types": [
+        "reasoning_action_failure"
+      ],
+      "count": 18
+    },
+    {
+      "sample_id": "topic_balanced_v3_constraint_i9_v4_seed43_approval_018_pending",
+      "failure_types": [
+        "constraint_failure"
+      ],
+      "count": 18
+    }
+  ],
+  "by_cell": {
+    "h10_b1024": {
+      "proposed": {
+        "agent_executed": 60,
+        "input_tokens_total": 91592,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 156878,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 167218,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 164526,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18,
+        "unknown_cost_runs": 1
+      }
+    },
+    "h10_b2048": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 259082,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 256974,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 260490,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 257414,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h10_b4096": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 387774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 391566,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 380330,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 376774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h10_b8192": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 387774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 391566,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 380330,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 376774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h50_b1024": {
+      "proposed": {
+        "agent_executed": 60,
+        "input_tokens_total": 91592,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 164300,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 20
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 167218,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 164526,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      }
+    },
+    "h50_b2048": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 259082,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 317690,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 8
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 260490,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 257414,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h50_b4096": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 387774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 376886,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 380330,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 376774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h50_b8192": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 387774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 376886,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 380330,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 376774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h100_b1024": {
+      "proposed": {
+        "agent_executed": 60,
+        "input_tokens_total": 91592,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 166126,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 167218,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 164526,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 18
+      }
+    },
+    "h100_b2048": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 259082,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 294810,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 6
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 260490,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 257414,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h100_b4096": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 387774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 376882,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 380330,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 376774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      }
+    },
+    "h100_b8192": {
+      "proposed": {
+        "agent_executed": 80,
+        "input_tokens_total": 387774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 2
+      },
+      "sliding_window": {
+        "agent_executed": 80,
+        "input_tokens_total": 376882,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 0
+      },
+      "vector_top_k": {
+        "agent_executed": 80,
+        "input_tokens_total": 380330,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14
+      },
+      "utility_per_token": {
+        "agent_executed": 80,
+        "input_tokens_total": 376774,
+        "constraint_evaluated": 20,
+        "runs_with_any_constraint_violation": 14,
+        "unknown_cost_runs": 1
+      }
+    }
+  }
+}

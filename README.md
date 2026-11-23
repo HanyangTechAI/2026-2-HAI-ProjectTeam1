@@ -19,6 +19,13 @@
 - Full Context 대비 Token 사용량과 비용의 관계 분석
 - 실제 Tool 호출 결과를 통한 행동 수준의 메모리 평가
 
+## 본실험 재실행 결과 (2026-11-20)
+
+Freeze **1.0.6**의 `topic_balanced_v3`에서 12셀·**3,840회**를 완료했다.
+Proposed의 작업 성공률은 H10/H50/H100 모두 1K에서 **50%**, 2K 이상에서 **95%**였다.
+2K에서는 Proposed가 네 전략 중 가장 높았고, 4K·8K에서는 Sliding Window가 **97.5~100%**였다.
+[최종 분석 보고서](docs/experiments/reports/main-final-analysis-2026-11-20.md) · [집계 및 재현성 자료](docs/results/main_20261120/README.md)
+
 ## 본실험 결과 (2026-11-09)
 
 Freeze **1.0.3**으로 Horizon **10/50/100 × 입력 Budget 1K/2K/4K/8K**의

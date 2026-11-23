@@ -1390,3 +1390,9 @@ Freeze 1.0.6과 고정 2,048-token 예산에서 seed 2100–2119의 synthetic Ho
 ON은 성공 후 반복 이메일 호출 40/40을 Tool 실행 전에 차단했고 초과 발송은 0건이었다. OFF에서는 40건 모두 두 번째 발송이 실행됐다. read-only file lookup 대조군에서는 오차단 0/39였고, 두 arm 모두 goal을 79/79 완료했다. Main runs 158/158은 status ok, budget stop은 0건이며 실제 prompt 최댓값은 1,345/2,048 tokens였다. Gemini API 호출은 198회, 비용 추정은 USD 0.12171이다.
 
 별도 smoke 8개에서도 중복 이메일 4/4 차단과 파일 조회 오차단 0/4를 관측했으며 Main 수치에는 합산하지 않았다. 이 결정적 반복 주입 실험은 mock Tool과 synthetic positive Holdout에 한정되며 자연 중복 발생률이나 외부 서비스 exactly-once 동작을 평가하지 않는다. 표본·CI·해시와 재현 명령은 [성공 후 중복 재생 보고서](../reports/post-success-duplicate-replay-2026-11-19.md)에 기록했다.
+
+## 38. Main 12셀 재실행 최종 결과 (2026-11-20)
+
+Freeze 1.0.6과 `topic_balanced_v3`로 H10/H50/H100 × 1K/2K/4K/8K의 12셀, 3,840회를 모두 완료했다. 40개 기본 과제를 셀마다 네 전략으로 두 번씩 실행했다. 저장 평가 3,840개와 집계 12개는 정규 평가기 재계산과 일치했다.
+
+Proposed의 작업 성공률은 세 Horizon에서 1K 50%, 2K 이상 95%였다. 2K에서 Sliding Window보다 45.0~55.0%p 높았다. 4K·8K에서는 Sliding Window가 97.5~100%였다. Proposed의 1K 실패는 입력 예산 부족에 집중됐으며, 2K 이상 실패는 같은 두 승인 과제의 첨부 인자 누락과 금지 후보 승인 요청으로 반복됐다. 전체 비교, 신뢰구간과 실행 진단은 [최종 분석 보고서](../reports/main-final-analysis-2026-11-20.md) 및 [결과 아카이브](../../results/main_20261120/README.md)에 기록했다.
