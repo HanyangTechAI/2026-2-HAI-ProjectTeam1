@@ -19,9 +19,11 @@ from benchmark.runner import (
     FROZEN_ALGORITHM_SHA256,
     FROZEN_EMBEDDER,
     FROZEN_EMBEDDING_MODEL,
+    FROZEN_PLANNER_BEHAVIOR_SHA256,
     _config_strategy_plan,
     _load_runner_config,
     _require_executable_config,
+    _planner_behavior_sha256,
     _validate_configured_scenario_profile,
     main,
     run_scenarios,
@@ -124,6 +126,12 @@ class FreezeConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "dataset.scenario_profile"):
                 _load_runner_config(path)
             config["freeze"]["version"] = "1.0.4"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "freeze.version"):
+                _load_runner_config(path)
+            config["freeze"]["version"] = "1.0.6"
+            config["dataset"]["scenario_profile"] = "topic_balanced_v3"
+            config["dataset"]["topics"] = ["constraint", "temporal", "state", "flexible"]
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "freeze.version"):
                 _load_runner_config(path)
@@ -250,6 +258,14 @@ class FreezeConfigTests(unittest.TestCase):
         with patch(
             "benchmark.runner.ACTION_SCHEMA", {"type": "object"},
         ), self.assertRaisesRegex(ValueError, "ACTION_SCHEMA"):
+            _load_runner_config(CONFIGS / "main.json")
+
+        self.assertEqual(_planner_behavior_sha256(), FROZEN_PLANNER_BEHAVIOR_SHA256)
+        changed_hashes = dict(FROZEN_PLANNER_BEHAVIOR_SHA256)
+        changed_hashes["ATTACHMENT_RESOLUTION"] = "0" * 64
+        with patch(
+            "benchmark.runner.FROZEN_PLANNER_BEHAVIOR_SHA256", changed_hashes,
+        ), self.assertRaisesRegex(ValueError, "ATTACHMENT_RESOLUTION"):
             _load_runner_config(CONFIGS / "main.json")
 
     def test_modified_algorithm_specification_is_rejected(self):

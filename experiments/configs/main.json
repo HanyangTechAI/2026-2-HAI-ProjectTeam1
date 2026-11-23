@@ -1,5 +1,5 @@
 {
-  "freeze": {"version": "1.0.6", "kind": "architecture_parameter_freeze"},
+  "freeze": {"version": "1.0.7", "kind": "architecture_parameter_freeze"},
   "scope": "main",
   "status": "executable",
   "executable": true,
@@ -52,5 +52,5 @@
     "delta_group_by": ["context_token_budget", "history_length_tokens", "horizon_turns"]
   },
   "budget_policy": {"scope": "total_input", "mandatory_overflow": "stop_and_log", "full_context": "reference_only_if_over_budget", "request_token_safety_margin": 32},
-  "output_directory": "experiments/results/main_topic_balanced_v3"
+  "output_directory": "experiments/results/main_topic_balanced_v3_v107"
 }

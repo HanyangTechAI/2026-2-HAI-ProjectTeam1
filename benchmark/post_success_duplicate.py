@@ -724,9 +724,9 @@ def main() -> None:
     config = _load_runner_config(args.config)
     _require_executable_config(config)
 
-    if config["freeze"]["version"] != "1.0.6":
+    if config["freeze"]["version"] != "1.0.7":
         raise ValueError(
-            "requires base freeze 1.0.6"
+            "requires base freeze 1.0.7"
         )
 
     if config["scope"] != "ablation":

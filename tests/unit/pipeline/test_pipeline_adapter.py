@@ -231,6 +231,10 @@ class PipelineAdapterTests(unittest.TestCase):
                 experiment["action_schema_hash"],
                 FROZEN_PLANNER_BEHAVIOR_SHA256["ACTION_SCHEMA"],
             )
+            self.assertEqual(
+                experiment["attachment_resolution_hash"],
+                FROZEN_PLANNER_BEHAVIOR_SHA256["ATTACHMENT_RESOLUTION"],
+            )
             for row in rows:
                 run = row["run_result"]
                 self.assertTrue(row["evaluation"]["task_success"])

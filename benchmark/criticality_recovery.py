@@ -1004,9 +1004,9 @@ def main():
     config = _load_runner_config(args.config)
     _require_executable_config(config)
 
-    if config["freeze"]["version"] not in ("1.0.5", "1.0.6"):
+    if config["freeze"]["version"] not in ("1.0.5", "1.0.7"):
         raise ValueError(
-            "Recovery experiment requires freeze 1.0.5 or 1.0.6"
+            "Recovery experiment requires freeze 1.0.5 or 1.0.7"
         )
         
     if config["scope"] != "ablation":

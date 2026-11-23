@@ -892,6 +892,8 @@ context/builder.py
 
 `Agent`는 완성된 Context를 Planner에 전달해 한 번에 하나의 행동을 실행하고, 필요하면 Tool을 호출한다. 기본 `agent.planner.Planner`는 결정적 규칙 기반이며, 실험 구성에서 `agent.llm_planner.LLMPlanner`로 교체할 수 있다. 여러 Tool 단계는 Orchestrator가 Context를 다시 구성하며 반복한다.
 
+현재 LLM 경로는 `request_approval` 또는 `send_email` 행동의 `attachment`가 비어 있으면, Context의 `[STATE]`와 `[CURRENT TASK]`에서 표시된 보고서 후보를 읽어 허용된 후보를 인자로 보완한다. 보호 제약에 의해 모든 후보가 금지되면 첨부 없이 진행하는 대신 텍스트 응답으로 멈춘다. 이 보완 로직은 11월 20일 Main 결과를 만든 commit `2c6c740` 이후 `bd5c3a9`에서 추가됐으며, 당시 보고된 결과에는 반영되지 않았다.
+
 예:
 
 ```text
@@ -1388,6 +1390,8 @@ Entity-aware 또는 timestamp 기반 Utility / Temporal Decay
 0/1 Knapsack 기반 core selector
 Full Context 비교 Policy
 ```
+
+`docs/algorithm.md`는 Freeze 1.0.7 patch 후보에서도 기존 체크섬을 유지한 알고리즘 사양이다. 그 안의 Memory Extraction 및 실행 종료 후 자동 Insert pseudocode는 목표 흐름이며 현재 Runtime 구현을 뜻하지 않는다. 현재 구현 범위는 이 절의 목록과 [README 구현 개요](../README.md)를 기준으로 한다. 알고리즘 사양을 수정하면 [Freeze 변경 절차](architecture_parameter_freeze_v1.md#7-change-control)를 따라 hash와 버전을 갱신해야 한다.
 
 후속 확장 후보:
 

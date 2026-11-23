@@ -26,6 +26,10 @@ Proposed의 작업 성공률은 H10/H50/H100 모두 1K에서 **50%**, 2K 이상�
 2K에서는 Proposed가 네 전략 중 가장 높았고, 4K·8K에서는 Sliding Window가 **97.5~100%**였다.
 [최종 분석 보고서](docs/experiments/reports/main-final-analysis-2026-11-20.md) · [집계 및 재현성 자료](docs/results/main_20261120/README.md)
 
+이 실행은 기록된 commit `2c6c740`의 코드로 수행됐다. 이후 `bd5c3a9`에서 LLM Planner가 보이는 Context의 허용된 파일을 이메일 첨부에서 보완하도록 수정했으므로, 그 변경은 위 결과에 포함되지 않는다.
+
+이 동작 수정은 성공 판정에 영향을 줄 수 있어 현재 표준 설정을 Freeze 1.0.7 patch 후보로 올렸다. 새 Freeze는 live gate와 Main 재실행이 끝날 때까지 승인 대기 상태이며, 위의 1.0.6 결과는 그대로 보존한다. [Freeze 상태와 변경 내역](docs/architecture_parameter_freeze_v1.md)
+
 ## 본실험 결과 (2026-11-09)
 
 Freeze **1.0.3**으로 Horizon **10/50/100 × 입력 Budget 1K/2K/4K/8K**의
@@ -151,6 +155,7 @@ subject to Σ C_i × x_i ≤ B_flex,  x_i ∈ {0, 1}
 - `runtime_environment`: Python 구현·버전·실행 파일, OS·machine, `google-genai`·`sentence-transformers`·`transformers`·`huggingface-hub`·`torch` 버전과 embedder 정보를 기록한다. 표준 다국어 embedder는 Hugging Face cache에서 확인한 실제 snapshot revision과 정규화·사전 로드 여부도 남긴다.
 - `request_token_safety_margin`: provider usage와 CountTokens 사이의 작은 차이를 흡수하기 위해 명목 Context Budget에서 미리 빼는 값이다. 기본값은 `0`이며, 설정 또는 `--request-token-safety-margin`으로 지정하면 모든 전략이 동일한 실효 Budget을 사용한다.
 - `prompt_checksums`: 실행에 넘긴 `system_prompt`, `tool_definitions`, LLM의 실제 `system_instruction` 문자열을 각각 UTF-8로 인코딩한 SHA-256. 공백과 개행을 포함하며, `llm_config`가 없으면 `system_instruction`은 `null`이다.
+- `attachment_resolution_hash`: Freeze 1.0.7에서 추가한 LLM 첨부 보완 코드의 체크섬. 패턴, 보완 함수, Planner 호출 지점을 정규화해 해시하며, LLM Planner의 후처리 구현이 달라졌는지 확인한다.
 - `bootstrap_seed`: 집계 신뢰구간 계산에 사용하는 `--seed` 값. `dataset_seeds`는 선택된 시나리오의 `metadata.seed` 목록이며, 각 결과 행의 `dataset_seed`는 해당 시나리오의 값이다. 생성 seed가 없는 입력은 행에 `null`로 기록하고 목록에서는 제외한다. 현재 LLM 요청에는 seed를 전달하지 않는다.
 
 Freeze checksum 대상인 `experiments/prompts/system_v1.txt`, `experiments/prompts/tools_v1.txt`, `docs/algorithm.md`는 `.gitattributes`에서 LF로 고정한다. Runner는 checkout된 원본 바이트의 SHA-256을 검증하므로 Windows와 Linux에서 개행 변환 때문에 같은 freeze가 다르게 판정되지 않는다.
@@ -211,7 +216,7 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 | Turn 60 | “보고서를 `report_final.pdf`로 변경했어.” |
 | Turn 120 | “지난 내용대로 보고서를 보내줘.” |
 
-중간에 관련 없는 대화가 누적되어도 올바른 Agent는 최신 파일을 선택하고 외부 발송 전 승인을 요청해야 한다. Context Budget 2K 등의 조건에서 동일한 Task를 서로 다른 Memory Policy로 실행하고, 선택된 Memory·Token 사용량·Agent Action·제약 위반 여부를 비교하는 Dashboard를 구축할 계획이다.
+중간에 관련 없는 대화가 누적되어도 올바른 Agent는 최신 파일을 선택하고 외부 발송 전 승인을 요청해야 한다. 로컬 [Memory Lab](ui/memory-lab/README.md)에서 사례를 골라 Memory Policy와 Ablation을 비교할 수 있다. 이 UI는 규칙 Planner, 해시 기반 임베딩, provisional Token 계산을 사용하는 데모이므로 Main LLM 실험 결과와 구분한다.
 
 ## 저장소 구조
 
@@ -224,6 +229,7 @@ History Length와 Token Budget의 교차 실험을 통해 두 조건의 복합 �
 ├── agent/               # Agent 실행 및 가상 Tool
 ├── pipeline/            # 선택·Context·Agent 반복 실행과 adapter
 ├── benchmark/           # Baseline 실행, 합성 시나리오 생성과 행동 평가
+├── ui/                  # 로컬 Memory Lab 비교 UI
 ├── experiments/
 │   ├── configs/         # 실험 설정
 │   └── results/         # 실험 결과
@@ -255,8 +261,8 @@ python tests/manual/smoke_4k8k.py report
 ```
 
 `report`는 실행 수와 checkpoint 완결성, 네 전략의 실제 LLM 호출, request-aware
-CountTokens, Prompt Audit·Budget 초과, Safety Margin, embedding revision 및 prompt
-checksum을 검사해 `experiments/results/smoke_4k8k_topic_balanced_v3/smoke_gate_report.json`에
+CountTokens, Prompt Audit·Budget 초과, Safety Margin, embedding revision 및 prompt·Planner
+checksum을 검사해 `experiments/results/smoke_4k8k_topic_balanced_v3_v107/smoke_gate_report.json`에
 `PASS` 또는 `HOLD`를 기록한다. 비용 회계 불완전은 성능 gate와 별도 warning으로
 보고하며, 해당 비용을 0으로 해석하지 않는다.
 
@@ -346,7 +352,7 @@ Freeze 1.0.4 결과와 1.0.5 재실행을 기록했다.
 
 2026-11-19에는 성공한 이메일 action을 같은 run에서 한 번 더 제안하는 중복 재생 평가를 했다. 독립 Holdout의 정답 최초 proposal 79개 중 승인 이메일 40쌍에서 ON은 반복 발송 40/40을 막았고, OFF는 모두 실행했다. 읽기 전용 파일 조회 대조군은 ON에서 오차단이 없었다(0/39). 양쪽 arm 모두 goal 79/79를 완료했지만, 이 결과는 synthetic 데이터와 mock Tool의 run-local 동작이며 실제 외부 서비스의 exactly-once 보장은 아니다. 별도 [보고서](docs/experiments/reports/post-success-duplicate-replay-2026-11-19.md)에 smoke, 비용, 데이터 hash와 한계를 기록했다.
 
-`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 파일 조회와 이메일 행동을 생성한다. 표준 생성 profile은 Freeze 1.0.6의 `topic_balanced_v3`다. 제약·시간·상태·Flexible 근거 주제를 먼저 배정해 Main의 독립 시나리오 40개에서는 주제별 10개씩 생성한다. 다른 표본 수에서도 주제별 개수 차이는 최대 1개다. 각 주제에는 실제 정답에 필요한 정보와 경쟁 조건을 넣으며 실제 LLM ablation 성공률은 별도로 측정한다.
+`benchmark/generator.py`는 `experiments/configs/`의 데이터 grid를 읽어 파일 조회와 이메일 행동을 생성한다. 현재 표준 설정 후보는 Freeze 1.0.7의 `topic_balanced_v3`다. 제약·시간·상태·Flexible 근거 주제를 먼저 배정해 Main의 독립 시나리오 40개에서는 주제별 10개씩 생성한다. 다른 표본 수에서도 주제별 개수 차이는 최대 1개다. 각 주제에는 실제 정답에 필요한 정보와 경쟁 조건을 넣으며 실제 LLM ablation 성공률은 별도로 측정한다.
 
 Budget 간 sample ID와 원본 데이터를 공유하고, History 길이·Horizon·token 기반 Noise 비율을 검증한다. 11월 17일 40개 입력의 주제 비율 사전 점검은 [topic ratio 결과 아카이브](docs/results/topic_ratio_check_20261117/README.md)에 기록했다. Horizon 채움은 반복, 결정적 로컬 자연어, 둘의 혼합, Gemini 자연어, 기존+Gemini 혼합의 다섯 mode 중 하나를 선택하며 mode와 생성 출처를 metadata에 남긴다. 기존 개발용 [smoke 입력 5개](benchmark/generated/smoke/manifest.json)와 [main 입력 480개](benchmark/generated/main.zip)는 이전 profile의 생성물로 보존한다. 새 profile은 Gemini counter로 새 경로에 생성·측정해야 한다. 생성·재측정·실행 방법은 [생성기 사용법](docs/guides/generator-usage.md)을 참고한다.
 
@@ -477,6 +483,6 @@ ZIP은 원래 생성 버전과 해시를 유지해 재사용한다. 상세 기�
 - [실험용 Packing·Task Criticality 사용 가이드](docs/guides/experimental-packing.md)
 - [11월 12일 Pipeline Smoke 점검 — 20회](docs/experiments/audits/pipeline-smoke-2026-11-12.md)
 - [실험 계획과 실행 결과](docs/experiments/plans/experiment-plan.md)
-- [Architecture / Parameter Freeze v1.0.6 + opt-in idempotency snapshot](docs/architecture_parameter_freeze_v1.md)
+- [Architecture / Parameter Freeze v1.0.7 patch candidate + opt-in idempotency snapshot](docs/architecture_parameter_freeze_v1.md)
 - [프로젝트 제안서](docs/research/constraint-preserving-budget-aware-memory.docx)
 - [연구 질문 및 평가 방향](docs/research/research-questions.md)

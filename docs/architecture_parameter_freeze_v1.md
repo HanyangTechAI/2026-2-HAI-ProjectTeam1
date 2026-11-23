@@ -1,10 +1,10 @@
-# Architecture / Parameter Freeze v1.0.6
+# Architecture / Parameter Freeze v1.0.7
 
-- 상태: **FROZEN** (표준 V1.0.6 기준; opt-in 실행 확장은 아래 별도 snapshot으로 고정)
-- 기준일: 2026-11-16 (Asia/Seoul)
+- 상태: **PENDING VALIDATION** (v1.0.7 patch 후보; live gate와 새 Main 재실행 검토 대기)
+- 기준일: 2026-11-23 (Asia/Seoul)
 - 적용 범위: V1 synthetic benchmark의 생성, 실행, 평가
-- 기계 판독 기준: 표준 `experiments/configs/*.json`의 `freeze.version = "1.0.6"`
-- 이전 기준 구현 commit: `fd779e5b14321cc0852da1f60c5ea5070a046cc7`; v1.0.3 변경은 각 실행의 `git_commit`, `git_dirty`, `resume_identity.code`와 함께 추적한다.
+- 기계 판독 기준: 표준 `experiments/configs/*.json`의 `freeze.version = "1.0.7"`
+- v1.0.6 Main 실행은 commit `2c6c74062e39f7442d09d8f45315dd414496123c`의 역사적 결과로 유지한다. 첨부 보완 수정은 이후 commit `bd5c3a9186eac652fbaa28a183fb5616752f6d36`에 추가됐다.
 
 2026-11-18에 추가한 실행별 side-effect idempotency는 표준 Memory 선택·Main 실행 경로에서 기본 비활성인 별도 실험 확장이다. 따라서 기존 `1.0.6` config와 실행물의 freeze identity는 유지하고, 확장 구현의 snapshot은 아래에 따로 고정한다.
 
@@ -132,6 +132,23 @@ LLM 모델·프롬프트·메모리 선택 알고리즘은 유지한다. 주제�
 실제 LLM의 ablation 성공률을 정하지 않는다. 새 입력을 실제 Gemini counter로
 재생성하고 live smoke와 본실험을 다시 수행해야 결과 차이를 판단할 수 있다.
 
+## Patch note - v1.0.7 (validation pending)
+
+2026-11-23, LLM Planner가 `request_approval` 또는 `send_email`의 첨부 인자를 비운 경우
+보이는 Context에서 허용된 파일을 찾아 보완하는 동작을 새 patch freeze로 분리한다.
+후보가 모두 제약에 막히면 Tool Call 대신 텍스트 응답으로 멈춘다. 이 동작은 실제
+Tool 인자와 Action-Level TSR 및 Constraint Violation 측정에 영향을 줄 수 있다.
+
+- Memory selection, 모델, prompt, action schema, tokenizer 및 `topic_balanced_v3` 입력은 유지한다.
+  따라서 입력 내용과 token count는 기존 검증 archive를 재사용할 수 있지만, 1.0.7 실행과
+  결과는 1.0.6과 합치지 않는다.
+- 표준 config는 `freeze.version = "1.0.7"`과 새 `*_v107` 결과 경로를 사용한다.
+  현재 Runner는 1.0.6 config를 받지 않는다. 과거 Main 결과 재현에는 당시 code commit을 사용한다.
+- Runner는 Planner system instruction·action schema 외에 첨부 보완 regex, helper 및
+  LLM Planner 호출 지점의 정규화된 SHA-256도 검증·기록한다.
+- 이 candidate는 전체 unittest, Gemini 4K/8K live gate, 별도 경로의 새 Main 실행 및 결과
+  검토가 끝나기 전까지 승인된 Freeze가 아니다.
+
 ## 1. Frozen architecture
 
 ```text
@@ -219,12 +236,15 @@ Algorithm specification, Prompt 및 Planner behavior checksum도 freeze에 포�
 | `tools_v1.txt` | `cc701a57b9aa951060ccfd28d69e74955e37af1e709ca932e04b96d725e61c3` |
 | `agent.llm_planner:SYSTEM_INSTRUCTION` | `aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f` |
 | `agent.llm_planner:ACTION_SCHEMA` | `634277e47b8b38427623d5d9116289d90d04868a43f4753ed7ab779a750370b9` |
+| `agent.llm_planner:attachment resolution` | `9ef3f39de5d18cbf3becf0f1fe05363fe5a360136abda153f4eb1d4bce9553c2` |
 
 `SYSTEM_INSTRUCTION`은 UTF-8 문자열 바이트를 직접 해시한다. `ACTION_SCHEMA`는
 `json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))`로
 정규화한 UTF-8 JSON 바이트를 해시한다. 실행 시 두 값은 `experiment.json`의
 `planner_rules_hash`와 `action_schema_hash`에 각각 기록한다. `docs/algorithm.md`는 파일의
 원본 바이트를 해시하며 실행 시 `experiment.json`의 `algorithm_hash`에 기록한다.
+첨부 보완 해시는 regex pattern/flags, `_fill_missing_attachment`와 `LLMPlanner.plan`의
+정규화된 source를 같은 정렬 JSON 규칙으로 묶어 계산하며 `attachment_resolution_hash`에 기록한다.
 파일 기반 freeze 대상인 `system_v1.txt`, `tools_v1.txt`, `docs/algorithm.md`는
 `.gitattributes`에서 `text eol=lf`로 고정한다. 따라서 Runner의 원본 바이트 SHA-256
 검증은 Windows와 Linux checkout에서 같은 LF 바이트를 기준으로 한다.
@@ -445,10 +465,16 @@ Freeze 항목 변경 절차는 다음과 같다.
 버그 수정이 결과를 바꿀 수 있으면 parameter 값이 같아도 새 patch freeze로 취급한다.
 로깅·문서·성능 최적화처럼 결과 의미를 바꾸지 않는 수정만 V1.0 안에서 허용한다.
 
+### v1.0.7 validation status — 2026-11-23
+
+- `python -m unittest discover -s tests -v`: **PASS**, 513 tests; 1 live Gemini test skipped and 1 expected failure.
+- Gemini 4K/8K live gate: **HOLD**. The environment has no `GEMINI_API_KEY` and the verified `benchmark/generated/main_topic_balanced_v3.zip` input archive is absent. The v1.0.7 gate entry point is `tests/manual/smoke_4k8k.py` and writes to a new `_v107` output directory.
+- A new v1.0.7 Main run has not been performed. The published 2026-11-20 Main results remain Freeze 1.0.6 and must not be attributed to the patch candidate.
+
 ## 8. Opt-in execution extension snapshot — Run-scoped Side-Effect Idempotency
 
 - Snapshot date: 2026-11-18 (Asia/Seoul)
-- Core architecture/config freeze: V1.0.6; all standard config files remain at `freeze.version = "1.0.6"`.
+- Core architecture/config freeze at this snapshot date: V1.0.6; then-standard config files used `freeze.version = "1.0.6"`.
 - Code snapshot: commit `1091a7f491a80dcc087b51a359dc552e42996f02` (`feat: Run-scoped Side-Effect Idempotency`); tracked source at that commit was clean.
 - Scope: `CriticalityGatedAdapter` only, enabled by explicit `enable_side_effect_idempotency=True`; recovery runner opt-in is `--side-effect-idempotency`. Default remains disabled.
 - Enabled recovery arms: `clean_on`, `fault_on`; `fault_off` and `fault_off_retry` remain disabled.

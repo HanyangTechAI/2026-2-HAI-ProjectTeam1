@@ -4,7 +4,7 @@
 
 기존 [`benchmark/scenarios.json`](../../benchmark/scenarios.json)의 S01~S39는 모듈 경계와 예외 정책을 검사하는 최소 fixture로 유지한다. 긴 이력을 사용하는 실험 데이터와 그 fixture의 용도는 다르다. 기존 fixture 설명은 [scenarios-usage.md](scenarios-usage.md)를 참고한다.
 
-## Freeze 1.0.6: 정보 주제별 균형 생성
+## Freeze 1.0.7 후보: 정보 주제별 균형 생성
 
 현재 기본 profile은 `topic_balanced_v3`다. `dataset.topics`에서 선택한 정보 주제를
 공통 배분 계획으로 나누며 기본 목록은 `constraint`, `temporal`, `state`, `flexible`이다.
@@ -26,7 +26,7 @@ python -m benchmark.generator --config experiments/configs/main.json --gemini-to
 
 새 기본 생성 경로와 실험 결과 경로는 `_topic_balanced_v3`로 분리한다. 표준 Runner는
 입력 profile 및 `metadata.primary_topic`이 config의 profile/선택 주제와 맞는지 API 호출
-전에 검사한다. 현재 config는 freeze `1.0.6`이며 과거 freeze `1.0.5`+`balanced_v2`
+전에 검사한다. 현재 표준 config는 freeze `1.0.7` 후보이며 live gate 승인 대기 중이다. 과거 freeze `1.0.5`+`balanced_v2`
 config도 명시적으로 읽을 수 있다. 두 버전의 profile을 바꾸어 붙여 재사용하지 않는다.
 `legacy_v1`과 `balanced_v2` 생성 API는 보존한다. 기존 ZIP, 집계 및 checkpoint는
 그대로 두고 새 입력은 실제 실험 counter로 재생성·측정해 새 결과 경로에서 실행한다.

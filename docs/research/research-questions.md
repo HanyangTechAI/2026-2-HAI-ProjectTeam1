@@ -6,6 +6,12 @@
 
 제안 구조는 Protected Memory, Version-Aware State Resolution, 남은 예산에 따른 Flexible Memory 선택으로 구성된다. 본 연구에서는 동일한 기억 공간에서 제안 방식이 기존 Memory 방식보다 실제 작업을 더 정확하게 수행하는지 확인하고, Context Token Budget 감소와 Horizon 증가와 같은 어려운 조건에서도 이러한 장점이 유지되는지를 검증한다. 성능 개선은 검증할 가설이며 실험 결과로 전제하지 않는다.
 
+## Main 평가 현황
+
+2026-11-20 Main 재실험은 Freeze 1.0.6의 합성 Tool 행동 벤치마크에서 12셀·3,840회를 완료했다. Proposed는 1K에서 50%, 2K에서 95%였고, 2K에서는 네 전략 중 가장 높았지만 4K·8K에서는 Sliding Window가 97.5~100%로 앞섰다. Proposed의 성공률은 H10/H50/H100에서 같아, 이 실험에서는 Horizon 증가에 따른 일관된 성능 하락이 관측되지 않았다. 결과와 범위·한계는 [최종 분석 보고서](../experiments/reports/main-final-analysis-2026-11-20.md)를 참조한다.
+
+이 현황은 RQ의 가설을 결과에 맞춰 바꾸지 않는다. 보고된 실행은 기록된 commit `2c6c740`을 기준으로 하며, 이후 Planner 첨부 보완 수정은 해당 결과에 포함되지 않았다.
+
 ## RQ1. 동일한 Token Budget에서의 작업 성공률
 
 **동일하게 제한된 Context Token Budget에서, 제약과 현재 Task에 필요한 상태를 우선 보존하는 Proposed 방식은 최근 대화만 유지하거나 Query와 유사한 정보를 검색하는 기존 방식보다 Agent의 실제 작업 성공률을 높이는가?**

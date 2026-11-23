@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import importlib
 import importlib.metadata as importlib_metadata
+import inspect
 import platform
 import json
 import subprocess
@@ -31,7 +32,16 @@ from typing import Any
 
 from agent.agent import Agent
 from agent.evaluation import scenario_with_granted_approvals
-from agent.llm_planner import ACTION_SCHEMA, LLMRunConfig, SYSTEM_INSTRUCTION
+from agent.llm_planner import (
+    ACTION_SCHEMA,
+    LLMPlanner,
+    LLMRunConfig,
+    SYSTEM_INSTRUCTION,
+    _BLOCKED_ATTACHMENT,
+    _REPORT_CANDIDATE,
+    _REPORT_FILE,
+    _fill_missing_attachment,
+)
 
 from context.tokenizer import (
     GeminiTokenCounter, TARGET_GEMINI_MODEL, TokenCounter, count_tokens,
@@ -53,10 +63,10 @@ from .experiment_settings import EXPERIMENT_EMBEDDER_SPEC, EXPERIMENT_EMBEDDING_
 STRATEGIES = ("sliding_window", "vector_top_k", "utility_per_token", "proposed")
 EnvironmentAgentFactory = Callable[[dict[str, Any]], Agent]
 
-FREEZE_VERSION = "1.0.6"
+FREEZE_VERSION = "1.0.7"
 FREEZE_SCENARIO_PROFILES = {
     "1.0.5": "balanced_v2",
-    "1.0.6": "topic_balanced_v3",
+    "1.0.7": "topic_balanced_v3",
 }
 FROZEN_TOPICS = ("constraint", "temporal", "state", "flexible")
 FROZEN_MODEL = "gemini-3.1-flash-lite"
@@ -77,6 +87,7 @@ FROZEN_PROMPT_SHA256 = {
 FROZEN_PLANNER_BEHAVIOR_SHA256 = {
     "SYSTEM_INSTRUCTION": "aff1c564d3d2c2d9aa28e1af91cf722c00588db88bad54d276bb4c0cdab6307f",
     "ACTION_SCHEMA": "634277e47b8b38427623d5d9116289d90d04868a43f4753ed7ab779a750370b9",
+    "ATTACHMENT_RESOLUTION": "9ef3f39de5d18cbf3becf0f1fe05363fe5a360136abda153f4eb1d4bce9553c2",
 }
 EXECUTABLE_STATUS = "executable"
 NON_EXECUTABLE_STATUSES = frozenset({"generation_only", "deferred"})
@@ -172,7 +183,32 @@ def _planner_behavior_sha256() -> dict[str, str]:
             SYSTEM_INSTRUCTION.encode("utf-8")
         ).hexdigest(),
         "ACTION_SCHEMA": hashlib.sha256(action_schema).hexdigest(),
+        "ATTACHMENT_RESOLUTION": _attachment_resolution_sha256(),
     }
+
+
+def _attachment_resolution_sha256() -> str:
+    """Hash the LLM attachment-repair code and the call that activates it."""
+    def source(function: Callable[..., Any]) -> str:
+        return inspect.getsource(function).replace("\r\n", "\n").replace("\r", "\n")
+
+    behavior = {
+        "patterns": {
+            "report_file": [_REPORT_FILE.pattern, _REPORT_FILE.flags],
+            "report_candidate": [_REPORT_CANDIDATE.pattern, _REPORT_CANDIDATE.flags],
+            "blocked_attachment": [_BLOCKED_ATTACHMENT.pattern, _BLOCKED_ATTACHMENT.flags],
+        },
+        "helper_source": source(_fill_missing_attachment),
+        "planner_call_source": source(LLMPlanner.plan),
+    }
+    payload = json.dumps(
+        behavior,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _environment_snapshot(scenario: Mapping[str, Any]) -> dict[str, Any]:
@@ -1104,6 +1140,7 @@ def run_scenarios(
         "algorithm_hash": _algorithm_spec_sha256(),
         "planner_rules_hash": planner_behavior_hashes["SYSTEM_INSTRUCTION"],
         "action_schema_hash": planner_behavior_hashes["ACTION_SCHEMA"],
+        "attachment_resolution_hash": planner_behavior_hashes["ATTACHMENT_RESOLUTION"],
         "llm": None if llm_config is None else llm_config.to_dict(),
         "config": None if config_metadata is None else _json_record(config_metadata),
         "cli_overrides": {} if cli_overrides is None else _json_record(cli_overrides),
