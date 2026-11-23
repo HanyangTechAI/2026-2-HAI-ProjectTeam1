@@ -14,6 +14,10 @@
 
 - [1K·2K Token Budget Preflight](token-budget-preflight-2026-11-08.md) — safety margin 0·32 조건의 128회 실행을 정리한다.
 
+## Main 재실행 결과 · 2026-11-20
+
+- [전체 Main 분석](main-final-analysis-2026-11-20.md) — Freeze 1.0.6, `topic_balanced_v3`, 12셀·3,840회.
+
 ## Main 결과 · 2026-11-09
 
 - [전체 Main 분석](main-final-analysis-2026-11-09.md)
